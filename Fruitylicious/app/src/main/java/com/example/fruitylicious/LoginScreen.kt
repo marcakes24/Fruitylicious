@@ -1,5 +1,6 @@
 package com.example.fruitylicious
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,10 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -22,8 +22,6 @@ import androidx.compose.ui.unit.sp
 
 // --- Color Palette ---
 val GreenDark = Color(0xFF2E7D32)
-val GreenMedium = Color(0xFF4CAF50)
-val RedAccent = Color(0xFFE53935)
 val CreamYellow = Color(0xFFF5E6A3)
 val InputGray = Color(0xFFF0F0F0)
 val TextDark = Color(0xFF333333)
@@ -47,33 +45,15 @@ fun FruityliciousLoginScreen() {
                 .padding(top = 56.dp, bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Oval Logo Badge
-            Box(
+            // Logo image — place logo.png / logo.webp in res/drawable/
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Fruitylicious Logo",
                 modifier = Modifier
                     .width(180.dp)
-                    .height(88.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Fruitylicious",
-                        color = GreenMedium,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
-                        fontStyle = FontStyle.Italic
-                    )
-                    Text(
-                        text = "FRUITS AND SHAKES STATION",
-                        color = RedAccent,
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
+                    .height(90.dp)
+                    .rotate(-10f)   // slight counter-clockwise tilt, matching the reference
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -118,8 +98,7 @@ fun FruityliciousLoginScreen() {
                     Text(
                         text = "Username",
                         color = TextDark,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal
+                        fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     TextField(
@@ -153,8 +132,7 @@ fun FruityliciousLoginScreen() {
                     Text(
                         text = "Password",
                         color = TextDark,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal
+                        fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     TextField(
