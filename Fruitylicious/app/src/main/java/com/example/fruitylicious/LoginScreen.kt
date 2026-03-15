@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.navigation.NavController
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,7 @@ val HintGray = Color(0xFFAAAAAA)
 val FooterGray = Color(0xFF888888)
 
 @Composable
-fun FruityliciousLoginScreen() {
+fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -165,7 +166,7 @@ fun FruityliciousLoginScreen() {
 
                     // Log In Button
                     Button(
-                        onClick = {},
+                        onClick = { navController.navigate("home") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -195,8 +196,8 @@ fun FruityliciousLoginScreen() {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun LoginScreenPreview() {
-    FruityliciousLoginScreen()
-}
+//@Preview(showBackground = true, showSystemUi = true)
+//@Composable
+//fun LoginScreenPreview() {
+//    FruityliciousLoginScreen()
+//}

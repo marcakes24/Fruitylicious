@@ -1,7 +1,7 @@
-com.example.fruitylicious.app-pngs-0 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\build\generated\res\pngs\debug
-com.example.fruitylicious.app-updated_navigation_xml-1 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\build\generated\updated_navigation_xml\debug
-com.example.fruitylicious.app-packageDebugResources-2 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
-com.example.fruitylicious.app-packageDebugResources-3 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
-com.example.fruitylicious.app-debug-4 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\build\intermediates\merged_res\debug\mergeDebugResources
-com.example.fruitylicious.app-debug-5 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\src\debug\res
-com.example.fruitylicious.app-main-6 C:\Users\axelp\AndroidStudioProjects\Fruitylicious\Fruitylicious\app\src\main\res
+com.example.fruitylicious.app-pngs-0 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\build\generated\res\pngs\debug
+com.example.fruitylicious.app-updated_navigation_xml-1 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\build\generated\updated_navigation_xml\debug
+com.example.fruitylicious.app-packageDebugResources-2 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.fruitylicious.app-packageDebugResources-3 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.fruitylicious.app-debug-4 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\build\intermediates\merged_res\debug\mergeDebugResources
+com.example.fruitylicious.app-debug-5 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\src\debug\res
+com.example.fruitylicious.app-main-6 C:\Users\Mark\Documents\Fruit\Fruitylicious\Fruitylicious\app\src\main\res

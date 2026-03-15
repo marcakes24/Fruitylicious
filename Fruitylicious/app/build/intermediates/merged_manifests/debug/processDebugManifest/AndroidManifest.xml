@@ -28,7 +28,7 @@
         android:testOnly="true"
         android:theme="@style/Theme.Fruitylicious" >
         <activity
-            android:name="com.example.fruitylicious.DashboardActivity"
+            android:name="com.example.fruitylicious.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Fruitylicious" >
@@ -38,9 +38,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name="com.example.fruitylicious.MainActivity"
-            android:exported="true" />
         <activity
             android:name="androidx.compose.ui.tooling.PreviewActivity"
             android:exported="true" />

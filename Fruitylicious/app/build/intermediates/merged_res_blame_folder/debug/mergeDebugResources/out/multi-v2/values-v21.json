@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.fruitylicious.app-mergeDebugResources-43:/values-v21/values-v21.xml",
+            "outputFile": "com.example.fruitylicious.app-mergeDebugResources-49:/values-v21/values-v21.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\axelp\\.gradle\\caches\\9.3.1\\transforms\\4b1457325be455ca411b3ec71ffd5e58\\workspace\\transformed\\core-1.13.1\\res\\values-v21\\values-v21.xml",
+                    "source": "C:\\Users\\Mark\\.gradle\\caches\\9.3.1\\transforms\\4b1457325be455ca411b3ec71ffd5e58\\workspace\\transformed\\core-1.13.1\\res\\values-v21\\values-v21.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,13",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4",

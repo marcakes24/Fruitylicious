@@ -23,17 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import androidx.navigation.NavController
 
-class DashboardActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            MyDashboard()
-        }
-    }
-}
 @Composable
-fun MyDashboard() {
+fun MyDashboard(navController: NavController) {  // ← add this
     Column(
         modifier = Modifier
             .fillMaxSize()
