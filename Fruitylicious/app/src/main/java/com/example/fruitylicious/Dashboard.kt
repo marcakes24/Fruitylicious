@@ -24,29 +24,48 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 
 @Composable
-fun MyDashboard(navController: NavController) {  // ← add this
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFFFEAA0))
-            .verticalScroll(rememberScrollState())
-    ) {
-        HeaderSection()
+fun MyDashboard(navController: NavController) {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
-            StatCardGrid()
-            Spacer(modifier = Modifier.height(14.dp))
-            WeeklyChartCard()
-            Spacer(modifier = Modifier.height(14.dp))
-            BestSellingCard()
-            Spacer(modifier = Modifier.height(16.dp))
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            SideBarContent()
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFFFEAA0))
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Pass the toggle action to the header
+            HeaderSection(onMenuClick = {
+                scope.launch { drawerState.open() }
+            })
+
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
+                StatCardGrid()
+                Spacer(modifier = Modifier.height(14.dp))
+                WeeklyChartCard()
+                Spacer(modifier = Modifier.height(14.dp))
+                BestSellingCard()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
 @Composable
-fun HeaderSection() {
+fun HeaderSection(onMenuClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -58,8 +77,11 @@ fun HeaderSection() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            //3 white line
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            // Hamburger menu — tapping opens sidebar
+            Column(
+                modifier = Modifier.clickable { onMenuClick() },
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
                 repeat(3) {
                     Box(
                         modifier = Modifier
