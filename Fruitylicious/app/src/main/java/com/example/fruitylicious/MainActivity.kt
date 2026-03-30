@@ -34,5 +34,13 @@ fun AppNavigation() {
         composable("home") {
             MyDashboard(navController)
         }
+        composable("stocks_report") {
+            StocksReportScreen(navController)
+        }
+        composable("stock_alerts") {
+            StockAlerts(navController)
+        }
+
+
     }
 }

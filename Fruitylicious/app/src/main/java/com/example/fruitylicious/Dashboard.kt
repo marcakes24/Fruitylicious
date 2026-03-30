@@ -39,7 +39,7 @@ fun MyDashboard(navController: NavController) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            SideBarContent()
+            SideBarContent(navController)
         }
     ) {
         Column(
