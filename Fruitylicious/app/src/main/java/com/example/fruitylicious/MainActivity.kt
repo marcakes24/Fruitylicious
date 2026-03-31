@@ -40,7 +40,9 @@ fun AppNavigation() {
         composable("stock_alerts") {
             StockAlerts(navController)
         }
-
+        composable("inventory") {
+            InventoryScreen(navController)
+        }
 
     }
 }

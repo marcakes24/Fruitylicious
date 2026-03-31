@@ -89,7 +89,7 @@ fun SideBarContent(navController: NavController) { // Addition: Accept navContro
 
         // ── Nav Items ──────────────────────────────────────────
         val menuItems = listOf(
-            "🏪" to "Inventory" to "",
+            "🏪" to "Inventory" to "inventory",
             "📊" to "Dashboard" to "home",
             "🧾" to "Purchased Orders" to "",
             "🚚" to "Suppliers" to "",
