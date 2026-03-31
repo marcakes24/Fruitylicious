@@ -93,7 +93,7 @@ fun SideBarContent(navController: NavController) { // Addition: Accept navContro
             "📊" to "Dashboard" to "home",
             "🧾" to "Purchased Orders" to "",
             "🚚" to "Suppliers" to "",
-            "📋" to "Stocks Reports" to "stocks_report",
+            "📋" to "Stocks Reports" to "stocks_report_main",
             "🔔" to "Alerts" to "stock_alerts",
             "🔄" to "Movements" to "",
             "⚙️" to "Settings" to ""
