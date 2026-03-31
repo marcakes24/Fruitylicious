@@ -1,6 +1,7 @@
 package com.example.fruitylicious
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable // Addition: Added clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,9 +13,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController // Addition: Added NavController import
 
 @Composable
-fun SideBarContent() {
+fun SideBarContent(navController: NavController) { // Addition: Accept navController
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -71,7 +73,7 @@ fun SideBarContent() {
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-        Divider(color = Color.White.copy(alpha = 0.2f))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.2f)) // Addition: Updated to Material3 HorizontalDivider
         Spacer(modifier = Modifier.height(16.dp))
 
         // ── Access Here Label ──────────────────────────────────
@@ -87,24 +89,37 @@ fun SideBarContent() {
 
         // ── Nav Items ──────────────────────────────────────────
         val menuItems = listOf(
-            "🏪" to "Inventory",
-            "📊" to "Dashboard",
-            "🧾" to "Purchased Orders",
-            "🚚" to "Suppliers",
-            "📋" to "Stocks Reports",
-            "🔔" to "Alerts",
-            "🔄" to "Movements",
-            "⚙️" to "Settings"
+            "🏪" to "Inventory" to "",
+            "📊" to "Dashboard" to "home",
+            "🧾" to "Purchased Orders" to "",
+            "🚚" to "Suppliers" to "",
+            "📋" to "Stocks Reports" to "stocks_report",
+            "🔔" to "Alerts" to "stock_alerts",
+            "🔄" to "Movements" to "",
+            "⚙️" to "Settings" to ""
         )
 
-        menuItems.forEach { (emoji, label) ->
-            SideBarItem(emoji = emoji, label = label)
+        menuItems.forEach { (data, route) ->
+            val (emoji, label) = data
+            SideBarItem(
+                emoji = emoji,
+                label = label,
+                onClick = {
+                    if (route.isNotEmpty()) {
+                        navController.navigate(route) {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
         // ── Footer ─────────────────────────────────────────────
-        Divider(color = Color.White.copy(alpha = 0.2f))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "All rights reserved 2025",
@@ -115,10 +130,11 @@ fun SideBarContent() {
 }
 
 @Composable
-fun SideBarItem(emoji: String, label: String) {
+fun SideBarItem(emoji: String, label: String, onClick: () -> Unit = {}) { // Addition: Added onClick
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() } // Addition: Made clickable
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
