@@ -1,8 +1,5 @@
 package com.example.fruitylicious
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,37 +27,34 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.DrawerState
+import kotlinx.coroutines.CoroutineScope
 
 @Composable
-fun MyDashboard(navController: NavController) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+fun MyDashboard(
+    navController: NavController,
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            SideBarContent(navController)
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFFEAA0))
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFFFEAA0))
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Pass the toggle action to the header
-            HeaderSection(onMenuClick = {
-                scope.launch { drawerState.open() }
-            })
+        // Pass the toggle action to the header
+        HeaderSection(onMenuClick = {
+            scope.launch { drawerState.open() }
+        })
 
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
-                StatCardGrid()
-                Spacer(modifier = Modifier.height(14.dp))
-                WeeklyChartCard()
-                Spacer(modifier = Modifier.height(14.dp))
-                BestSellingCard()
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)) {
+            StatCardGrid()
+            Spacer(modifier = Modifier.height(14.dp))
+            WeeklyChartCard()
+            Spacer(modifier = Modifier.height(14.dp))
+            BestSellingCard()
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

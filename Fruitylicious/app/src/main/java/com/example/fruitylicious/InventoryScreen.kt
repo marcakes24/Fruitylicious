@@ -1,5 +1,7 @@
 package com.example.fruitylicious
 
+import androidx.compose.material3.DrawerState
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -81,173 +81,169 @@ val filterTabs = listOf("All", "Fruits", "Utensils", "Add Ons", "Syrup", "Milk")
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun InventoryScreen(navController : NavController) {
+fun InventoryScreen(
+    navController: NavController,
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
     var selectedTab by remember { mutableStateOf("Fruits") }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     val filtered = if (selectedTab == "All") sampleInventory
     else sampleInventory.filter { it.category == selectedTab }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            SideBarContent(navController)
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFFEAA0))
+            .verticalScroll(rememberScrollState())
     ) {
+
+        // ── Green Header ─────────────────────────────────────────────────────
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFFFEAA0))
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
+                .background(Color(0xFF2E7D32))
+                .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 24.dp)
         ) {
-
-            // ── Green Header ─────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF2E7D32))
-                    .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 24.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Hamburger
+                Column(
+                    modifier = Modifier.clickable { scope.launch { drawerState.open() } },
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    // Hamburger
-                    Column(
-                        modifier = Modifier.clickable { scope.launch { drawerState.open() } },
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        repeat(3) {
-                            Box(
-                                modifier = Modifier
-                                    .width(22.dp)
-                                    .height(2.dp)
-                                    .background(Color.White, RoundedCornerShape(1.dp))
-                            )
-                        }
-                    }
-                    // Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color(0xFFC62828), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "E1",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                    repeat(3) {
+                        Box(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .height(2.dp)
+                                .background(Color.White, RoundedCornerShape(1.dp))
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "Inventory",
-                    color = Color.White,
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "12 products • Just updated",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.sp
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // ── Stat Cards Row ────────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(Color(0xFFC62828), CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    MiniStatCard(
-                        label = "PRODUCTS", value = "12", emoji = "📦",
-                        bg = Color(0xFFFFA000), modifier = Modifier.weight(1f)
-                    )
-                    MiniStatCard(
-                        label = "STOCK UNITS", value = "4.5K", emoji = "📊",
-                        bg = Color(0xFF388E3C), modifier = Modifier.weight(1f)
-                    )
-                    MiniStatCard(
-                        label = "VALUE", value = "₱4K", emoji = "💰",
-                        bg = Color(0xFF43A047), modifier = Modifier.weight(1f)
-                    )
-                    MiniStatCard(
-                        label = "LOW STOCKS", value = "5", emoji = "⚠️",
-                        bg = Color(0xFFC62828), modifier = Modifier.weight(1f)
+                    Text(
+                        "E1",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // ── Filter Tabs ───────────────────────────────────────────────────────
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Inventory",
+                color = Color.White,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "12 products • Just updated",
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 13.sp
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Stat Cards Row ────────────────────────────────────────────
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFFFEAA0))
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                filterTabs.forEach { tab ->
-                    val selected = tab == selectedTab
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                if (selected) Color(0xFF2E7D32) else Color.White
-                            )
-                            .clickable { selectedTab = tab }
-                            .padding(horizontal = 16.dp, vertical = 7.dp)
-                    ) {
-                        Text(
-                            text = tab,
-                            color = if (selected) Color.White else Color(0xFF555555),
-                            fontSize = 13.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-
-            // ── Product List ──────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                Text(
-                    text = "ALL PRODUCTS",
-                    color = Color(0xFFA07840),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(bottom = 10.dp)
+                MiniStatCard(
+                    label = "PRODUCTS", value = "12", emoji = "📦",
+                    bg = Color(0xFFFFA000), modifier = Modifier.weight(1f)
                 )
-
-                filtered.forEach { item ->
-                    InventoryRow(item = item)
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                Spacer(modifier = Modifier.height(80.dp))
+                MiniStatCard(
+                    label = "STOCK UNITS", value = "4.5K", emoji = "📊",
+                    bg = Color(0xFF388E3C), modifier = Modifier.weight(1f)
+                )
+                MiniStatCard(
+                    label = "VALUE", value = "₱4K", emoji = "💰",
+                    bg = Color(0xFF43A047), modifier = Modifier.weight(1f)
+                )
+                MiniStatCard(
+                    label = "LOW STOCKS", value = "5", emoji = "⚠️",
+                    bg = Color(0xFFC62828), modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        // ── FAB ───────────────────────────────────────────────────────────────────
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(24.dp)
-                    .size(52.dp)
-                    .background(Color(0xFFFFA000), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("+", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        // ── Filter Tabs ───────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFFFEAA0))
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filterTabs.forEach { tab ->
+                val selected = tab == selectedTab
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (selected) Color(0xFF2E7D32) else Color.White
+                        )
+                        .clickable { selectedTab = tab }
+                        .padding(horizontal = 16.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = tab,
+                        color = if (selected) Color.White else Color(0xFF555555),
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
+        }
+
+        // ── Product List ──────────────────────────────────────────────────────
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            Text(
+                text = "ALL PRODUCTS",
+                color = Color(0xFFA07840),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+
+            filtered.forEach { item ->
+                InventoryRow(item = item)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+
+    // ── FAB ───────────────────────────────────────────────────────────────────
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(24.dp)
+                .size(52.dp)
+                .background(Color(0xFFFFA000), CircleShape)
+                .clickable { navController.navigate("add_stocks") },  // ← just add this
+            contentAlignment = Alignment.Center
+        ) {
+            Text("+", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

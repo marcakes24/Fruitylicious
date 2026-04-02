@@ -1,5 +1,6 @@
 package com.example.fruitylicious
 
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable // Addition: Added clickable
 import androidx.compose.foundation.layout.*
@@ -14,9 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController // Addition: Added NavController import
+import kotlinx.coroutines.CoroutineScope
 
 @Composable
-fun SideBarContent(navController: NavController) { // Addition: Accept navController
+fun SideBarContent(navController: NavController, drawerState: DrawerState, scope: CoroutineScope) { // Addition: Accept navController
     Column(
         modifier = Modifier
             .fillMaxHeight()
@@ -92,10 +94,10 @@ fun SideBarContent(navController: NavController) { // Addition: Accept navContro
             "🏪" to "Inventory" to "inventory",
             "📊" to "Dashboard" to "home",
             "🧾" to "Purchased Orders" to "",
-            "🚚" to "Suppliers" to "",
+            "🚚" to "Suppliers" to "suppliers",
             "📋" to "Stocks Reports" to "stocks_report_main",
             "🔔" to "Alerts" to "stock_alerts",
-            "🔄" to "Movements" to "",
+            "🔄" to "Movements" to "movements",
             "⚙️" to "Settings" to ""
         )
 
@@ -106,6 +108,7 @@ fun SideBarContent(navController: NavController) { // Addition: Accept navContro
                 label = label,
                 onClick = {
                     if (route.isNotEmpty()) {
+                        scope.launch { drawerState.close() }  // ← add this
                         navController.navigate(route) {
                             popUpTo("home") { saveState = true }
                             launchSingleTop = true

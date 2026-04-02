@@ -1,5 +1,7 @@
 package com.example.fruitylicious
 
+import androidx.compose.material3.DrawerState
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,135 +44,132 @@ val sampleOrders = listOf(
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 @Composable
-fun PurchasedOrdersScreen(navController: NavController) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+fun PurchasedOrdersScreen(
+    navController: NavController,
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = { SideBarContent(navController,) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFFEAA0))
+            .verticalScroll(rememberScrollState())
     ) {
+
+        // ── Green Header ──────────────────────────────────────────────
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFFFEAA0))
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
+                .background(Color(0xFF2E7D32))
+                .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 28.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Hamburger
+                Column(
+                    modifier = Modifier.clickable { scope.launch { drawerState.open() } },
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    repeat(3) {
+                        Box(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .height(2.dp)
+                                .background(Color.White, RoundedCornerShape(1.dp))
+                        )
+                    }
+                }
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(Color(0xFFC62828), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("E1", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Purchased Orders",
+                color = Color.White,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "3 ongoing • 12 completed",
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 13.sp
+            )
+        }
+
+        // ── Body ──────────────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
 
-            // ── Green Header ──────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF2E7D32))
-                    .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 28.dp)
+            // ── Tab Row ───────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Complete Orders",
+                    color = Color(0xFF2E7D32),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                // Filter icon (3 lines with dots)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    // Hamburger
-                    Column(
-                        modifier = Modifier.clickable { scope.launch { drawerState.open() } },
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        repeat(3) {
+                    repeat(3) { i ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .width(22.dp)
+                                    .width(if (i == 1) 14.dp else 20.dp)
                                     .height(2.dp)
-                                    .background(Color.White, RoundedCornerShape(1.dp))
+                                    .background(Color(0xFF555555), RoundedCornerShape(1.dp))
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF555555))
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(if (i == 1) 6.dp else 4.dp)
+                                    .height(2.dp)
+                                    .background(Color(0xFF555555), RoundedCornerShape(1.dp))
                             )
                         }
                     }
-                    // Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color(0xFFC62828), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("E1", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
                 }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "Purchased Orders",
-                    color = Color.White,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "3 ongoing • 12 completed",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.sp
-                )
             }
 
-            // ── Body ──────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-            ) {
+            Spacer(modifier = Modifier.height(14.dp))
 
-                // ── Tab Row ───────────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Complete Orders",
-                        color = Color(0xFF2E7D32),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    // Filter icon (3 lines with dots)
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        repeat(3) { i ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(if (i == 1) 14.dp else 20.dp)
-                                        .height(2.dp)
-                                        .background(Color(0xFF555555), RoundedCornerShape(1.dp))
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(5.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF555555))
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .width(if (i == 1) 6.dp else 4.dp)
-                                        .height(2.dp)
-                                        .background(Color(0xFF555555), RoundedCornerShape(1.dp))
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // ── Order Cards ───────────────────────────────────────────
-                sampleOrders.forEach { order ->
-                    OrderCard(order = order)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+            // ── Order Cards ───────────────────────────────────────────
+            sampleOrders.forEach { order ->
+                OrderCard(order = order)
+                Spacer(modifier = Modifier.height(12.dp))
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

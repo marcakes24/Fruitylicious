@@ -1,5 +1,7 @@
 package com.example.fruitylicious
 
+import androidx.compose.material3.DrawerState
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,53 +22,48 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 
 @Composable
-fun StocksReportScreen(navController: NavController) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+fun StocksReportScreen(
+    navController: NavController,
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            SideBarContent(navController)
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFFEAA0))
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFFFEAA0))
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Reusing header
-            ReportsHeader(onMenuClick = {
-                scope.launch { drawerState.open() }
-            })
+        // Reusing header
+        ReportsHeader(onMenuClick = {
+            scope.launch { drawerState.open() }
+        })
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                // Time Filter Tabs
-                TimeFilterTabs()
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            // Time Filter Tabs
+            TimeFilterTabs()
 
-                Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-                ReportChartCard(
-                    title = "TURNOVER",
-                    data = listOf(
-                        "Mon" to 85, "Tue" to 15, "Wed" to 45,
-                        "Thu" to 30, "Fri" to 80, "Sat" to 75, "Sun" to 85
-                    )
+            ReportChartCard(
+                title = "TURNOVER",
+                data = listOf(
+                    "Mon" to 85, "Tue" to 15, "Wed" to 45,
+                    "Thu" to 30, "Fri" to 80, "Sat" to 75, "Sun" to 85
                 )
+            )
 
-                Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-                ReportChartCard(
-                    title = "NET CHANGE",
-                    data = listOf(
-                        "Mon" to 60, "Tue" to 45, "Wed" to 70,
-                        "Thu" to 35, "Fri" to 65, "Sat" to 80, "Sun" to 65
-                    )
+            ReportChartCard(
+                title = "NET CHANGE",
+                data = listOf(
+                    "Mon" to 60, "Tue" to 45, "Wed" to 70,
+                    "Thu" to 35, "Fri" to 65, "Sat" to 80, "Sun" to 65
                 )
+            )
 
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

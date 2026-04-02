@@ -1,5 +1,7 @@
 package com.example.fruitylicious
 
+import androidx.compose.material3.DrawerState
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,68 +22,65 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 
 @Composable
-fun StockAlerts(navController: NavController) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+fun StockAlerts(
+    navController: NavController,
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = { SideBarContent(navController) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFFEAA0))
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFFFEAA0))
-                .verticalScroll(rememberScrollState())
-        ) {
-            AlertsHeader(onMenuClick = { scope.launch { drawerState.open() } })
+        AlertsHeader(onMenuClick = { scope.launch { drawerState.open() } })
 
-            Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
 
-                WarningBanner(count = 3)
+            WarningBanner(count = 3)
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                // Alert Cards
-                AlertItemCard(
-                    emoji = "🥭",
-                    name = "Mango",
-                    sku = "SKU-0041 - Mangoes",
-                    current = 12f,
-                    min = 50f,
-                    status = "Critical",
-                    statusColor = Color(0xFFFFEBEE),
-                    textColor = Color(0xFFC62828)
-                )
+            // Alert Cards
+            AlertItemCard(
+                emoji = "🥭",
+                name = "Mango",
+                sku = "SKU-0041 - Mangoes",
+                current = 12f,
+                min = 50f,
+                status = "Critical",
+                statusColor = Color(0xFFFFEBEE),
+                textColor = Color(0xFFC62828)
+            )
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                AlertItemCard(
-                    emoji = "🍉",
-                    name = "Watermelon",
-                    sku = "SKU-0018 - Melons",
-                    current = 8f,
-                    min = 40f, // Estimated max for progress bar
-                    status = "Critical",
-                    statusColor = Color(0xFFFFEBEE),
-                    textColor = Color(0xFFC62828)
-                )
+            AlertItemCard(
+                emoji = "🍉",
+                name = "Watermelon",
+                sku = "SKU-0018 - Melons",
+                current = 8f,
+                min = 40f, // Estimated max for progress bar
+                status = "Critical",
+                statusColor = Color(0xFFFFEBEE),
+                textColor = Color(0xFFC62828)
+            )
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                AlertItemCard(
-                    emoji = "🥑",
-                    name = "Avocado",
-                    sku = "SKU-0012 - Avocados",
-                    current = 15f,
-                    min = 30f,
-                    status = "Warning",
-                    statusColor = Color(0xFFFFF3E0),
-                    textColor = Color(0xFFEF6C00)
-                )
+            AlertItemCard(
+                emoji = "🥑",
+                name = "Avocado",
+                sku = "SKU-0012 - Avocados",
+                current = 15f,
+                min = 30f,
+                status = "Warning",
+                statusColor = Color(0xFFFFF3E0),
+                textColor = Color(0xFFEF6C00)
+            )
 
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
