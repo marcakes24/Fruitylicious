@@ -68,6 +68,15 @@ fun AppNavigation() {
         composable("transacHistory") {
             MainScaffold(navController, "transacHistory")
         }
+        composable("pos") {
+            MainScaffold(navController, "pos")
+        }
+        composable("checkout") {
+            MainScaffold(navController, "checkout")
+        }
+        composable("restock") {
+            MainScaffold(navController, "restock")
+        }
     }
 }
 
@@ -98,9 +107,26 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "stock_alerts"      -> NotificationsScreen(drawerState, scope)
 
             "stocks_report_main"-> StocksReportScreenMain(navController, drawerState, scope)
+when (startScreen) {
+            "home"              -> MyDashboard(navController, drawerState, scope)
+            "inventory"         -> InventoryScreen(navController, drawerState, scope)
+            "purchased_orders"  -> PurchasedOrdersScreen(navController, drawerState, scope)
+            "stocks_reports"    -> StocksReportScreen(navController, drawerState, scope)
+            "suppliers"         -> SuppliersScreen(navController, drawerState, scope)
+            
+            // Notification Screen route
+            "stock_alerts"      -> NotificationsScreen(navController, drawerState, scope)
+            
+            "stocks_report_main" -> StocksReportScreenMain(navController, drawerState, scope)
             "movements"         -> MovementsScreen(navController, drawerState, scope)
             "add_stocks"        -> AddStocksScreen(navController, drawerState, scope)
             "transacHistory"    -> TransactionHistoryScreen(navController, drawerState, scope)
+            
+            // New routes from main branch
+            "pos"               -> POSScreen(navController, drawerState, scope)
+            "checkout"          -> CheckoutScreen(navController, drawerState, scope)
+            "restock"           -> RestockScreen(navController, drawerState, scope)
+        }
         }
     }
 }
