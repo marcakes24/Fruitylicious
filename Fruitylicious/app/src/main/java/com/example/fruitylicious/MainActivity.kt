@@ -75,6 +75,9 @@ fun AppNavigation() {
         composable("checkout") {
             MainScaffold(navController, "checkout")
         }
+        composable("restock") {
+            MainScaffold(navController, "restock")
+        }
     }
 }
 
@@ -106,6 +109,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "transacHistory" -> TransactionHistoryScreen(navController, drawerState, scope)
             "pos" -> POSScreen(navController, drawerState, scope)
             "checkout" -> CheckoutScreen(navController, drawerState, scope)
+            "restock" -> RestockScreen(navController, drawerState, scope)
         }
     }
 }
