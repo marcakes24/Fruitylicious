@@ -18,27 +18,42 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineScope
 
+data class SideBarMenuItem(
+    val icon: String,
+    val label: String,
+    val route: String
+)
+
 @Composable
 fun SideBarContent(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
+    val menuItems = listOf(
+        SideBarMenuItem("🖥",  "POS",                  "home"),
+        SideBarMenuItem("🗑",  "Waste Management",     ""),
+        SideBarMenuItem("📦",  "Inventory Adjustment", "inventory"),
+        SideBarMenuItem("🔃",  "Restock",              ""),
+        SideBarMenuItem("📈",  "Sales Summary",        "stocks_report_main"),
+        SideBarMenuItem("🧾",  "Transaction History",  "transacHistory"),
+        SideBarMenuItem("🔔",  "Notification",         "stock_alerts"),
+    )
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(260.dp)
+            .width(270.dp)
             .background(Color(0xFF2E7D32))
     ) {
 
-        // ── Top Section ────────────────────────────────────────
+        // ── Header ────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 32.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 20.dp)
         ) {
-
-            // Hamburger icon
+            // Hamburger
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 repeat(3) {
                     Box(
@@ -52,9 +67,8 @@ fun SideBarContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── User Info ─────────────────────────────────────
+            // User info
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Person icon circle
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -69,7 +83,7 @@ fun SideBarContent(
 
                 Column {
                     Text(
-                        text = "Sean Andrei",
+                        text = "Mariz Tuliao",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
@@ -83,29 +97,17 @@ fun SideBarContent(
             }
         }
 
-        // ── Nav Items ──────────────────────────────────────────
-        val menuItems = listOf(
-            "🏪" to "POS"        to "inventory",
-            "📊" to "Waste Management"        to "home",
-            "🧾" to "Inventory Adjustment" to "",
-            "🚚" to "Restock"        to "suppliers",
-            "📋" to "Sales Summary"   to "stocks_report_main",
-            "🔔" to "Transaction History"           to "stock_alerts",
-            "🔄" to "Notification"        to "movements"
-        )
-
-        menuItems.forEach { (data, route) ->
-            val (emoji, label) = data
-            // Highlight first item as active (POS-style highlight)
-            val isActive = route == "inventory"
+        // ── Menu Items ────────────────────────────────────────
+        menuItems.forEach { item ->
+            val isActive = item.label == "POS"
             SideBarItem(
-                emoji = emoji,
-                label = label,
+                icon = item.icon,
+                label = item.label,
                 isActive = isActive,
                 onClick = {
-                    if (route.isNotEmpty()) {
+                    if (item.route.isNotEmpty()) {
                         scope.launch { drawerState.close() }
-                        navController.navigate(route) {
+                        navController.navigate(item.route) {
                             popUpTo("home") { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -117,10 +119,11 @@ fun SideBarContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // ── Footer ─────────────────────────────────────────────
+        // ── Footer ────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Fix 2 — replace named padding with explicit padding calls
                 .padding(start = 20.dp, end = 20.dp, bottom = 32.dp)
         ) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
@@ -136,7 +139,7 @@ fun SideBarContent(
 
 @Composable
 fun SideBarItem(
-    emoji: String,
+    icon: String,
     label: String,
     isActive: Boolean = false,
     onClick: () -> Unit = {}
@@ -144,28 +147,13 @@ fun SideBarItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                if (isActive) Color(0xFF1B5E20) else Color.Transparent
-            )
+            .background(if (isActive) Color(0xFF1B5E20) else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 20.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Icon in dark circle bg for active, plain for others
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (isActive) Color(0xFF2E7D32) else Color.Transparent
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = emoji, fontSize = 18.sp)
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
+            Text(text = icon, fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = label,
                 color = Color.White,

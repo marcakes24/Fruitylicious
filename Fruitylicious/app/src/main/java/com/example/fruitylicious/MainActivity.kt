@@ -66,6 +66,9 @@ fun AppNavigation() {
         composable("add_stocks") {
             MainScaffold(navController, "add_stocks")
         }
+        composable("transacHistory") {
+            MainScaffold(navController, "transacHistory")
+        }
     }
 }
 
@@ -94,6 +97,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "stocks_report_main"-> StocksReportScreenMain(navController, drawerState, scope)
             "movements" -> MovementsScreen(navController, drawerState, scope)
             "add_stocks" -> AddStocksScreen(navController, drawerState, scope)
+            "transacHistory" -> TransactionHistoryScreen(navController, drawerState, scope)
         }
     }
 }
