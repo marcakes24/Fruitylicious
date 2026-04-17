@@ -73,7 +73,8 @@ fun NotificationsScreen(
                 current = "7 kg",
                 min = "50 kg",
                 status = "Critical",
-                emoji = "🥭"
+                emoji = "🥭",
+                onViewDetails = { navController.navigate("inventory_adjustment") }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -84,7 +85,8 @@ fun NotificationsScreen(
                 current = "12 kg",
                 min = "40 kg",
                 status = "Critical",
-                emoji = "🍉"
+                emoji = "🍉",
+                onViewDetails = { navController.navigate("inventory_adjustment") }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -95,7 +97,8 @@ fun NotificationsScreen(
                 current = "15 kg",
                 min = "N/A",
                 status = "Warning",
-                emoji = "🥑"
+                emoji = "🥑",
+                onViewDetails = { navController.navigate("inventory_adjustment") }
             )
         }
     }
@@ -108,7 +111,8 @@ fun NotificationItem(
     current: String,
     min: String,
     status: String,
-    emoji: String
+    emoji: String,
+    onViewDetails: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -166,7 +170,7 @@ fun NotificationItem(
             )
 
             Button(
-                onClick = { /* Navigate to detailed view */ },
+                onClick = onViewDetails,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                 shape = RoundedCornerShape(8.dp)
