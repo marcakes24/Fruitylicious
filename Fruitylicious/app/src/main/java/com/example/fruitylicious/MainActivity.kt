@@ -56,6 +56,12 @@ fun AppNavigation() {
         composable("notification") {
             MainScaffold(navController, "notification")
         }
+        composable("waste_management") {
+            MainScaffold(navController, "waste_management")
+        }
+        composable("inventory_adjustment") {
+            MainScaffold(navController, "inventory_adjustment")
+        }
     }
 }
 
@@ -83,6 +89,8 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "checkout"          -> CheckoutScreen(navController, drawerState, scope)
             "restock"           -> RestockScreen(navController, drawerState, scope)
             "notification"      -> NotificationsScreen(navController, drawerState, scope)
+            "waste_management"  -> WasteManagementScreen(navController, drawerState, scope)
+            "inventory_adjustment"  -> InventoryAdjustmentScreen(navController, drawerState, scope)
         }
     }
 }
