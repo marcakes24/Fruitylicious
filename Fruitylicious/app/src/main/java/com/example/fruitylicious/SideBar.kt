@@ -35,7 +35,7 @@ fun SideBarContent(
         SideBarMenuItem("🗑",  "Waste Management",     ""),
         SideBarMenuItem("📦",  "Inventory Adjustment", "inventory"),
         SideBarMenuItem("🔃",  "Restock",              "restock"),
-        SideBarMenuItem("📈",  "Sales Summary",        "stocks_report_main"),
+        SideBarMenuItem("📈",  "Sales Summary",        "SalesSummary"),
         SideBarMenuItem("🧾",  "Transaction History",  "transacHistory"),
         SideBarMenuItem("🔔",  "Notification",         "notification"),
     )
