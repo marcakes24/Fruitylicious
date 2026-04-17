@@ -37,7 +37,7 @@ fun SideBarContent(
         SideBarMenuItem("🔃",  "Restock",              "restock"),
         SideBarMenuItem("📈",  "Sales Summary",        "stocks_report_main"),
         SideBarMenuItem("🧾",  "Transaction History",  "transacHistory"),
-        SideBarMenuItem("🔔",  "Notification",         "stock_alerts"),
+        SideBarMenuItem("🔔",  "Notification",         "notification"),
     )
 
     Column(
