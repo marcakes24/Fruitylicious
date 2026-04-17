@@ -31,7 +31,7 @@ fun SideBarContent(
     scope: CoroutineScope
 ) {
     val menuItems = listOf(
-        SideBarMenuItem("🖥",  "POS",                  "home"),
+        SideBarMenuItem("🖥",  "POS",                  "pos"),
         SideBarMenuItem("🗑",  "Waste Management",     ""),
         SideBarMenuItem("📦",  "Inventory Adjustment", "inventory"),
         SideBarMenuItem("🔃",  "Restock",              ""),
