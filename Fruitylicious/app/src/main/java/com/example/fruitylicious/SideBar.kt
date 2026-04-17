@@ -68,7 +68,19 @@ fun SideBarContent(
             Spacer(modifier = Modifier.height(24.dp))
 
             // User info
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        scope.launch { drawerState.close() }
+                        navController.navigate("staff_dashboard") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+            ) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
