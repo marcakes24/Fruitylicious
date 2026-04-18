@@ -65,6 +65,9 @@ fun AppNavigation() {
         composable("inventory_adjustment") {
             MainScaffold(navController, "inventory_adjustment")
         }
+        composable("SalesSummary") {
+            MainScaffold(navController, "SalesSummary")
+        }
     }
 }
 
