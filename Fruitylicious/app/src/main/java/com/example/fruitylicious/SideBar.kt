@@ -32,8 +32,8 @@ fun SideBarContent(
 ) {
     val menuItems = listOf(
         SideBarMenuItem("🖥",  "POS",                  "pos"),
-        SideBarMenuItem("🗑",  "Waste Management",     ""),
-        SideBarMenuItem("📦",  "Inventory Adjustment", "inventory"),
+        SideBarMenuItem("🗑",  "Waste Management",     "waste_management"),
+        SideBarMenuItem("📦",  "Inventory Adjustment", "inventory_adjustment"),
         SideBarMenuItem("🔃",  "Restock",              "restock"),
         SideBarMenuItem("📈",  "Sales Summary",        "SalesSummary"),
         SideBarMenuItem("🧾",  "Transaction History",  "transacHistory"),
