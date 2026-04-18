@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.CoroutineScope
 
 data class SideBarMenuItem(
@@ -24,13 +26,20 @@ data class SideBarMenuItem(
     val route: String
 )
 
+
 @Composable
 fun SideBarContent(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
+    // 1. Observe the current navigation backstack
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    // 2. Extract the current route string
+    val currentRoute = navBackStackEntry?.destination?.route
+
     val menuItems = listOf(
+        SideBarMenuItem("🏠",  "Dashboard",            "home"),
         SideBarMenuItem("🖥",  "POS",                  "pos"),
         SideBarMenuItem("🗑",  "Waste Management",     "waste_management"),
         SideBarMenuItem("📦",  "Inventory Adjustment", "inventory_adjustment"),
@@ -111,19 +120,25 @@ fun SideBarContent(
 
         // ── Menu Items ────────────────────────────────────────
         menuItems.forEach { item ->
-            val isActive = item.label == "POS"
+            // 3. Dynamically set isActive by comparing the current route to the item route
+            val isActive = currentRoute == item.route
+
             SideBarItem(
                 icon = item.icon,
                 label = item.label,
                 isActive = isActive,
                 onClick = {
-                    if (item.route.isNotEmpty()) {
+                    if (item.route.isNotEmpty() && currentRoute != item.route) {
                         scope.launch { drawerState.close() }
                         navController.navigate(item.route) {
+                            // popUpTo avoids building a huge stack of screens
                             popUpTo("home") { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
+                    } else {
+                        // Just close if we are already on that screen
+                        scope.launch { drawerState.close() }
                     }
                 }
             )
