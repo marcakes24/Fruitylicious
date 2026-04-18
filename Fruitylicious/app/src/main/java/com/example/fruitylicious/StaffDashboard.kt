@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -32,51 +33,53 @@ fun StaffDashboardScreen(
     ) {
         StaffHeader(onMenuClick = { scope.launch { drawerState.open() } })
 
-            Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
 
-                // 1. Big POS Button
-                StartSellingCard(navController)
+            // 1. Big POS Button
+            StartSellingCard(navController)
 
-                Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // 2. Quick Actions Section
-                Text(
-                    text = "Quick Actions",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1B5E20)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+            // 2. Quick Actions Section
+            Text(
+                text = "Quick Actions",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-                QuickActionRow(emoji = "🗑", label = "Waste Management", onClick = { /* TODO */ })
+            QuickActionRow(emoji = "🗑", label = "Waste Management", onClick = { /* TODO */ })
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                QuickActionRow(
-                    emoji = "📦",
-                    label = "Inventory Adjustment",
-                    onClick = {
-                        navController.navigate("inventory") {
-                            popUpTo("home") { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+            QuickActionRow(
+                emoji = "📦",
+                label = "Inventory Adjustment",
+                onClick = {
+                    navController.navigate("inventory") {
+                        popUpTo("home") { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                // 3. Sales Summary Preview
-                Text(
-                    text = "Sales Summary Preview",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1B5E20)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                }
+            )
 
-                StaffSalesChart()
-            }
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 3. Sales Summary Preview
+            Text(
+                text = "Sales Summary Preview",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            StaffSalesChart()
         }
     }
+}
 
 @Composable
 fun StaffHeader(onMenuClick: () -> Unit) {
@@ -90,10 +93,10 @@ fun StaffHeader(onMenuClick: () -> Unit) {
         // Hamburger Menu
         Column(
             modifier = Modifier.clickable { onMenuClick() },
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             repeat(3) {
-                Box(modifier = Modifier.width(22.dp).height(2.dp).background(Color.White))
+                Box(modifier = Modifier.width(22.dp).height(1.5.dp).background(Color.White))
             }
         }
 
@@ -101,10 +104,10 @@ fun StaffHeader(onMenuClick: () -> Unit) {
         Text(
             text = "STAFF DASHBOARD",
             modifier = Modifier.fillMaxWidth(),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            textAlign = TextAlign.Center,
             color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.ExtraBold
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -114,34 +117,36 @@ fun StartSellingCard(navController: NavController) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
-            .clickable { navController.navigate("pos"){
-                popUpTo("home") { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            } },
-        color = Color(0xFFFFFF55),
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = 6.dp
+            .height(120.dp)
+            .clickable {
+                navController.navigate("pos") {
+                    popUpTo("home") { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+        color = Color(0xFFFAFF82),
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier.padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "🖥", fontSize = 60.sp)
+            Text(text = "🖥", fontSize = 50.sp)
 
             Spacer(modifier = Modifier.width(20.dp))
 
             Column {
                 Text(
                     text = "Start Selling",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Black,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = Color.Black
                 )
                 Text(
                     text = "Open POS",
-                    fontSize = 18.sp,
+                    fontSize = 14.sp,
                     color = Color.Black.copy(alpha = 0.7f)
                 )
             }
@@ -154,23 +159,23 @@ fun QuickActionRow(emoji: String, label: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
-            .clickable { onClick() }, // Added clickable logic here
-        color = Color(0xFF99FF66), // Bright Green
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = 4.dp
+            .height(70.dp)
+            .clickable { onClick() },
+        color = Color(0xFF7CC444), // Bright Green matching the bars
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = emoji, fontSize = 32.sp)
+            Text(text = emoji, fontSize = 28.sp)
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = label,
-                fontSize = 22.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1B5E20)
+                color = Color.Black
             )
         }
     }
@@ -181,27 +186,88 @@ fun StaffSalesChart() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        shadowElevation = 4.dp
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Reusing your existing BarChart logic with specific colors
-            // Note: Use your existing BarChart component here
-            BarChart(
-                bars = listOf(
-                    "Feb 10" to 60,
-                    "Feb 11" to 80,
-                    "Feb 12" to 30, // Low bar (Red in your image)
-                    "Feb 13" to 95,
-                    "Feb 14" to 45  // Medium bar (Red in your image)
-                ),
-                barColor = Color(0xFF8BC34A), // Default Green
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+                .padding(16.dp)
+        ) {
+            // Grid and Bars
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                // Background Grid Lines
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    repeat(7) { HorizontalDivider(color = Color.Black.copy(alpha = 0.05f), thickness = 1.dp) }
+                }
+
+                // Full-height bar row
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    // Heights matching visual mock for "Sales Summary Preview"
+                    val chartHeights = listOf(60, 80, 40, 95, 45)
+
+                    chartHeights.forEach { value ->
+                        val barColor = if (value < 50) Color(0xFFFF3B30) else Color(0xFF7CC444)
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .fillMaxHeight(value / 100f)
+                                .background(barColor)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // X-Axis Multi-line Labels Bottom Row
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp)
-            )
-
-            // Sub-labels for price/date would go here as per image
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val labelData = listOf(
+                    Pair("Feb 10 , 2026", "12, 300"),
+                    Pair("Feb 11 , 2026", "13, 300"),
+                    Pair("Feb 12 , 2026", "6, 000"),
+                    Pair("Feb 13 , 2026", "14, 300"),
+                    Pair("Feb 14 , 2026", "8, 000")
+                )
+                labelData.forEach { (date, amount) ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(50.dp)
+                    ) {
+                        Text(
+                            text = date,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 9.sp
+                        )
+                        Text(
+                            text = amount,
+                            fontSize = 7.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 9.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
