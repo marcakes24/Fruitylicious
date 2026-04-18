@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.navigation.NavController
 import androidx.compose.ui.Modifier
@@ -30,7 +32,27 @@ val HintGray = Color(0xFFAAAAAA)
 val FooterGray = Color(0xFF888888)
 
 @Composable
-fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
+fun FruityliciousLoginScreen(navController: NavController) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    // Logic function to handle login attempts
+    fun handleLogin() {
+        if (username.isNotBlank() && password.isNotEmpty()) {
+            if(username == "user" && password == "123") {
+                navController.navigate("home")
+            }
+            else if(username == "admin" && password == "admin") {
+                navController.navigate("admin_home")
+            } else {
+                // Here you would typically show a Snackbar or error text in UI
+                println("Login failed: invalid credentials")
+            }
+        } else {
+            println("Login failed: fields are empty")
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -46,14 +68,13 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
                 .padding(top = 56.dp, bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo image — place logo.png / logo.webp in res/drawable/
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Fruitylicious Logo",
                 modifier = Modifier
                     .width(180.dp)
                     .height(90.dp)
-                    .rotate(-10f)   // slight counter-clockwise tilt, matching the reference
+                    .rotate(-10f)
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -83,7 +104,6 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // Login Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -103,8 +123,8 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     TextField(
-                        value = "",
-                        onValueChange = {},
+                        value = username, // Connect to state
+                        onValueChange = { username = it }, // Update state on input
                         placeholder = {
                             Text(
                                 text = "Enter your username here",
@@ -137,8 +157,8 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     TextField(
-                        value = "",
-                        onValueChange = {},
+                        value = password, // Connect to state
+                        onValueChange = { password = it }, // Update state on input
                         placeholder = {
                             Text(
                                 text = "Enter your password here",
@@ -166,7 +186,7 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
 
                     // Log In Button
                     Button(
-                        onClick = { navController.navigate("home") },
+                        onClick = { handleLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -195,9 +215,3 @@ fun FruityliciousLoginScreen(navController: NavController) {  // ← add this
         }
     }
 }
-
-//@Preview(showBackground = true, showSystemUi = true)
-//@Composable
-//fun LoginScreenPreview() {
-//    FruityliciousLoginScreen()
-//}

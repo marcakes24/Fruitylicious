@@ -37,12 +37,9 @@ fun AppNavigation() {
             FruityliciousLoginScreen(navController)
         }
 
-        // ✅ All other screens go through MainScaffold
+        //STAFF
         composable("home") {
             MainScaffold(navController, "home")
-        }
-        composable("staff_dashboard") {
-            MainScaffold(navController, "staff_dashboard")
         }
         composable("transacHistory") {
             MainScaffold(navController, "transacHistory")
@@ -68,6 +65,35 @@ fun AppNavigation() {
         composable("SalesSummary") {
             MainScaffold(navController, "SalesSummary")
         }
+
+        //ADMIN
+        composable("admin_home") {
+            AdminScaffold(navController, "admin_home")
+        }
+        composable("admin_pos") {
+            AdminScaffold(navController, "pos")
+        }
+        composable("admin_transacHistory") {
+            AdminScaffold(navController, "transacHistory")
+        }
+        composable("admin_checkout") {
+            AdminScaffold(navController, "checkout")
+        }
+        composable("admin_restock") {
+            AdminScaffold(navController, "restock")
+        }
+        composable("admin_notification") {
+            AdminScaffold(navController, "notification")
+        }
+        composable("admin_waste_management") {
+            AdminScaffold(navController, "waste_management")
+        }
+        composable("admin_inventory_adjustment") {
+            AdminScaffold(navController, "inventory_adjustment")
+        }
+        composable("admin_SalesSummary") {
+            AdminScaffold(navController, "SalesSummary")
+        }
     }
 }
 
@@ -89,15 +115,43 @@ fun MainScaffold(navController: NavController, startScreen: String) {
         // Here is where the specific screen is loaded based on the Sidebar route
         when (startScreen) {
             "home"              -> StaffDashboardScreen(navController, drawerState, scope)
-            "inventory"         -> InventoryScreen(navController, drawerState, scope)
             "transacHistory"    -> TransactionHistoryScreen(navController, drawerState, scope)
             "pos"               -> POSScreen(navController, drawerState, scope)
             "checkout"          -> CheckoutScreen(navController, drawerState, scope)
             "restock"           -> RestockScreen(navController, drawerState, scope)
             "notification"      -> NotificationsScreen(navController, drawerState, scope)
-            "sales_summary"      -> SalesSummaryScreen(navController, drawerState, scope)
+            "SalesSummary"      -> SalesSummaryScreen(navController, drawerState, scope)
             "waste_management"  -> WasteManagementScreen(navController, drawerState, scope)
             "inventory_adjustment"  -> InventoryAdjustmentScreen(navController, drawerState, scope)
+        }
+    }
+}
+// Add this composable function in MainActivity.kt:
+@Composable
+fun AdminScaffold(navController: NavController, startScreen: String) {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AdminSideBarContent(
+                navController = navController,
+                drawerState = drawerState,
+                scope = scope
+            )
+        }
+    ) {
+        when (startScreen) {
+            "admin_home"           -> AdminDashboardScreen(navController, drawerState, scope)
+            "pos"               -> POSScreen(navController, drawerState, scope)
+            "checkout"          -> CheckoutScreen(navController, drawerState, scope)
+            "restock"           -> RestockScreen(navController, drawerState, scope)
+            "notification"      -> NotificationsScreen(navController, drawerState, scope)
+            "SalesSummary"      -> SalesSummaryScreen(navController, drawerState, scope)
+            "waste_management"  -> WasteManagementScreen(navController, drawerState, scope)
+            "inventory_adjustment"  -> InventoryAdjustmentScreen(navController, drawerState, scope)
+            "transacHistory"    -> TransactionHistoryScreen(navController, drawerState, scope)
         }
     }
 }
