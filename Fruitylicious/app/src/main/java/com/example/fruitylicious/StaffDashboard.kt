@@ -49,7 +49,7 @@ fun StaffDashboardScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            QuickActionRow(emoji = "🗑", label = "Waste Management", onClick = { /* TODO */ })
+            QuickActionRow(emoji = "🗑", label = "Waste Management", onClick = { navController.navigate("waste_management") })
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -57,7 +57,7 @@ fun StaffDashboardScreen(
                 emoji = "📦",
                 label = "Inventory Adjustment",
                 onClick = {
-                    navController.navigate("inventory") {
+                    navController.navigate("inventory_adjustment") {
                         popUpTo("home") { saveState = true }
                         launchSingleTop = true
                         restoreState = true
@@ -76,7 +76,7 @@ fun StaffDashboardScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            StaffSalesChart()
+            StaffSalesChart(navController)
         }
     }
 }
@@ -182,8 +182,9 @@ fun QuickActionRow(emoji: String, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun StaffSalesChart() {
+fun StaffSalesChart(navController: NavController) {
     Surface(
+        onClick = { navController.navigate("SalesSummary") },
         modifier = Modifier.fillMaxWidth(),
         color = Color.White,
         shape = RoundedCornerShape(8.dp),
