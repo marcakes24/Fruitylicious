@@ -103,7 +103,7 @@ fun AdminDashboardScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            AdminSalesChart()
+            AdminSalesChart(navController)
 
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -224,8 +224,9 @@ fun DashboardTile(
 }
 
 @Composable
-fun AdminSalesChart() {
+fun AdminSalesChart(navController: NavController) {
     Surface(
+        onClick = { navController.navigate("SalesSummary") },
         modifier = Modifier.fillMaxWidth(),
         color = Color.White,
         shape = RoundedCornerShape(8.dp),
