@@ -10,6 +10,8 @@ kotlin = "2.2.10"
 composeBom = "2024.09.00"
 material3 = "1.4.0"
 foundation = "1.10.6"
+room = "2.8.4"
+ksp  = "2.2.10-2.0.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,8 +30,11 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+room-runtime  = { group = "androidx.room", name = "room-runtime",  version.ref = "room" }
+room-ktx      = { group = "androidx.room", name = "room-ktx",      version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler",  version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
