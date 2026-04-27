@@ -49,6 +49,9 @@ data class WasteLogEntity(
     @ColumnInfo(name = "quantity")
     val quantity: Double,
 
+    @ColumnInfo(name = "image")
+    val image: ByteArray? = null,
+
     @ColumnInfo(name = "reason")
     val reason: String,
 
@@ -66,4 +69,23 @@ data class WasteLogEntity(
 
     @ColumnInfo(name = "synced_at")
     val syncedAt: Long? = null
-)
+
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as WasteLogEntity
+        if (wasteId != other.wasteId) return false
+        if (image != null) {
+            if (other.image == null) return false
+            if (!image.contentEquals(other.image)) return false
+        } else if (other.image != null) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = wasteId.hashCode()
+        result = 31 * result + (image?.contentHashCode() ?: 0)
+        return result
+    }
+}

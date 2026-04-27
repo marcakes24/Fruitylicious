@@ -24,8 +24,6 @@ interface AuditLogDao {
     @Query("DELETE FROM audit_logs")
     suspend fun deleteAll()
 
-    // ─── Queries ────────────────────────────────────────────────────────────
-
     @Query("SELECT * FROM audit_logs WHERE log_id = :logId")
     suspend fun getById(logId: String): AuditLogEntity?
 
