@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import com.example.fruitylicious.GuestsScreen //
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,12 +33,17 @@ fun AppNavigation() {
         navController = navController,
         startDestination = "login"
     ) {
-        // ✅ Login has no drawer
+        // ✅ Login Screen
         composable("login") {
             FruityliciousLoginScreen(navController)
         }
 
-        //STAFF
+        // ✅ Guest Screen (Added this)
+        composable("guests_screen") {
+            GuestsScreen(navController)
+        }
+
+        // STAFF ROUTES
         composable("home") {
             MainScaffold(navController, "home")
         }
@@ -66,7 +72,7 @@ fun AppNavigation() {
             MainScaffold(navController, "SalesSummary")
         }
 
-        //ADMIN
+        // ADMIN ROUTES
         composable("admin_home") {
             AdminScaffold(navController, "admin_home")
         }
@@ -96,6 +102,8 @@ fun AppNavigation() {
         }
     }
 }
+
+
 
 @Composable
 fun MainScaffold(navController: NavController, startScreen: String) {

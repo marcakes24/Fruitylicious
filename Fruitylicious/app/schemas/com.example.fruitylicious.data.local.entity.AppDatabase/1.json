@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "e57dfd3e14452f74c6d3d77028695ade",
+    "identityHash": "af099b7e7fa37784202013c58ff50a0a",
     "entities": [
       {
         "tableName": "products",
@@ -803,7 +803,7 @@
       },
       {
         "tableName": "waste_logs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`waste_id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `branch_id` TEXT NOT NULL, `quantity` REAL NOT NULL, `reason` TEXT NOT NULL, `date_time` INTEGER NOT NULL, `user_id` TEXT, `last_modified` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `synced_at` INTEGER, PRIMARY KEY(`waste_id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`ingredient_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`branch_id`) REFERENCES `branches`(`branch_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`user_id`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`waste_id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `branch_id` TEXT NOT NULL, `quantity` REAL NOT NULL, `image` BLOB, `reason` TEXT NOT NULL, `date_time` INTEGER NOT NULL, `user_id` TEXT, `last_modified` INTEGER NOT NULL, `is_synced` INTEGER NOT NULL, `synced_at` INTEGER, PRIMARY KEY(`waste_id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`ingredient_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`branch_id`) REFERENCES `branches`(`branch_id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`user_id`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "wasteId",
@@ -828,6 +828,11 @@
             "columnName": "quantity",
             "affinity": "REAL",
             "notNull": true
+          },
+          {
+            "fieldPath": "image",
+            "columnName": "image",
+            "affinity": "BLOB"
           },
           {
             "fieldPath": "reason",
@@ -1262,7 +1267,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e57dfd3e14452f74c6d3d77028695ade')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'af099b7e7fa37784202013c58ff50a0a')"
     ]
   }
 }

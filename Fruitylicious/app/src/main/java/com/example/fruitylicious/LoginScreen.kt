@@ -1,216 +1,237 @@
 package com.example.fruitylicious
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.navigation.NavController
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// --- Color Palette ---
+// --- Final Color Calibration ---
 val GreenDark = Color(0xFF2E7D32)
-val CreamYellow = Color(0xFFF5E6A3)
-val InputGray = Color(0xFFF0F0F0)
-val TextDark = Color(0xFF333333)
-val HintGray = Color(0xFFAAAAAA)
-val FooterGray = Color(0xFF888888)
+val CreamYellow = Color(0xFFFDEB95)
+val InputGray = Color(0xFFF1F1F1)
+val HintGray = Color(0xFFBDBDBD)
+val FooterGray = Color(0xFF757575)
+val BrownText = Color(0xFF5D4037)
+val GoldBorder = Color(0xFFFFD54F)
+
+// --- User Data Model ---
+data class User(
+    val username: String,
+    val password: String,
+    val role: String // "admin" or "staff"
+)
+
+// --- Authentication Repository ---
+object AuthRepository {
+    private val users = listOf(
+        User("admin", "admin", "admin"),
+        User("user", "123", "staff")
+    )
+
+    fun authenticate(username: String, password: String): User? {
+        return users.find { it.username == username && it.password == password }
+    }
+}
 
 @Composable
 fun FruityliciousLoginScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
-    // Logic function to handle login attempts
-    fun handleLogin() {
-        if (username.isNotBlank() && password.isNotEmpty()) {
-            if(username == "user" && password == "123") {
-                navController.navigate("home")
-            }
-            else if(username == "admin" && password == "admin") {
-                navController.navigate("admin_home")
-            } else {
-                // Here you would typically show a Snackbar or error text in UI
-                println("Login failed: invalid credentials")
-            }
-        } else {
-            println("Login failed: fields are empty")
-        }
-    }
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(CreamYellow)
-            .verticalScroll(rememberScrollState())
     ) {
-
-        // ── Green Header ──────────────────────────────────────────
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(GreenDark)
-                .padding(top = 56.dp, bottom = 36.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = "Fruitylicious Logo",
+            // --- Green Header (Background for the overlap) ---
+            Column(
                 modifier = Modifier
-                    .width(180.dp)
-                    .height(90.dp)
-                    .rotate(-10f)
-            )
+                    .fillMaxWidth()
+                    .background(GreenDark)
+                    .padding(top = 50.dp, bottom = 120.dp), // Large bottom padding allows the card to "sit" on top
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Logo",
+                    modifier = Modifier
+                        .width(230.dp)
+                        .height(110.dp)
+                )
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "Welcome Back",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = "Welcome Back",
+                    color = Color.White,
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Manage Fruitylicious Now!",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 15.sp
+                )
+            }
 
-            Text(
-                text = "Manage Fruitylicious Now!",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 14.sp
-            )
-        }
-
-        // ── Cream Body ────────────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CreamYellow)
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
+            // --- The White Card (Identical Spacing) ---
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 25.dp)
+                    .offset(y = (-80).dp), // High negative offset to match your reference exactly
+                shape = RoundedCornerShape(35.dp), // Deeply rounded corners
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 30.dp)
                 ) {
-                    // Username Field
-                    Text(
-                        text = "Username",
-                        color = TextDark,
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Username", color = BrownText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
                     TextField(
-                        value = username, // Connect to state
-                        onValueChange = { username = it }, // Update state on input
-                        placeholder = {
-                            Text(
-                                text = "Enter your username here",
-                                color = HintGray,
-                                fontSize = 14.sp
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        value = username,
+                        onValueChange = { username = it },
+                        placeholder = { Text("Enter your username here", color = HintGray, fontSize = 14.sp) },
+                        modifier = Modifier.fillMaxWidth().height(55.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = InputGray,
                             focusedContainerColor = InputGray,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedTextColor = TextDark,
-                            focusedTextColor = TextDark
+                            focusedIndicatorColor = Color.Transparent
                         ),
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // Password Field
-                    Text(
-                        text = "Password",
-                        color = TextDark,
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Password", color = BrownText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
                     TextField(
-                        value = password, // Connect to state
-                        onValueChange = { password = it }, // Update state on input
-                        placeholder = {
-                            Text(
-                                text = "Enter your password here",
-                                color = HintGray,
-                                fontSize = 14.sp
-                            )
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = { Text("Enter your password here", color = HintGray, fontSize = 14.sp) },
+                        modifier = Modifier.fillMaxWidth().height(55.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = null, tint = HintGray)
+                            }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        visualTransformation = PasswordVisualTransformation(),
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = InputGray,
                             focusedContainerColor = InputGray,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedTextColor = TextDark,
-                            focusedTextColor = TextDark
+                            focusedIndicatorColor = Color.Transparent
                         ),
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(30.dp))
 
-                    // Log In Button
                     Button(
-                        onClick = { handleLogin() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        onClick = {
+                            val user = AuthRepository.authenticate(username, password)
+                            if (user != null) {
+                                // Navigate based on role
+                                val route = if (user.role == "admin") "admin_home" else "home"
+                                navController.navigate(route) {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                                errorMessage = ""
+                            } else {
+                                errorMessage = "Invalid username or password"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(55.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
                     ) {
+                        Text("Log In", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Error message display
+                    if (errorMessage.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Log In",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                            text = errorMessage,
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth()
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // "or" line
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = InputGray)
+                        Text(" or ", color = HintGray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp))
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = InputGray)
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Continue as Guest button
+                    OutlinedButton(
+                        onClick = { navController.navigate("guests_screen") },
+                        modifier = Modifier.fillMaxWidth().height(55.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, GoldBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BrownText)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Continue as Guest", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Footer
+            // --- Bottom Spacer & Footer ---
             Text(
                 text = "All rights reserved 2026.",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp)
+                    .offset(y = (-40).dp), // Adjust footer position relative to card offset
                 color = FooterGray,
                 fontSize = 12.sp,
-                textAlign = TextAlign.Center
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
