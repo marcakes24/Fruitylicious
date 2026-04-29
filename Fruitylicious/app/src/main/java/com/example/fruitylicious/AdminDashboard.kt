@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.ceil
 
 // ── Brand colors (Renamed to avoid conflicts) ────────────────────────────────
 private val DashGreenPrimary = Color(0xFF2C8C44)
@@ -347,7 +348,7 @@ private fun QuickActionsSection(navController: NavController) {
             modifier   = Modifier.padding(bottom = 10.dp)
         )
 
-        // 2 × 2 grid
+        // 2 × 2 grid - wala pa tong mga route
         val actions = listOf(
             Triple(Icons.Outlined.Inventory2,  "Products",    ""),
             Triple(Icons.Outlined.SetMeal,     "Ingredients", ""),
@@ -453,7 +454,7 @@ private fun SalesChartSection(weeklySales: List<Float>, totalAmount: Double) {
                 
                 // Dynamically scale Y-axis based on data
                 val maxSales = (weeklySales.maxOrNull() ?: 0f).coerceAtLeast(100f)
-                val roundedMax = (Math.ceil(maxSales / 100.0) * 100).toInt()
+                val roundedMax = (ceil(maxSales / 100.0) * 100).toInt()
                 val yLabels = listOf("P$roundedMax", "P${roundedMax*3/4}", "P${roundedMax/2}", "P${roundedMax/4}", "P0")
 
                 // Y-axis labels + bars

@@ -68,7 +68,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            SideBarContent(navController, drawerState, scope)
+            StaffSideBarContent(navController, drawerState, scope)
         }
     ) {
         when (startScreen) {
