@@ -120,9 +120,9 @@ fun AdminSideBarContent(
             val managementItems = listOf(
                 NavItem(Icons.Outlined.Inventory2,           "Manage Products",       "admin_manage_products"),
                 NavItem(Icons.Outlined.SetMeal,              "Manage Ingredients",    "admin_manage_ingredients"),
-                NavItem(Icons.AutoMirrored.Outlined.MenuBook,"Recipe Management",     ""),
+                NavItem(Icons.AutoMirrored.Outlined.MenuBook,"Recipe Management",     "admin_recipe_management"),
                 NavItem(Icons.Outlined.Group,                "User Management",       "admin_users"),
-                NavItem(Icons.Outlined.Search,               "Inventory Monitoring",  ""),
+                NavItem(Icons.Outlined.Search,               "Inventory Monitoring",  "admin_inventory_monitoring"),
                 NavItem(Icons.Outlined.Tune,                 "Inventory Adjustment",  "admin_inventory_adjustment"),
                 NavItem(Icons.Outlined.Autorenew,            "Restock",               "admin_restock"),
                 NavItem(Icons.Outlined.DeleteOutline,        "Waste Management",      "admin_waste_management")

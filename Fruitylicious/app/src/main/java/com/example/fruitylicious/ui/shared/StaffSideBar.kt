@@ -100,7 +100,7 @@ fun StaffSideBarContent(
                 StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", "queue_screen"), // Route added
                 StaffNavItem(Icons.Outlined.BarChart, "Sales Summary", "SalesSummary"),
                 StaffNavItem(Icons.Outlined.AccessTime, "Time Log", "time_log"),
-                StaffNavItem(Icons.Outlined.Search, "Inventory Monitoring", ""),
+                StaffNavItem(Icons.Outlined.Search, "Inventory Monitoring", "inventory_monitoring"),
                 StaffNavItem(Icons.Outlined.Notifications, "Notifications", "notification")
             )
 // ... rest of code remains same
@@ -122,7 +122,7 @@ fun StaffSideBarContent(
             StaffSidebarSectionHeader("Management")
             val managementItems = listOf(
                 StaffNavItem(Icons.Outlined.Autorenew,   "Restock",              ""),
-                StaffNavItem(Icons.Outlined.DeleteOutline,"Waste Management",    "")
+                StaffNavItem(Icons.Outlined.DeleteOutline,"Waste Management",    "waste_management")
             )
             managementItems.forEach { item ->
                 StaffSidebarNavItem(
@@ -141,7 +141,7 @@ fun StaffSideBarContent(
             // ── Reports section (staff-limited) ──────────────────────────────
             StaffSidebarSectionHeader("Reports")
             val reportItems = listOf(
-                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "")
+                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "transacHistory")
             )
             reportItems.forEach { item ->
                 StaffSidebarNavItem(

@@ -65,7 +65,8 @@ fun AppNavigation() {
             "checkout",
             "waste_management",
             "queue_screen",
-            "time_log"
+            "time_log",
+            "inventory_monitoring"
         )
 
         staffRoutes.forEach { route ->
@@ -83,7 +84,9 @@ fun AppNavigation() {
             "admin_manage_ingredients",
             "admin_queue",
             "admin_users",
-            "admin_time_log"
+            "admin_time_log",
+            "admin_recipe_management",
+            "admin_inventory_monitoring"
         )
 
         adminRoutes.forEach { route ->
@@ -109,6 +112,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "waste_management" -> WasteManagementScreen(navController, drawerState, scope)
             "queue_screen" -> QueueScreen(navController, drawerState, scope)
             "time_log" -> TimeLogRoute(drawerState, scope)
+            "inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
         }
     }
 }
@@ -133,6 +137,8 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_manage_ingredients" -> ManageIngredientsScreen(drawerState, scope)
             "admin_users" -> UserManagementScreen(navController, drawerState, scope)
             "admin_time_log" -> TimeLogRoute(drawerState, scope)
+            "admin_recipe_management" -> RecipeManagementScreen(navController, drawerState, scope)
+            "admin_inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
         }
     }
 }

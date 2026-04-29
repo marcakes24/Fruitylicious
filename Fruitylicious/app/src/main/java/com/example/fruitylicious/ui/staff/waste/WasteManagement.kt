@@ -2,6 +2,8 @@ package com.example.fruitylicious.ui.staff.waste
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -15,13 +17,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
+import com.example.fruitylicious.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 // ── DATA MODELS ──────────────────────────────────────────────────────────────
 
@@ -30,11 +37,14 @@ data class WasteHistoryItem(
     val staff: String,
     val date: String,
     val time: String,
-    val quantity: String
+    val quantity: String,
+    val branch: String,
+    val imageRes: Int? = null
 )
 
 // ── MAIN SCREEN ─────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WasteManagementScreen(
     navController: NavController,
@@ -46,14 +56,55 @@ fun WasteManagementScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateText by remember { mutableStateOf("") }
+    var selectedBranch by remember { mutableStateOf("All") }
 
-    // Sample data for the waste history list
-    val wasteHistory = listOf(
-        WasteHistoryItem("Avocado", "Staff User", "4/14/2026", "12:38 AM", "- 20 pcs"),
-        WasteHistoryItem("Evap", "Staff User", "4/15/2026", "12:38 AM", "- 12 can"),
-        WasteHistoryItem("Pearl", "Admin User", "4/13/2026", "12:38 AM", "- 10 pack"),
-        WasteHistoryItem("Pearl", "Admin User", "4/13/2026", "12:38 AM", "- 10 pack")
-    )
+    // State list for waste history to make it functional
+    val wasteHistory = remember { 
+        mutableStateListOf(
+            WasteHistoryItem("Avocado", "Staff User", "04/14/2026", "12:38 AM", "- 20 pcs", "B1", R.drawable.avocado),
+            WasteHistoryItem("Evap", "Staff User", "04/15/2026", "12:38 AM", "- 12 can", "B2", R.drawable.evap),
+            WasteHistoryItem("Pearl", "Admin User", "04/13/2026", "12:38 AM", "- 10 pack", "B1", R.drawable.pearl),
+            WasteHistoryItem("Pearl", "Admin User", "04/13/2026", "12:38 AM", "- 10 pack", "B2", R.drawable.pearl)
+        )
+    }
+
+    // Filtered list based on search query, branch, and date
+    val filteredHistory = remember(searchQuery, selectedBranch, selectedDateText, wasteHistory.size) {
+        wasteHistory.filter { item ->
+            val matchesSearch = item.ingredient.contains(searchQuery, ignoreCase = true) || 
+                              item.staff.contains(searchQuery, ignoreCase = true)
+            val matchesBranch = if (selectedBranch == "All") true else item.branch == selectedBranch
+            val matchesDate = if (selectedDateText.isEmpty()) true else item.date == selectedDateText
+            
+            matchesSearch && matchesBranch && matchesDate
+        }.reversed() // Show newest first if we assume they are added at the end
+    }
+
+    // Date Picker State
+    val datePickerState = rememberDatePickerState()
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        selectedDateText = sdf.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    selectedDateText = ""
+                    showDatePicker = false 
+                }) { Text("Clear") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -73,31 +124,52 @@ fun WasteManagementScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // Sidebar Menu Trigger
-                Column(
-                    modifier = Modifier
-                        .clickable { scope.launch { drawerState.open() } }
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(20.dp)
-                                .height(2.dp)
-                                .background(Color.White)
-                        )
-                    }
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Page Title
                 Text(
                     text = "WASTE MANAGEMENT",
                     color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
+
+                // Branch Selector Toggle
+                Surface(
+                    color = Color(0xFF1B5E20),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("B1", "B2", "All").forEach { branch ->
+                            val isSelected = selectedBranch == branch
+                            Surface(
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clickable { selectedBranch = branch }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                ) {
+                                    Text(
+                                        text = branch,
+                                        color = if (isSelected) Color(0xFF2E7D32) else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -179,7 +251,9 @@ fun WasteManagementScreen(
                                     focusedBorderColor = Color(0xFF2E7D32)
                                 )
                             )
-                            Box(modifier = Modifier.matchParentSize().clickable { showDatePicker = true })
+                            Box(modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker = true })
                         }
                     }
                 }
@@ -212,7 +286,7 @@ fun WasteManagementScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "${wasteHistory.size} entries",
+                                    text = "${filteredHistory.size} entries",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -224,10 +298,21 @@ fun WasteManagementScreen(
                         HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
                         // Render history items
-                        wasteHistory.forEachIndexed { index, entry ->
-                            WasteRecordRow(entry)
-                            if (index < wasteHistory.size - 1) {
-                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        if (filteredHistory.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No records found", color = Color.Gray, fontSize = 14.sp)
+                            }
+                        } else {
+                            filteredHistory.forEachIndexed { index, entry ->
+                                WasteRecordRow(entry)
+                                if (index < filteredHistory.size - 1) {
+                                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                                }
                             }
                         }
                     }
@@ -240,7 +325,14 @@ fun WasteManagementScreen(
 
     // Waste Entry Popup
     if (showWasteEntry) {
-        WasteEntryDialog(onDismiss = { showWasteEntry = false })
+        WasteEntryDialog(
+            onDismiss = { showWasteEntry = false },
+            onAddEntry = { newItem ->
+                wasteHistory.add(newItem)
+                showWasteEntry = false
+            },
+            currentBranch = if (selectedBranch == "All") "B1" else selectedBranch
+        )
     }
 }
 
@@ -252,42 +344,71 @@ fun WasteRecordRow(entry: WasteHistoryItem) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = entry.ingredient,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = Color(0xFF333333)
-            )
-            Text(
-                text = entry.staff,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+        // Ingredient Image
+        Surface(
+            modifier = Modifier.size(52.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = Color(0xFFF8FAFC)
+        ) {
+            if (entry.imageRes != null) {
+                Image(
+                    painter = painterResource(id = entry.imageRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Image, 
+                        contentDescription = null, 
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
-        
-        Column(horizontalAlignment = Alignment.End) {
-            Surface(
-                color = Color(0xFFF1F5F9),
-                shape = RoundedCornerShape(6.dp)
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = entry.quantity,
-                    color = Color(0xFF475569),
-                    fontSize = 12.sp,
+                    text = entry.ingredient,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    fontSize = 15.sp,
+                    color = Color(0xFF1E293B)
+                )
+                Text(
+                    text = entry.quantity,
+                    color = Color(0xFF64748B),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${entry.date}  ${entry.time}",
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${entry.staff} (${entry.branch})",
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8)
+                )
+                Text(
+                    text = "${entry.date}  ${entry.time}",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8)
+                )
+            }
         }
     }
 }
@@ -295,9 +416,14 @@ fun WasteRecordRow(entry: WasteHistoryItem) {
 // ── COMPONENT: WASTE ENTRY DIALOG (POPUP) ───────────────────────────────────
 
 @Composable
-fun WasteEntryDialog(onDismiss: () -> Unit) {
+fun WasteEntryDialog(
+    onDismiss: () -> Unit,
+    onAddEntry: (WasteHistoryItem) -> Unit,
+    currentBranch: String
+) {
     var selectedIngredient by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("pcs") } // Default unit
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
@@ -341,7 +467,7 @@ fun WasteEntryDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Ingredient Selection
                 Text("Ingredient", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
@@ -369,8 +495,10 @@ fun WasteEntryDialog(onDismiss: () -> Unit) {
                             .background(Color.White)
                             .heightIn(max = 400.dp)
                     ) {
-                        WasteIngredientDropdownList { ingredient ->
-                            selectedIngredient = ingredient
+                        WasteIngredientDropdownList { name, qtyUnit ->
+                            selectedIngredient = name
+                            // Extract unit from qty string (e.g. "30 pcs" -> "pcs")
+                            unit = qtyUnit.split(" ").lastOrNull() ?: "pcs"
                             dropdownExpanded = false
                         }
                     }
@@ -381,16 +509,20 @@ fun WasteEntryDialog(onDismiss: () -> Unit) {
                 // Quantity Input (Typeable)
                 Text("Quantity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = quantity,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) quantity = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Enter quantity", color = Color.LightGray) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFCBD5E1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) quantity = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Enter quantity", color = Color.LightGray) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
+                        )
                     )
-                )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = unit, color = Color.Gray, fontWeight = FontWeight.Bold)
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color(0xFFE2E8F0))
@@ -416,11 +548,63 @@ fun WasteEntryDialog(onDismiss: () -> Unit) {
                     )
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Add Image
+                Text("Add Image", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .clickable { /* TODO: Image Picker */ },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddPhotoAlternate, 
+                            contentDescription = null, 
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Upload Image", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Submit Waste Button
                 Button(
-                    onClick = { if (isFormValid) onDismiss() },
+                    onClick = { 
+                        if (isFormValid) {
+                            val now = Calendar.getInstance().time
+                            val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                            val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                            
+                            val newItem = WasteHistoryItem(
+                                ingredient = selectedIngredient,
+                                staff = "Current User", // Mock user
+                                date = dateFormat.format(now),
+                                time = timeFormat.format(now),
+                                quantity = "- $quantity $unit",
+                                branch = currentBranch,
+                                imageRes = when (selectedIngredient) {
+                                    "Avocado" -> R.drawable.avocado
+                                    "Evap" -> R.drawable.evap
+                                    "Pearl" -> R.drawable.pearl
+                                    else -> null
+                                }
+                            )
+                            onAddEntry(newItem)
+                        } 
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
@@ -453,13 +637,41 @@ fun WasteEntryDialog(onDismiss: () -> Unit) {
 // ── COMPONENT: CATEGORIZED INGREDIENT LIST ───────────────────────────────────
 
 @Composable
-fun WasteIngredientDropdownList(onSelected: (String) -> Unit) {
+fun WasteIngredientDropdownList(onSelected: (String, String) -> Unit) {
     val categories = mapOf(
-        "Fruits" to listOf("Mango", "Dragon Fruit", "Guyabano", "Strawberry", "Buko", "Avocado", "Melon", "Banana", "Apple"),
-        "Toppings & Mix-ins" to listOf("Oreo", "Crashed Graham", "Cheese", "Lemon Square Cheesecake", "Nata de Coco", "Pearl"),
-        "Syrups" to listOf("Syrup - Caramel", "Syrup - Mango", "Syrup - Chocolate", "Syrup - Strawberry"),
-        "Dairy & Sweeteners" to listOf("Evap", "Condense", "Sugar"),
-        "Others" to listOf("Ice")
+        "Fruits" to listOf(
+            "Mango" to "30 pcs",
+            "Dragon Fruit" to "8 pcs",
+            "Guyabano" to "12 pcs",
+            "Strawberry" to "10 pack",
+            "Buko" to "20 pcs",
+            "Avocado" to "25 pcs",
+            "Melon" to "5 pcs",
+            "Banana" to "40 pcs",
+            "Apple" to "18 pcs"
+        ),
+        "Toppings & Mix-ins" to listOf(
+            "Oreo" to "20 pack",
+            "Crashed Graham" to "15 pack",
+            "Cheese" to "12 pack",
+            "Lemon Square Cheesecake" to "10 pack",
+            "Nata de Coco" to "18 pack",
+            "Pearl" to "14 pack"
+        ),
+        "Syrups" to listOf(
+            "Syrup - Caramel" to "8 pack",
+            "Syrup - Mango" to "8 pack",
+            "Syrup - Chocolate" to "8 pack",
+            "Syrup - Strawberry" to "6 pack"
+        ),
+        "Dairy & Sweeteners" to listOf(
+            "Evap" to "24 can",
+            "Condense" to "20 can",
+            "Sugar" to "15 pack"
+        ),
+        "Others" to listOf(
+            "Ice" to "10 sack"
+        )
     )
 
     Column {
@@ -471,10 +683,16 @@ fun WasteIngredientDropdownList(onSelected: (String) -> Unit) {
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF2E7D32)
             )
-            items.forEach { item ->
+            items.forEach { (name, qty) ->
                 DropdownMenuItem(
-                    text = { Text(item, fontSize = 14.sp, color = Color(0xFF334155)) },
-                    onClick = { onSelected(item) },
+                    text = { 
+                        Text(
+                            text = "$name ($qty)", 
+                            fontSize = 14.sp, 
+                            color = Color(0xFF334155)
+                        ) 
+                    },
+                    onClick = { onSelected(name, qty) },
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
                 )
             }

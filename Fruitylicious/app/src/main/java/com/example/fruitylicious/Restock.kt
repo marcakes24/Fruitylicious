@@ -20,9 +20,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.staff.transaction.CustomDatePickerDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 // ── DATA MODELS ──────────────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ data class RestockEntry(
 
 // ── MAIN SCREEN ─────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RestockScreen(
     navController: NavController,
@@ -57,6 +59,32 @@ fun RestockScreen(
         RestockEntry("Pearl", null, "Admin User", "4/13/2026", "12:38 AM", "+ 10 pack")
     )
 
+    // Date Picker State
+    val datePickerState = rememberDatePickerState()
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        selectedDateText = sdf.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    selectedDateText = ""
+                    showDatePicker = false 
+                }) { Text("Clear") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -75,20 +103,8 @@ fun RestockScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // Burger Menu Trigger (Connected to Sidebar)
-                Column(
-                    modifier = Modifier
-                        .clickable { scope.launch { drawerState.open() } }
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(20.dp)
-                                .height(2.dp)
-                                .background(Color.White)
-                        )
-                    }
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -241,17 +257,6 @@ fun RestockScreen(
     }
 
     // ── SECTION 5: POP-UPS (DIALOGS) ──────────────────────────────────────────
-
-    // Custom Date Picker Dialog
-    if (showDatePicker) {
-        CustomDatePickerDialog(
-            onDismiss = { showDatePicker = false },
-            onDateSelected = { date ->
-                selectedDateText = date
-                showDatePicker = false
-            }
-        )
-    }
 
     // Restock Entry Popup
     if (showRestockEntry) {

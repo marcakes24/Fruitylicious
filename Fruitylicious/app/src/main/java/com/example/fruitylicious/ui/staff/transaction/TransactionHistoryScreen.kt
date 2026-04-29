@@ -4,67 +4,112 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.*
 
-// ── DATA MODEL ──────────────────────────────────────────────────────────────
+// ── DATA MODELS ──────────────────────────────────────────────────────────────
 
 data class TransactionEntry(
     val id: String,
     val staff: String,
     val date: String,
     val time: String,
-    val amount: String
+    val amount: Double,
+    var status: String = "Completed",
+    val branch: String = "B1",
+    val product: String = "Avocado",
+    val size: String = "Small",
+    val addOns: String = "Pearl",
+    val qty: String = "1pc",
+    val paymentMethod: String = "Cash",
+    val fullDateTime: String = "February 10, 2026 - 10:00 AM"
 )
 
 // ── MAIN SCREEN ─────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionHistoryScreen(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
-    // UI State for managing pop-ups
-    var showDatePicker by remember { mutableStateOf(false) }
-    var selectedTransaction by remember { mutableStateOf<TransactionEntry?>(null) }
-    
-    // Usable Search and Date States
+    // UI State
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateText by remember { mutableStateOf("") }
+    var selectedBranch by remember { mutableStateOf("All") }
+    
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedTransaction by remember { mutableStateOf<TransactionEntry?>(null) }
+    var showVoidConfirm by remember { mutableStateOf(false) }
 
-    // Sample data for the list
-    val transactions = listOf(
-        TransactionEntry("AV 0001", "Mariz Tuliao", "4/14/2026", "12:38 AM", "₱85"),
-        TransactionEntry("AV 0001", "Mariz Tuliao", "4/14/2026", "12:38 AM", "₱85"),
-        TransactionEntry("AV 0001", "Mariz Tuliao", "4/14/2026", "12:38 AM", "₱85"),
-        TransactionEntry("AV 0001", "Mariz Tuliao", "4/14/2026", "12:38 AM", "₱85"),
-        TransactionEntry("AV 0001", "Mariz Tuliao", "4/14/2026", "12:38 AM", "₱85")
-    )
+    // Functional Transaction List
+    val transactionList = remember { 
+        mutableStateListOf(
+            TransactionEntry("AV 0001", "Mariz Tuliao", "04/14/2026", "12:38 AM", 85.0, branch = "B1"),
+            TransactionEntry("AV 0001", "Mariz Tuliao", "04/14/2026", "12:38 AM", 85.0, branch = "B2"),
+            TransactionEntry("AV 0001", "Mariz Tuliao", "04/14/2026", "12:38 AM", 85.0, branch = "B1"),
+            TransactionEntry("AV 0001", "Mariz Tuliao", "04/14/2026", "12:38 AM", 85.0, branch = "B1"),
+            TransactionEntry("AV 0002", "John Doe", "04/15/2026", "02:15 PM", 120.0, branch = "B2"),
+            TransactionEntry("AV 0003", "Jane Smith", "04/13/2026", "11:20 AM", 95.0, branch = "B1")
+        )
+    }
+
+    // Filter Logic
+    val filteredTransactions = remember(searchQuery, selectedBranch, selectedDateText, transactionList.size) {
+        transactionList.filter { item ->
+            val matchesSearch = item.id.contains(searchQuery, ignoreCase = true) || 
+                              item.staff.contains(searchQuery, ignoreCase = true)
+            val matchesBranch = if (selectedBranch == "All") true else item.branch == selectedBranch
+            val matchesDate = if (selectedDateText.isEmpty()) true else item.date == selectedDateText
+            
+            matchesSearch && matchesBranch && matchesDate
+        }.reversed()
+    }
+
+    // Date Picker State
+    val datePickerState = rememberDatePickerState()
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        selectedDateText = sdf.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    selectedDateText = ""
+                    showDatePicker = false 
+                }) { Text("Clear") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -83,32 +128,52 @@ fun TransactionHistoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Hamburger Menu Trigger
-                Column(
-                    modifier = Modifier
-                        .clickable { scope.launch { drawerState.open() } }
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(20.dp)
-                                .height(2.dp)
-                                .background(Color.White)
-                        )
-                    }
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Page Title
                 Text(
                     text = "TRANSACTION HISTORY",
                     color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
+
+                // Branch Selector
+                Surface(
+                    color = Color(0xFF1B5E20),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("B1", "B2", "All").forEach { branch ->
+                            val isSelected = selectedBranch == branch
+                            Surface(
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clickable { selectedBranch = branch }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                ) {
+                                    Text(
+                                        text = branch,
+                                        color = if (isSelected) Color(0xFF2E7D32) else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -116,7 +181,7 @@ fun TransactionHistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 20.dp, bottom = 20.dp),
+            contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             
@@ -132,7 +197,6 @@ fun TransactionHistoryScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Search Field - Now Usable
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -146,34 +210,22 @@ fun TransactionHistoryScreen(
                             )
                         )
 
-                        // Date Selector Field - Now Usable
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = selectedDateText,
-                                onValueChange = { },
-                                readOnly = true, // Read-only because we use the picker
+                                onValueChange = {},
+                                readOnly = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("mm/dd/yyyy", color = Color.LightGray, fontSize = 14.sp) },
                                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.LightGray) },
-                                trailingIcon = { 
-                                    Icon(
-                                        Icons.Default.CalendarMonth, 
-                                        contentDescription = null, 
-                                        tint = Color.Black
-                                    ) 
-                                },
+                                trailingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color.Black) },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     unfocusedBorderColor = Color(0xFFEEEEEE),
                                     focusedBorderColor = Color(0xFF2E7D32)
                                 )
                             )
-                            // Transparent overlay to catch clicks for the picker
-                            Box(
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .clickable { showDatePicker = true }
-                            )
+                            Box(modifier = Modifier.matchParentSize().clickable { showDatePicker = true })
                         }
                     }
                 }
@@ -188,7 +240,6 @@ fun TransactionHistoryScreen(
                     shadowElevation = 2.dp
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        // List Header with Entry Count
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -202,13 +253,12 @@ fun TransactionHistoryScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF333333)
                             )
-                            
                             Surface(
-                                color = Color(0xFFFFB300), // Orange badge
+                                color = Color(0xFFFFB300),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "25 entries",
+                                    text = "${filteredTransactions.size} entries",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -219,13 +269,23 @@ fun TransactionHistoryScreen(
 
                         HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
-                        // Transaction Items (Triggers Transaction Details Pop-up)
-                        transactions.forEachIndexed { index, transaction ->
-                            TransactionListItem(transaction) {
-                                selectedTransaction = transaction
+                        if (filteredTransactions.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("No transactions found", color = Color.Gray)
                             }
-                            if (index < transactions.size - 1) {
-                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        } else {
+                            filteredTransactions.forEachIndexed { index, transaction ->
+                                TransactionListItem(
+                                    transaction = transaction,
+                                    onClick = { selectedTransaction = transaction },
+                                    onVoidClick = {
+                                        selectedTransaction = transaction
+                                        showVoidConfirm = true
+                                    }
+                                )
+                                if (index < filteredTransactions.size - 1) {
+                                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                                }
                             }
                         }
                     }
@@ -234,294 +294,228 @@ fun TransactionHistoryScreen(
         }
     }
 
-    // ── SECTION 4: DIALOGS (POP-UPS) ──────────────────────────────────────────
+    // ── DIALOGS ──────────────────────────────────────────────────────────────
 
-    // Custom Calendar Pop-up - Now Functional
-    if (showDatePicker) {
-        CustomDatePickerDialog(
-            onDismiss = { showDatePicker = false },
-            onDateSelected = { date ->
-                selectedDateText = date
-                showDatePicker = false
-            }
+    if (selectedTransaction != null && !showVoidConfirm) {
+        TransactionDetailsDialog(
+            transaction = selectedTransaction!!,
+            onDismiss = { selectedTransaction = null },
+            onVoidClick = { showVoidConfirm = true }
         )
     }
 
-    // Transaction Details Pop-up
-    if (selectedTransaction != null) {
-        TransactionDetailsDialog(
-            transaction = selectedTransaction!!,
-            onDismiss = { selectedTransaction = null }
+    if (showVoidConfirm && selectedTransaction != null) {
+        VoidTransactionDialog(
+            onConfirm = {
+                // Find and update the original list
+                val originalIndex = transactionList.indexOfFirst { it.id == selectedTransaction!!.id && it.date == selectedTransaction!!.date && it.time == selectedTransaction!!.time }
+                if (originalIndex != -1) {
+                    transactionList[originalIndex] = transactionList[originalIndex].copy(status = "Void")
+                }
+                showVoidConfirm = false
+                selectedTransaction = null
+            },
+            onCancel = { showVoidConfirm = false }
         )
     }
 }
 
-// ── COMPONENT: TRANSACTION LIST ITEM ────────────────────────────────────────
+// ── COMPONENTS ──────────────────────────────────────────────────────────────
 
 @Composable
-fun TransactionListItem(transaction: TransactionEntry, onClick: () -> Unit) {
+fun TransactionListItem(
+    transaction: TransactionEntry, 
+    onClick: () -> Unit,
+    onVoidClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
-        Column {
-            Text(
-                text = transaction.id,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Color(0xFF333333)
-            )
-            Text(
-                text = transaction.staff,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = transaction.id, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF333333))
+            Text(text = transaction.status, fontSize = 12.sp, color = if(transaction.status == "Void") Color.Red else Color.Gray)
+            Text(text = transaction.staff, fontSize = 12.sp, color = Color.Gray)
         }
         
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = transaction.amount,
+                text = "₱${String.format("%.0f", transaction.amount)}",
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = Color(0xFFF57C00) // Deep orange
+                fontSize = 16.sp,
+                color = Color(0xFFF57C00)
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = transaction.date,
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = transaction.time,
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-            }
-        }
-    }
-}
-
-// ── COMPONENT: CALENDAR POP-UP (DATE PICKER) ────────────────────────────────
-
-@Composable
-fun CustomDatePickerDialog(onDismiss: () -> Unit, onDateSelected: (String) -> Unit) {
-    var calendar by remember { mutableStateOf(Calendar.getInstance()) }
-    val monthNames = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
-    
-    val currentMonth = calendar.get(Calendar.MONTH)
-    val currentYear = calendar.get(Calendar.YEAR)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color.White,
-            modifier = Modifier.width(340.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Calendar Header (Month/Year Selection)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            
+            if (transaction.status != "Void") {
+                Surface(
+                    color = Color.Red,
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.clickable { onVoidClick() }
                 ) {
-                    IconButton(onClick = {
-                        val newCal = calendar.clone() as Calendar
-                        newCal.add(Calendar.MONTH, -1)
-                        calendar = newCal
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
-                    }
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(monthNames[currentMonth], fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF2E7D32))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(currentYear.toString(), fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF2E7D32))
-                    }
-
-                    IconButton(onClick = {
-                        val newCal = calendar.clone() as Calendar
-                        newCal.add(Calendar.MONTH, 1)
-                        calendar = newCal
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
-                    }
+                    Text(
+                        text = "Void",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Days of Week Header
-                val daysOfWeek = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    daysOfWeek.forEach { day ->
-                        Text(
-                            text = day,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.Gray
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Calendar Grid Days Calculation
-                val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-                val firstDayOfMonthCal = calendar.clone() as Calendar
-                firstDayOfMonthCal.set(Calendar.DAY_OF_MONTH, 1)
-                // Adjusting Calendar.DAY_OF_WEEK (Sun=1) to Mo=0, Tu=1... Su=6
-                var firstDayOfWeek = firstDayOfMonthCal.get(Calendar.DAY_OF_WEEK) - 2
-                if (firstDayOfWeek < 0) firstDayOfWeek = 6 // Sunday was 1, so 1-2 = -1, becomes 6
-
-                // Previous month days to fill start
-                val prevMonthCal = calendar.clone() as Calendar
-                prevMonthCal.add(Calendar.MONTH, -1)
-                val daysInPrevMonth = prevMonthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-
-                Column {
-                    var dayCounter = 1
-                    var nextMonthDayCounter = 1
-                    for (week in 0 until 6) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            for (dayIndex in 0 until 7) {
-                                val currentGridIndex = week * 7 + dayIndex
-                                
-                                val day: Int
-                                val isCurrentMonth: Boolean
-                                val isNeighbor: Boolean
-                                
-                                if (currentGridIndex < firstDayOfWeek) {
-                                    day = daysInPrevMonth - (firstDayOfWeek - currentGridIndex - 1)
-                                    isCurrentMonth = false
-                                    isNeighbor = true
-                                } else if (dayCounter <= daysInMonth) {
-                                    day = dayCounter
-                                    isCurrentMonth = true
-                                    isNeighbor = false
-                                    dayCounter++
-                                } else {
-                                    day = nextMonthDayCounter
-                                    isCurrentMonth = false
-                                    isNeighbor = true
-                                    nextMonthDayCounter++
-                                }
-
-                                // Selection logic (just an example, let's say today or first of month)
-                                val isSelected = false // We can add selection state if needed
-
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .padding(2.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) Color(0xFF2E7D32) else Color.Transparent)
-                                        .clickable { 
-                                            if (isCurrentMonth) {
-                                                val formattedMonth = String.format("%02d", currentMonth + 1)
-                                                val formattedDay = String.format("%02d", day)
-                                                onDateSelected("$formattedMonth/$formattedDay/$currentYear")
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = day.toString(),
-                                        color = if (isSelected) Color.White 
-                                                else if (isNeighbor) Color(0xFF2E7D32) // Styled per image
-                                                else Color.Black,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        }
-                        if (dayCounter > daysInMonth && week >= 4) break
-                    }
+            } else {
+                Surface(
+                    color = Color.LightGray,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "Voided",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    )
                 }
             }
+            
+            Text(
+                text = "${transaction.date}  ${transaction.time}",
+                fontSize = 11.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }
 
-// ── COMPONENT: TRANSACTION DETAILS POP-UP ───────────────────────────────────
-
 @Composable
-fun TransactionDetailsDialog(transaction: TransactionEntry, onDismiss: () -> Unit) {
+fun TransactionDetailsDialog(
+    transaction: TransactionEntry,
+    onDismiss: () -> Unit,
+    onVoidClick: () -> Unit
+) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = Color.White,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                // Detail Header
-                Text(
-                    text = transaction.id,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF334155)
-                )
-                
+                Text(text = transaction.id, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF333333))
                 Spacer(modifier = Modifier.height(20.dp))
                 
-                // Detail Rows
-                DetailRow("Product", "Avocado")
-                DetailRow("Size", "Small")
-                DetailRow("Add ons", "Pearl")
-                DetailRow("Qty", "1pc")
-                DetailRow("Total Amount", transaction.amount, isAmount = true)
-                DetailRow("Payment Method", "Cash")
-                DetailRow("Date & Time", "February 10, 2026 - 10:00 AM")
-                DetailRow("Processed by", transaction.staff)
+                DetailItem("Product", transaction.product)
+                DetailItem("Size", transaction.size)
+                DetailItem("Add ons", transaction.addOns)
+                DetailItem("Qty", transaction.qty)
+                DetailItem("Total Amount", "₱${String.format("%.0f", transaction.amount)}", isAmount = true)
+                DetailItem("Payment Method", transaction.paymentMethod)
+                DetailItem("Date & Time", transaction.fullDateTime)
+                DetailItem("Processed by", transaction.staff)
+                DetailItem("Status", transaction.status)
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2E8F0)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Close", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    if (transaction.status != "Void") {
+                        Button(
+                            onClick = onVoidClick,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Void", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-// ── COMPONENT: REUSABLE DETAIL ROW ──────────────────────────────────────────
-
 @Composable
-fun DetailRow(label: String, value: String, isAmount: Boolean = false) {
+fun DetailItem(label: String, value: String, isAmount: Boolean = false) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = Color(0xFF475569)
-        )
+        Text(text = label, fontSize = 14.sp, color = Color(0xFF64748B))
         Text(
             text = value,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isAmount) Color(0xFFF57C00) else Color(0xFF1E293B),
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f).padding(start = 16.dp)
+            color = if (isAmount) Color(0xFFF57C00) else Color(0xFF1E293B)
         )
     }
 }
 
-// ── PREVIEW ──────────────────────────────────────────────────────────────────
-
-@Preview(showBackground = true)
 @Composable
-fun TransactionHistoryScreenPreview() {
-    TransactionHistoryScreen(
-        navController = rememberNavController(),
-        drawerState = rememberDrawerState(initialValue = DrawerValue.Closed),
-        scope = MainScope()
-    )
+fun VoidTransactionDialog(
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Dialog(onDismissRequest = onCancel) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFFEE2E2),
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(36.dp))
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Text(text = "Void Transaction", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1E293B))
+                Text(
+                    text = "Are you sure you want to\nvoid this transaction",
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFF64748B),
+                    modifier = Modifier.padding(top = 8.dp),
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B8E6B)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFCA5A5)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Void", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 }
