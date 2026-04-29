@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import com.example.fruitylicious.GuestsScreen //
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,10 +33,73 @@ fun AppNavigation() {
         navController = navController,
         startDestination = "login"
     ) {
+        // ✅ Login Screen
         composable("login") {
             FruityliciousLoginScreen(navController)
         }
 
+        // ✅ Guest Screen (Added this)
+        composable("guests_screen") {
+            GuestsScreen(navController)
+        }
+
+        // STAFF ROUTES
+        composable("home") {
+            MainScaffold(navController, "home")
+        }
+        composable("transacHistory") {
+            MainScaffold(navController, "transacHistory")
+        }
+        composable("pos") {
+            MainScaffold(navController, "pos")
+        }
+        composable("checkout") {
+            MainScaffold(navController, "checkout")
+        }
+        composable("restock") {
+            MainScaffold(navController, "restock")
+        }
+        composable("notification") {
+            MainScaffold(navController, "notification")
+        }
+        composable("waste_management") {
+            MainScaffold(navController, "waste_management")
+        }
+        composable("inventory_adjustment") {
+            MainScaffold(navController, "inventory_adjustment")
+        }
+        composable("SalesSummary") {
+            MainScaffold(navController, "SalesSummary")
+        }
+
+        // ADMIN ROUTES
+        composable("admin_home") {
+            AdminScaffold(navController, "admin_home")
+        }
+        composable("admin_pos") {
+            AdminScaffold(navController, "pos")
+        }
+        composable("admin_transacHistory") {
+            AdminScaffold(navController, "transacHistory")
+        }
+        composable("admin_checkout") {
+            AdminScaffold(navController, "checkout")
+        }
+        composable("admin_restock") {
+            AdminScaffold(navController, "restock")
+        }
+        composable("admin_notification") {
+            AdminScaffold(navController, "notification")
+        }
+        composable("admin_waste_management") {
+            AdminScaffold(navController, "waste_management")
+        }
+        composable("admin_inventory_adjustment") {
+            AdminScaffold(navController, "inventory_adjustment")
+        }
+        composable("admin_SalesSummary") {
+            AdminScaffold(navController, "SalesSummary")
+        }
         // Staff screens
         composable("home")              { MainScaffold(navController, "home") }
         composable("transacHistory")    { MainScaffold(navController, "transacHistory") }
@@ -59,6 +123,8 @@ fun AppNavigation() {
         composable("admin_SalesSummary")            { AdminScaffold(navController, "SalesSummary") }
     }
 }
+
+
 
 @Composable
 fun MainScaffold(navController: NavController, startScreen: String) {
