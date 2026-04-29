@@ -26,7 +26,6 @@ import com.example.fruitylicious.ui.admin.restock.AdminRestockHistoryScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogsScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserFormScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserListScreen
-import com.example.fruitylicious.ui.admin.system.AuditLogsScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteEntryScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteHistoryScreen
 import com.example.fruitylicious.ui.auth.LoginScreen
