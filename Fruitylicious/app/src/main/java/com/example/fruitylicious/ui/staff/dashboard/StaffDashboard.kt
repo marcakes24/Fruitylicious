@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.staff.dashboard
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background

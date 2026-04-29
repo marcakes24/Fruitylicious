@@ -14,7 +14,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
-import com.example.fruitylicious.GuestsScreen //
+import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
+import com.example.fruitylicious.ui.auth.FruityliciousLoginScreen
+import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.GuestsScreen
+import com.example.fruitylicious.ui.shared.StaffSideBarContent
+import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
+import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
+import com.example.fruitylicious.ui.staff.pos.POSScreen
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -163,7 +171,11 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
         }
     ) {
         when (startScreen) {
-            "admin_home"           -> AdminDashboardScreen(navController, drawerState, scope) // updated file
+            "admin_home"           -> AdminDashboardScreen(
+                navController,
+                drawerState,
+                scope
+            ) // updated file
             "pos"               -> POSScreen(navController, drawerState, scope)
             "checkout"          -> CheckoutScreen(navController, drawerState, scope)
             "restock"           -> RestockScreen(navController, drawerState, scope)
