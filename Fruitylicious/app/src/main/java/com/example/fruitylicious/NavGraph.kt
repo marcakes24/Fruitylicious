@@ -32,7 +32,6 @@ import com.example.fruitylicious.ui.admin.waste.AdminWasteHistoryScreen
 import com.example.fruitylicious.ui.auth.LoginScreen
 import com.example.fruitylicious.ui.staff.adjustment.AdjustmentScreen
 import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
-import com.example.fruitylicious.ui.staff.inventory.InventoryScreen
 import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.PosScreen
 import com.example.fruitylicious.ui.staff.pos.ReceiptScreen
