@@ -1,3 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Fruitylicious</string>
+    <string name="app_name">Fruitylicious POS</string>
+
+    <string name="login_title">Fruitylicious POS</string>
+    <string name="login_subtitle">Branch Point of Sale System</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="login">Login</string>
+    <string name="logout">Logout</string>
+
+    <string name="staff_dashboard">Staff Dashboard</string>
+    <string name="admin_dashboard">Admin Dashboard</string>
+    <string name="point_of_sale">Point of Sale</string>
+    <string name="checkout">Checkout</string>
+    <string name="receipt">Receipt</string>
+
+    <string name="inventory">Inventory</string>
+    <string name="inventory_adjustment">Inventory Adjustment</string>
+    <string name="waste">Waste</string>
+    <string name="restock">Restock</string>
+    <string name="sales_summary">Sales Summary</string>
+    <string name="transaction_history">Transaction History</string>
+
+    <string name="manage_products">Manage Products</string>
+    <string name="manage_ingredients">Manage Ingredients</string>
+    <string name="recipe_management">Recipe Management</string>
+    <string name="staff_management">Staff Management</string>
+    <string name="reports">Reports</string>
+    <string name="audit_logs">Audit Logs</string>
+
+    <string name="clock_in">Clock In</string>
+    <string name="clock_out">Clock Out</string>
+    <string name="sync_status">Sync Status</string>
+    <string name="low_stock_alert">Low stock alert</string>
+
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="add">Add</string>
+    <string name="search">Search</string>
+    <string name="filter">Filter</string>
+    <string name="submit">Submit</string>
+    <string name="confirm">Confirm</string>
+    <string name="back">Back</string>
+
+    <string name="required_field">This field is required</string>
+    <string name="invalid_login">Invalid username or password</string>
+    <string name="session_expired">Session expired. Please login again.</string>
+    <string name="offline_mode">Offline mode</string>
+    <string name="online_mode">Online</string>
 </resources>

@@ -1,0 +1,6 @@
+{
+  "branchId": 1,
+  "branchName": "Branch 1",
+  "apiBaseUrl": "https://your-spring-boot-server.com",
+  "apiKey": "your-branch-api-key"
+}
