@@ -1,49 +1,47 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ProductDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM products ORDER BY productName ASC")
+    fun observeAllProducts(): Flow<List<ProductEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(product: ProductEntity)
+    @Query("SELECT * FROM products ORDER BY productName ASC")
+    suspend fun getAllProducts(): List<ProductEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(products: List<ProductEntity>)
+    @Query("SELECT * FROM products WHERE isAddon = 0 ORDER BY productName ASC")
+    fun observeMainProducts(): Flow<List<ProductEntity>>
 
-    @Update
-    suspend fun update(product: ProductEntity)
+    @Query("SELECT * FROM products WHERE isAddon = 1 ORDER BY productName ASC")
+    fun observeAddons(): Flow<List<ProductEntity>>
 
-    @Delete
-    suspend fun delete(product: ProductEntity)
+    @Query("SELECT * FROM products WHERE productId = :productId LIMIT 1")
+    fun observeProduct(productId: Int): Flow<ProductEntity?>
 
-    @Query("DELETE FROM products WHERE product_id = :productId")
-    suspend fun deleteById(productId: String)
+    @Query("SELECT * FROM products WHERE productId = :productId LIMIT 1")
+    suspend fun getProductById(productId: Int): ProductEntity?
 
-    @Query("DELETE FROM products")
-    suspend fun deleteAll()
+    @Query("SELECT * FROM products WHERE productName LIKE '%' || :query || '%' ORDER BY productName ASC")
+    fun searchProducts(query: String): Flow<List<ProductEntity>>
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Query("SELECT * FROM products WHERE isSynced = 0")
+    suspend fun getUnsyncedProducts(): List<ProductEntity>
 
-    @Query("SELECT * FROM products WHERE product_id = :productId")
-    suspend fun getById(productId: String): ProductEntity?
+    @Upsert
+    suspend fun upsertProduct(product: ProductEntity)
 
-    @Query("SELECT * FROM products ORDER BY product_name ASC")
-    fun getAll(): Flow<List<ProductEntity>>
+    @Upsert
+    suspend fun upsertProducts(products: List<ProductEntity>)
 
-    @Query("SELECT * FROM products WHERE is_addon = 0 ORDER BY product_name ASC")
-    fun getMainProducts(): Flow<List<ProductEntity>>
+    @Query("UPDATE products SET isSynced = 1, syncedAt = :syncedAt WHERE productId = :productId")
+    suspend fun markSynced(productId: Int, syncedAt: Long)
 
-    @Query("SELECT * FROM products WHERE is_addon = 1 ORDER BY product_name ASC")
-    fun getAddons(): Flow<List<ProductEntity>>
-
-    @Query("SELECT * FROM products WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<ProductEntity>
-
-    @Query("UPDATE products SET is_synced = 1, synced_at = :syncedAt WHERE product_id = :productId")
-    suspend fun markSynced(productId: String, syncedAt: Long)
+    @Query("DELETE FROM products WHERE productId = :productId")
+    suspend fun deleteProduct(productId: Int)
 }

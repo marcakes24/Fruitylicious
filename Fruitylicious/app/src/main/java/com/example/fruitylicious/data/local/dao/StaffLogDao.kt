@@ -1,63 +1,82 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StaffLogDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM staff_logs WHERE branchId = :branchId ORDER BY clockIn DESC")
+    fun observeStaffLogsByBranch(branchId: Int): Flow<List<StaffLogEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(log: StaffLogEntity)
+    @Query("SELECT * FROM staff_logs WHERE branchId = :branchId ORDER BY clockIn DESC")
+    suspend fun getStaffLogsByBranch(branchId: Int): List<StaffLogEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(logs: List<StaffLogEntity>)
+    @Query("SELECT * FROM staff_logs WHERE userId = :userId ORDER BY clockIn DESC")
+    fun observeStaffLogsByUser(userId: Int): Flow<List<StaffLogEntity>>
 
-    @Update
-    suspend fun update(log: StaffLogEntity)
+    @Query("SELECT * FROM staff_logs WHERE logId = :logId LIMIT 1")
+    suspend fun getStaffLogById(logId: String): StaffLogEntity?
 
-    @Delete
-    suspend fun delete(log: StaffLogEntity)
+    @Query(
+        """
+        SELECT * FROM staff_logs
+        WHERE userId = :userId
+        AND branchId = :branchId
+        AND clockOut IS NULL
+        ORDER BY clockIn DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getOpenStaffLog(userId: Int, branchId: Int): StaffLogEntity?
 
-    @Query("DELETE FROM staff_logs WHERE log_id = :logId")
-    suspend fun deleteById(logId: String)
+    @Query(
+        """
+        SELECT * FROM staff_logs
+        WHERE branchId = :branchId
+        AND clockIn BETWEEN :from AND :to
+        ORDER BY clockIn DESC
+        """
+    )
+    fun observeStaffLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<StaffLogEntity>>
 
-    @Query("DELETE FROM staff_logs")
-    suspend fun deleteAll()
+    @Query(
+        """
+        SELECT * FROM staff_logs
+        WHERE branchId = :branchId
+        AND clockIn BETWEEN :from AND :to
+        ORDER BY clockIn DESC
+        """
+    )
+    suspend fun getStaffLogsByDateRange(branchId: Int, from: Long, to: Long): List<StaffLogEntity>
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Query("SELECT * FROM staff_logs WHERE isSynced = 0")
+    suspend fun getUnsyncedStaffLogs(): List<StaffLogEntity>
 
-    @Query("SELECT * FROM staff_logs WHERE log_id = :logId")
-    suspend fun getById(logId: String): StaffLogEntity?
+    @Upsert
+    suspend fun upsertStaffLog(staffLog: StaffLogEntity)
 
-    @Query("SELECT * FROM staff_logs WHERE user_id = :userId ORDER BY clock_in DESC")
-    fun getByUser(userId: String): Flow<List<StaffLogEntity>>
+    @Upsert
+    suspend fun upsertStaffLogs(staffLogs: List<StaffLogEntity>)
 
-    @Query("SELECT * FROM staff_logs WHERE branch_id = :branchId ORDER BY clock_in DESC")
-    fun getByBranch(branchId: String): Flow<List<StaffLogEntity>>
+    @Query(
+        """
+        UPDATE staff_logs
+        SET clockOut = :clockOut,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE logId = :logId
+        """
+    )
+    suspend fun clockOut(logId: String, clockOut: Long, lastModified: Long)
 
-    @Query("SELECT * FROM staff_logs WHERE clock_in BETWEEN :from AND :to ORDER BY clock_in DESC")
-    fun getByDateRange(from: Long, to: Long): Flow<List<StaffLogEntity>>
-
-    @Query("SELECT * FROM staff_logs WHERE branch_id = :branchId AND clock_in BETWEEN :from AND :to ORDER BY clock_in DESC")
-    fun getByBranchAndDateRange(branchId: String, from: Long, to: Long): Flow<List<StaffLogEntity>>
-
-    /** Get the latest open (not yet clocked out) session for a user */
-    @Query("SELECT * FROM staff_logs WHERE user_id = :userId AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1")
-    suspend fun getActiveSession(userId: String): StaffLogEntity?
-
-    /** Clock out — set the clock_out timestamp for an active session */
-    @Query("UPDATE staff_logs SET clock_out = :clockOut, last_modified = :lastModified WHERE log_id = :logId")
-    suspend fun clockOut(logId: String, clockOut: Long, lastModified: Long = System.currentTimeMillis())
-
-    @Query("SELECT * FROM staff_logs ORDER BY clock_in DESC")
-    fun getAll(): Flow<List<StaffLogEntity>>
-
-    @Query("SELECT * FROM staff_logs WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<StaffLogEntity>
-
-    @Query("UPDATE staff_logs SET is_synced = 1, synced_at = :syncedAt WHERE log_id = :logId")
+    @Query("UPDATE staff_logs SET isSynced = 1, syncedAt = :syncedAt WHERE logId = :logId")
     suspend fun markSynced(logId: String, syncedAt: Long)
+
+    @Query("DELETE FROM staff_logs WHERE logId = :logId")
+    suspend fun deleteStaffLog(logId: String)
 }

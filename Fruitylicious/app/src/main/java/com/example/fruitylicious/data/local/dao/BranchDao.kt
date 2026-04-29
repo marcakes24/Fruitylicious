@@ -1,43 +1,38 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BranchDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM branches ORDER BY branchName ASC")
+    fun observeAllBranches(): Flow<List<BranchEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(branch: BranchEntity)
+    @Query("SELECT * FROM branches ORDER BY branchName ASC")
+    suspend fun getAllBranches(): List<BranchEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(branches: List<BranchEntity>)
+    @Query("SELECT * FROM branches WHERE branchId = :branchId LIMIT 1")
+    fun observeBranch(branchId: Int): Flow<BranchEntity?>
 
-    @Update
-    suspend fun update(branch: BranchEntity)
+    @Query("SELECT * FROM branches WHERE branchId = :branchId LIMIT 1")
+    suspend fun getBranchById(branchId: Int): BranchEntity?
 
-    @Delete
-    suspend fun delete(branch: BranchEntity)
+    @Query("SELECT * FROM branches WHERE isSynced = 0")
+    suspend fun getUnsyncedBranches(): List<BranchEntity>
 
-    @Query("DELETE FROM branches WHERE branch_id = :branchId")
-    suspend fun deleteById(branchId: String)
+    @Upsert
+    suspend fun upsertBranch(branch: BranchEntity)
 
-    @Query("DELETE FROM branches")
-    suspend fun deleteAll()
+    @Upsert
+    suspend fun upsertBranches(branches: List<BranchEntity>)
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Query("UPDATE branches SET isSynced = 1, syncedAt = :syncedAt WHERE branchId = :branchId")
+    suspend fun markSynced(branchId: Int, syncedAt: Long)
 
-    @Query("SELECT * FROM branches WHERE branch_id = :branchId")
-    suspend fun getById(branchId: String): BranchEntity?
-
-    @Query("SELECT * FROM branches ORDER BY branch_name ASC")
-    fun getAll(): Flow<List<BranchEntity>>
-
-    @Query("SELECT * FROM branches WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<BranchEntity>
-
-    @Query("UPDATE branches SET is_synced = 1, synced_at = :syncedAt WHERE branch_id = :branchId")
-    suspend fun markSynced(branchId: String, syncedAt: Long)
+    @Query("DELETE FROM branches WHERE branchId = :branchId")
+    suspend fun deleteBranch(branchId: Int)
 }

@@ -1,60 +1,44 @@
 package com.example.fruitylicious.data.local.entity
-
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-
+import androidx.room.Entity
+import androidx.room.ForeignKey
 
 @Entity(
     tableName = "audit_logs",
     foreignKeys = [
         ForeignKey(
             entity = UserEntity::class,
-            parentColumns = ["user_id"],
-            childColumns = ["user_id"],
-            onDelete = ForeignKey.SET_NULL
+            parentColumns = ["userId"],
+            childColumns = ["userId"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = BranchEntity::class,
-            parentColumns = ["branch_id"],
-            childColumns = ["branch_id"],
-            onDelete = ForeignKey.SET_NULL
+            parentColumns = ["branchId"],
+            childColumns = ["branchId"],
+            onDelete = ForeignKey.RESTRICT,
+            onUpdate = ForeignKey.CASCADE
         )
     ],
     indices = [
-        Index(value = ["user_id"]),
-        Index(value = ["branch_id"])
+        Index(value = ["userId"]),
+        Index(value = ["branchId"]),
+        Index(value = ["action"]),
+        Index(value = ["tableAffected"]),
+        Index(value = ["timestamp"])
     ]
 )
 data class AuditLogEntity(
-
     @PrimaryKey
-    @ColumnInfo(name = "log_id")
     val logId: String,
-
-    @ColumnInfo(name = "user_id")
-    val userId: String? = null,
-
-    @ColumnInfo(name = "branch_id")
-    val branchId: String? = null,
-
-    @ColumnInfo(name = "action")
+    val userId: Int,
+    val branchId: Int,
     val action: String,
-
-    @ColumnInfo(name = "table_affected")
     val tableAffected: String,
-
-    @ColumnInfo(name = "timestamp")
-    val timestamp: Long = System.currentTimeMillis(),
-
-    @ColumnInfo(name = "last_modified")
-    val lastModified: Long = System.currentTimeMillis(),
-
-    @ColumnInfo(name = "is_synced")
-    val isSynced: Boolean = false,
-
-    @ColumnInfo(name = "synced_at")
-    val syncedAt: Long? = null
+    val timestamp: Long,
+    val lastModified: Long,
+    val isSynced: Boolean,
+    val syncedAt: Long?
 )

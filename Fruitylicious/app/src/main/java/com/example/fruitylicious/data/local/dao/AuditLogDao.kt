@@ -1,53 +1,61 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AuditLogDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM audit_logs WHERE branchId = :branchId ORDER BY timestamp DESC")
+    fun observeAuditLogsByBranch(branchId: Int): Flow<List<AuditLogEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(log: AuditLogEntity)
+    @Query("SELECT * FROM audit_logs WHERE branchId = :branchId ORDER BY timestamp DESC")
+    suspend fun getAuditLogsByBranch(branchId: Int): List<AuditLogEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(logs: List<AuditLogEntity>)
+    @Query("SELECT * FROM audit_logs WHERE logId = :logId LIMIT 1")
+    suspend fun getAuditLogById(logId: String): AuditLogEntity?
 
-    @Delete
-    suspend fun delete(log: AuditLogEntity)
+    @Query("SELECT * FROM audit_logs WHERE userId = :userId ORDER BY timestamp DESC")
+    fun observeAuditLogsByUser(userId: Int): Flow<List<AuditLogEntity>>
 
-    @Query("DELETE FROM audit_logs WHERE log_id = :logId")
-    suspend fun deleteById(logId: String)
+    @Query("SELECT * FROM audit_logs WHERE 'action' LIKE '%' || :action || '%' ORDER BY timestamp DESC")
+    fun observeAuditLogsByAction(action: String): Flow<List<AuditLogEntity>>
 
-    @Query("DELETE FROM audit_logs")
-    suspend fun deleteAll()
+    @Query(
+        """
+        SELECT * FROM audit_logs
+        WHERE branchId = :branchId
+        AND timestamp BETWEEN :from AND :to
+        ORDER BY timestamp DESC
+        """
+    )
+    fun observeAuditLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<AuditLogEntity>>
 
-    @Query("SELECT * FROM audit_logs WHERE log_id = :logId")
-    suspend fun getById(logId: String): AuditLogEntity?
+    @Query(
+        """
+        SELECT * FROM audit_logs
+        WHERE branchId = :branchId
+        AND timestamp BETWEEN :from AND :to
+        ORDER BY timestamp DESC
+        """
+    )
+    suspend fun getAuditLogsByDateRange(branchId: Int, from: Long, to: Long): List<AuditLogEntity>
 
-    @Query("SELECT * FROM audit_logs ORDER BY timestamp DESC")
-    fun getAll(): Flow<List<AuditLogEntity>>
+    @Query("SELECT * FROM audit_logs WHERE isSynced = 0")
+    suspend fun getUnsyncedAuditLogs(): List<AuditLogEntity>
 
-    @Query("SELECT * FROM audit_logs WHERE user_id = :userId ORDER BY timestamp DESC")
-    fun getByUser(userId: String): Flow<List<AuditLogEntity>>
+    @Upsert
+    suspend fun upsertAuditLog(auditLog: AuditLogEntity)
 
-    @Query("SELECT * FROM audit_logs WHERE branch_id = :branchId ORDER BY timestamp DESC")
-    fun getByBranch(branchId: String): Flow<List<AuditLogEntity>>
+    @Upsert
+    suspend fun upsertAuditLogs(auditLogs: List<AuditLogEntity>)
 
-    @Query("SELECT * FROM audit_logs WHERE table_affected = :tableName ORDER BY timestamp DESC")
-    fun getByTable(tableName: String): Flow<List<AuditLogEntity>>
-
-    @Query("SELECT * FROM audit_logs WHERE 'action' = :action ORDER BY timestamp DESC")
-    fun getByAction(action: String): Flow<List<AuditLogEntity>>
-
-    @Query("SELECT * FROM audit_logs WHERE timestamp BETWEEN :from AND :to ORDER BY timestamp DESC")
-    fun getByDateRange(from: Long, to: Long): Flow<List<AuditLogEntity>>
-
-    @Query("SELECT * FROM audit_logs WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<AuditLogEntity>
-
-    @Query("UPDATE audit_logs SET is_synced = 1, synced_at = :syncedAt WHERE log_id = :logId")
+    @Query("UPDATE audit_logs SET isSynced = 1, syncedAt = :syncedAt WHERE logId = :logId")
     suspend fun markSynced(logId: String, syncedAt: Long)
+
+    @Query("DELETE FROM audit_logs WHERE logId = :logId")
+    suspend fun deleteAuditLog(logId: String)
 }

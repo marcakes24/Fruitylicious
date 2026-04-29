@@ -1,84 +1,58 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RestockLogDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM restock_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
+    fun observeRestockLogsByBranch(branchId: Int): Flow<List<RestockLogEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(log: RestockLogEntity)
+    @Query("SELECT * FROM restock_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
+    suspend fun getRestockLogsByBranch(branchId: Int): List<RestockLogEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(logs: List<RestockLogEntity>)
+    @Query("SELECT * FROM restock_logs WHERE restockId = :restockId LIMIT 1")
+    suspend fun getRestockLogById(restockId: String): RestockLogEntity?
 
-    @Update
-    suspend fun update(log: RestockLogEntity)
+    @Query("SELECT * FROM restock_logs WHERE userId = :userId ORDER BY dateTime DESC")
+    fun observeRestockLogsByUser(userId: Int): Flow<List<RestockLogEntity>>
 
-    @Delete
-    suspend fun delete(log: RestockLogEntity)
+    @Query(
+        """
+        SELECT * FROM restock_logs
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    fun observeRestockLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<RestockLogEntity>>
 
-    @Query("DELETE FROM restock_logs WHERE restock_id = :restockId")
-    suspend fun deleteById(restockId: String)
+    @Query(
+        """
+        SELECT * FROM restock_logs
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    suspend fun getRestockLogsByDateRange(branchId: Int, from: Long, to: Long): List<RestockLogEntity>
 
-    @Query("DELETE FROM restock_logs")
-    suspend fun deleteAll()
+    @Query("SELECT * FROM restock_logs WHERE isSynced = 0")
+    suspend fun getUnsyncedRestockLogs(): List<RestockLogEntity>
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Upsert
+    suspend fun upsertRestockLog(restockLog: RestockLogEntity)
 
-    @Query("SELECT * FROM restock_logs WHERE restock_id = :restockId")
-    suspend fun getById(restockId: String): RestockLogEntity?
+    @Upsert
+    suspend fun upsertRestockLogs(restockLogs: List<RestockLogEntity>)
 
-    @Query("SELECT * FROM restock_logs WHERE branch_id = :branchId ORDER BY date_time DESC")
-    fun getByBranch(branchId: String): Flow<List<RestockLogEntity>>
-
-    @Query("SELECT * FROM restock_logs WHERE ingredient_id = :ingredientId ORDER BY date_time DESC")
-    fun getByIngredient(ingredientId: String): Flow<List<RestockLogEntity>>
-
-    @Query("SELECT * FROM restock_logs WHERE branch_id = :branchId AND ingredient_id = :ingredientId ORDER BY date_time DESC")
-    fun getByBranchAndIngredient(branchId: String, ingredientId: String): Flow<List<RestockLogEntity>>
-
-    @Query("SELECT * FROM restock_logs WHERE date_time BETWEEN :from AND :to ORDER BY date_time DESC")
-    fun getByDateRange(from: Long, to: Long): Flow<List<RestockLogEntity>>
-
-    @Query("SELECT * FROM restock_logs ORDER BY date_time DESC")
-    fun getAll(): Flow<List<RestockLogEntity>>
-
-    @Query("""
-        SELECT SUM(quantity_added) FROM restock_logs 
-        WHERE (:branchId IS NULL OR branch_id = :branchId) 
-        AND date_time BETWEEN :from AND :to
-    """)
-    suspend fun getTotalRestockedToday(branchId: String?, from: Long, to: Long): Int?
-
-    @Query("""
-        SELECT i.ingredient_name as ingredientName, COUNT(*) as count, AVG(r.quantity_added) as avgUnits
-        FROM restock_logs r
-        JOIN ingredients i ON r.ingredient_id = i.ingredient_id
-        WHERE (:branchId IS NULL OR r.branch_id = :branchId)
-        GROUP BY r.ingredient_id
-        ORDER BY count DESC
-    """)
-    suspend fun getRestockFrequency(branchId: String?): List<RestockFrequencySummary>
-
-    @Query("SELECT * FROM restock_logs WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<RestockLogEntity>
-
-    @Query("UPDATE restock_logs SET is_synced = 1, synced_at = :syncedAt WHERE restock_id = :restockId")
+    @Query("UPDATE restock_logs SET isSynced = 1, syncedAt = :syncedAt WHERE restockId = :restockId")
     suspend fun markSynced(restockId: String, syncedAt: Long)
-}
 
-data class RestockFrequencySummary(
-    val ingredientName: String,
-    val count: Int,
-    val avgUnits: Int
-) {
-    val frequencyLabel: String get() = when {
-        count >= 5 -> "High"
-        count >= 2 -> "Moderate"
-        else -> "Low"
-    }
+    @Query("DELETE FROM restock_logs WHERE restockId = :restockId")
+    suspend fun deleteRestockLog(restockId: String)
 }

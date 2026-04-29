@@ -1,56 +1,73 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionItemDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM transaction_items WHERE transactionId = :transactionId ORDER BY transactionItemId ASC")
+    fun observeItemsForTransaction(transactionId: String): Flow<List<TransactionItemEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(item: TransactionItemEntity)
+    @Query("SELECT * FROM transaction_items WHERE transactionId = :transactionId ORDER BY transactionItemId ASC")
+    suspend fun getItemsForTransaction(transactionId: String): List<TransactionItemEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(items: List<TransactionItemEntity>)
+    @Query("SELECT * FROM transaction_items WHERE transactionItemId = :transactionItemId LIMIT 1")
+    suspend fun getTransactionItemById(transactionItemId: String): TransactionItemEntity?
 
-    @Update
-    suspend fun update(item: TransactionItemEntity)
+    @Query("SELECT * FROM transaction_items WHERE productId = :productId ORDER BY transactionId DESC")
+    fun observeItemsByProduct(productId: Int): Flow<List<TransactionItemEntity>>
 
-    @Delete
-    suspend fun delete(item: TransactionItemEntity)
+    @Query(
+        """
+        SELECT transaction_items.*
+        FROM transaction_items
+        INNER JOIN transactions ON transaction_items.transactionId = transactions.transactionId
+        WHERE transactions.branchId = :branchId
+        AND transactions.dateTime BETWEEN :from AND :to
+        ORDER BY transactions.dateTime DESC
+        """
+    )
+    fun observeItemsByBranchAndDateRange(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): Flow<List<TransactionItemEntity>>
 
-    @Query("DELETE FROM transaction_items WHERE transaction_item_id = :itemId")
-    suspend fun deleteById(itemId: String)
+    @Query(
+        """
+        SELECT transaction_items.*
+        FROM transaction_items
+        INNER JOIN transactions ON transaction_items.transactionId = transactions.transactionId
+        WHERE transactions.branchId = :branchId
+        AND transactions.dateTime BETWEEN :from AND :to
+        ORDER BY transactions.dateTime DESC
+        """
+    )
+    suspend fun getItemsByBranchAndDateRange(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): List<TransactionItemEntity>
 
-    @Query("DELETE FROM transaction_items WHERE transaction_id = :transactionId")
-    suspend fun deleteByTransactionId(transactionId: String)
+    @Query("SELECT * FROM transaction_items WHERE isSynced = 0")
+    suspend fun getUnsyncedTransactionItems(): List<TransactionItemEntity>
 
-    @Query("DELETE FROM transaction_items")
-    suspend fun deleteAll()
+    @Upsert
+    suspend fun upsertTransactionItem(transactionItem: TransactionItemEntity)
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Upsert
+    suspend fun upsertTransactionItems(transactionItems: List<TransactionItemEntity>)
 
-    @Query("SELECT * FROM transaction_items WHERE transaction_item_id = :itemId")
-    suspend fun getById(itemId: String): TransactionItemEntity?
+    @Query("UPDATE transaction_items SET isSynced = 1, syncedAt = :syncedAt WHERE transactionItemId = :transactionItemId")
+    suspend fun markSynced(transactionItemId: String, syncedAt: Long)
 
-    @Query("SELECT * FROM transaction_items WHERE transaction_id = :transactionId")
-    fun getByTransactionId(transactionId: String): Flow<List<TransactionItemEntity>>
+    @Query("DELETE FROM transaction_items WHERE transactionItemId = :transactionItemId")
+    suspend fun deleteTransactionItem(transactionItemId: String)
 
-    @Query("SELECT * FROM transaction_items WHERE product_id = :productId ORDER BY last_modified DESC")
-    fun getByProductId(productId: String): Flow<List<TransactionItemEntity>>
-
-    @Query("SELECT * FROM transaction_items")
-    fun getAll(): Flow<List<TransactionItemEntity>>
-
-    /** Total quantity sold per product — useful for bestseller reports */
-    @Query("SELECT SUM(quantity) FROM transaction_items WHERE product_id = :productId")
-    suspend fun getTotalQuantitySold(productId: String): Int?
-
-    @Query("SELECT * FROM transaction_items WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<TransactionItemEntity>
-
-    @Query("UPDATE transaction_items SET is_synced = 1, synced_at = :syncedAt WHERE transaction_item_id = :itemId")
-    suspend fun markSynced(itemId: String, syncedAt: Long)
+    @Query("DELETE FROM transaction_items WHERE transactionId = :transactionId")
+    suspend fun deleteItemsForTransaction(transactionId: String)
 }

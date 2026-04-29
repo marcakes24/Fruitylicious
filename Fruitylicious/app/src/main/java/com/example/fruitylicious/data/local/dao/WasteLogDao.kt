@@ -1,89 +1,58 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WasteLogDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
+    fun observeWasteLogsByBranch(branchId: Int): Flow<List<WasteLogEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(log: WasteLogEntity)
+    @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
+    suspend fun getWasteLogsByBranch(branchId: Int): List<WasteLogEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(logs: List<WasteLogEntity>)
+    @Query("SELECT * FROM waste_logs WHERE wasteId = :wasteId LIMIT 1")
+    suspend fun getWasteLogById(wasteId: String): WasteLogEntity?
 
-    @Update
-    suspend fun update(log: WasteLogEntity)
+    @Query("SELECT * FROM waste_logs WHERE userId = :userId ORDER BY dateTime DESC")
+    fun observeWasteLogsByUser(userId: Int): Flow<List<WasteLogEntity>>
 
-    @Delete
-    suspend fun delete(log: WasteLogEntity)
+    @Query(
+        """
+        SELECT * FROM waste_logs
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    fun observeWasteLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<WasteLogEntity>>
 
-    @Query("DELETE FROM waste_logs WHERE waste_id = :wasteId")
-    suspend fun deleteById(wasteId: String)
+    @Query(
+        """
+        SELECT * FROM waste_logs
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    suspend fun getWasteLogsByDateRange(branchId: Int, from: Long, to: Long): List<WasteLogEntity>
 
-    @Query("DELETE FROM waste_logs")
-    suspend fun deleteAll()
+    @Query("SELECT * FROM waste_logs WHERE isSynced = 0")
+    suspend fun getUnsyncedWasteLogs(): List<WasteLogEntity>
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Upsert
+    suspend fun upsertWasteLog(wasteLog: WasteLogEntity)
 
-    @Query("SELECT * FROM waste_logs WHERE waste_id = :wasteId")
-    suspend fun getById(wasteId: String): WasteLogEntity?
+    @Upsert
+    suspend fun upsertWasteLogs(wasteLogs: List<WasteLogEntity>)
 
-    @Query("SELECT * FROM waste_logs WHERE branch_id = :branchId ORDER BY date_time DESC")
-    fun getByBranch(branchId: String): Flow<List<WasteLogEntity>>
-
-    @Query("SELECT * FROM waste_logs WHERE ingredient_id = :ingredientId ORDER BY date_time DESC")
-    fun getByIngredient(ingredientId: String): Flow<List<WasteLogEntity>>
-
-    @Query("SELECT * FROM waste_logs WHERE user_id = :userId ORDER BY date_time DESC")
-    fun getByUser(userId: String): Flow<List<WasteLogEntity>>
-
-    @Query("SELECT * FROM waste_logs WHERE date_time BETWEEN :from AND :to ORDER BY date_time DESC")
-    fun getByDateRange(from: Long, to: Long): Flow<List<WasteLogEntity>>
-
-    @Query("SELECT * FROM waste_logs ORDER BY date_time DESC")
-    fun getAll(): Flow<List<WasteLogEntity>>
-
-    /** Total waste quantity per ingredient in a branch — useful for waste reports */
-    @Query("SELECT SUM(quantity) FROM waste_logs WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun getTotalWaste(ingredientId: String, branchId: String): Double?
-
-    @Query("""
-        SELECT SUM(quantity) FROM waste_logs 
-        WHERE (:branchId IS NULL OR branch_id = :branchId) 
-        AND date_time BETWEEN :from AND :to
-    """)
-    suspend fun getTotalWasteCount(branchId: String?, from: Long, to: Long): Int?
-
-    @Query("""
-        SELECT reason, COUNT(*) as count FROM waste_logs 
-        WHERE (:branchId IS NULL OR branch_id = :branchId) 
-        AND date_time BETWEEN :from AND :to 
-        GROUP BY reason 
-        ORDER BY count DESC
-    """)
-    suspend fun getWasteByReason(branchId: String?, from: Long, to: Long): List<WasteReasonSummary>
-
-    @Query("""
-        SELECT i.ingredient_name as itemName, SUM(w.quantity) as count 
-        FROM waste_logs w 
-        JOIN ingredients i ON w.ingredient_id = i.ingredient_id 
-        WHERE (:branchId IS NULL OR w.branch_id = :branchId) 
-        AND w.date_time BETWEEN :from AND :to 
-        GROUP BY w.ingredient_id 
-        ORDER BY count DESC
-    """)
-    suspend fun getWasteByItem(branchId: String?, from: Long, to: Long): List<WasteItemSummary>
-
-    @Query("SELECT * FROM waste_logs WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<WasteLogEntity>
-
-    @Query("UPDATE waste_logs SET is_synced = 1, synced_at = :syncedAt WHERE waste_id = :wasteId")
+    @Query("UPDATE waste_logs SET isSynced = 1, syncedAt = :syncedAt WHERE wasteId = :wasteId")
     suspend fun markSynced(wasteId: String, syncedAt: Long)
-}
 
-data class WasteReasonSummary(val reason: String, val count: Int)
-data class WasteItemSummary(val itemName: String, val count: Int)
+    @Query("DELETE FROM waste_logs WHERE wasteId = :wasteId")
+    suspend fun deleteWasteLog(wasteId: String)
+}

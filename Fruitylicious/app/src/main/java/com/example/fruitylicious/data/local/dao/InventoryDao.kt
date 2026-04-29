@@ -1,75 +1,113 @@
 package com.example.fruitylicious.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface InventoryDao {
 
-    // ─── Insert / Update / Delete ───────────────────────────────────────────
+    @Query("SELECT * FROM inventory WHERE branchId = :branchId ORDER BY ingredientId ASC")
+    fun observeInventoryByBranch(branchId: Int): Flow<List<InventoryEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(inventory: InventoryEntity)
+    @Query("SELECT * FROM inventory WHERE branchId = :branchId ORDER BY ingredientId ASC")
+    suspend fun getInventoryByBranch(branchId: Int): List<InventoryEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(inventories: List<InventoryEntity>)
+    @Query("SELECT * FROM inventory WHERE ingredientId = :ingredientId AND branchId = :branchId LIMIT 1")
+    fun observeInventoryItem(ingredientId: Int, branchId: Int): Flow<InventoryEntity?>
 
-    @Update
-    suspend fun update(inventory: InventoryEntity)
+    @Query("SELECT * FROM inventory WHERE ingredientId = :ingredientId AND branchId = :branchId LIMIT 1")
+    suspend fun getInventoryItem(ingredientId: Int, branchId: Int): InventoryEntity?
 
-    @Query("DELETE FROM inventory WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun delete(ingredientId: String, branchId: String)
+    @Query(
+        """
+        SELECT inventory.*
+        FROM inventory
+        INNER JOIN ingredients ON inventory.ingredientId = ingredients.ingredientId
+        WHERE inventory.branchId = :branchId
+        AND inventory.currentStock <= ingredients.lowStockThreshold
+        ORDER BY ingredients.ingredientName ASC
+        """
+    )
+    fun observeLowStockItems(branchId: Int): Flow<List<InventoryEntity>>
 
-    @Query("DELETE FROM inventory WHERE branch_id = :branchId")
-    suspend fun deleteByBranch(branchId: String)
+    @Query(
+        """
+        SELECT inventory.*
+        FROM inventory
+        INNER JOIN ingredients ON inventory.ingredientId = ingredients.ingredientId
+        WHERE inventory.branchId = :branchId
+        AND inventory.currentStock <= ingredients.lowStockThreshold
+        ORDER BY ingredients.ingredientName ASC
+        """
+    )
+    suspend fun getLowStockItems(branchId: Int): List<InventoryEntity>
 
-    @Query("DELETE FROM inventory")
-    suspend fun deleteAll()
+    @Query("SELECT * FROM inventory WHERE isSynced = 0")
+    suspend fun getUnsyncedInventory(): List<InventoryEntity>
 
-    // ─── Queries ────────────────────────────────────────────────────────────
+    @Upsert
+    suspend fun upsertInventoryItem(inventory: InventoryEntity)
 
-    @Query("SELECT * FROM inventory WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun getByKey(ingredientId: String, branchId: String): InventoryEntity?
+    @Upsert
+    suspend fun upsertInventoryItems(inventory: List<InventoryEntity>)
 
-    @Query("SELECT * FROM inventory WHERE branch_id = :branchId ORDER BY ingredient_id ASC")
-    fun getByBranch(branchId: String): Flow<List<InventoryEntity>>
+    @Query(
+        """
+        UPDATE inventory
+        SET currentStock = currentStock + :amount,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE ingredientId = :ingredientId AND branchId = :branchId
+        """
+    )
+    suspend fun addStock(
+        ingredientId: Int,
+        branchId: Int,
+        amount: Double,
+        lastModified: Long
+    )
 
-    @Query("SELECT * FROM inventory WHERE ingredient_id = :ingredientId")
-    fun getByIngredient(ingredientId: String): Flow<List<InventoryEntity>>
+    @Query(
+        """
+        UPDATE inventory
+        SET currentStock = currentStock - :amount,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE ingredientId = :ingredientId AND branchId = :branchId
+        """
+    )
+    suspend fun deductStock(
+        ingredientId: Int,
+        branchId: Int,
+        amount: Double,
+        lastModified: Long
+    )
 
-    @Query("SELECT * FROM inventory")
-    fun getAll(): Flow<List<InventoryEntity>>
+    @Query(
+        """
+        UPDATE inventory
+        SET currentStock = :currentStock,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE ingredientId = :ingredientId AND branchId = :branchId
+        """
+    )
+    suspend fun setStock(
+        ingredientId: Int,
+        branchId: Int,
+        currentStock: Double,
+        lastModified: Long
+    )
 
-    @Query("""
-        SELECT i.ingredient_name as ingredientName, i.is_packaging as isPackaging, 
-               inv.current_stock as currentStock, i.unit_type as unitType
-        FROM ingredients i
-        LEFT JOIN inventory inv ON i.ingredient_id = inv.ingredient_id
-        WHERE (:branchId IS NULL OR inv.branch_id = :branchId)
-    """)
-    suspend fun getInventoryReport(branchId: String?): List<InventoryReportItem>
+    @Query("UPDATE inventory SET isSynced = 1, syncedAt = :syncedAt WHERE ingredientId = :ingredientId AND branchId = :branchId")
+    suspend fun markSynced(ingredientId: Int, branchId: Int, syncedAt: Long)
 
-    /** Returns stock entries where current_stock is at or below a threshold — useful for low-stock alerts */
-    @Query("SELECT * FROM inventory WHERE branch_id = :branchId AND current_stock <= :threshold")
-    fun getLowStock(branchId: String, threshold: Double): Flow<List<InventoryEntity>>
-
-    @Query("UPDATE inventory SET current_stock = current_stock + :amount, last_modified = :lastModified WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun addStock(ingredientId: String, branchId: String, amount: Double, lastModified: Long = System.currentTimeMillis())
-
-    @Query("UPDATE inventory SET current_stock = current_stock - :amount, last_modified = :lastModified WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun deductStock(ingredientId: String, branchId: String, amount: Double, lastModified: Long = System.currentTimeMillis())
-
-    @Query("SELECT * FROM inventory WHERE is_synced = 0")
-    suspend fun getUnsynced(): List<InventoryEntity>
-
-    @Query("UPDATE inventory SET is_synced = 1, synced_at = :syncedAt WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
-    suspend fun markSynced(ingredientId: String, branchId: String, syncedAt: Long)
+    @Query("DELETE FROM inventory WHERE ingredientId = :ingredientId AND branchId = :branchId")
+    suspend fun deleteInventoryItem(ingredientId: Int, branchId: Int)
 }
-
-data class InventoryReportItem(
-    val ingredientName: String,
-    val isPackaging: Boolean,
-    val currentStock: Double,
-    val unitType: String
-)
