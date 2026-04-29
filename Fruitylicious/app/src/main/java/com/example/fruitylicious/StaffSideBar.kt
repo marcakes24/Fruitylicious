@@ -138,7 +138,7 @@ fun StaffSideBarContent(
             // ── Reports section (staff-limited) ──────────────────────────────
             StaffSidebarSectionHeader("Reports")
             val reportItems = listOf(
-                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "")
+                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "transacHistory")
             )
             reportItems.forEach { item ->
                 StaffSidebarNavItem(
