@@ -8,12 +8,20 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
+
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
+import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
+import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.auth.FruityliciousLoginScreen
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import com.example.fruitylicious.ui.shared.GuestsScreen
@@ -23,8 +31,13 @@ import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.POSScreen
 import com.example.fruitylicious.ui.staff.transaction.TransactionHistoryScreen
 import com.example.fruitylicious.ui.staff.waste.WasteManagementScreen
-import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
-import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
+
+// Corrected Imports
+import com.example.fruitylicious.QueueScreen
+import com.example.fruitylicious.UserManagementScreen
+import com.example.fruitylicious.ui.shared.AttendanceState
+import com.example.fruitylicious.ui.shared.TimeLogScreen
+import com.example.fruitylicious.ui.shared.TimeLogUiState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,17 +58,33 @@ fun AppNavigation() {
         composable("guests_screen") { GuestsScreen(navController) }
 
         // STAFF ROUTES
-        val staffRoutes = listOf("home", "transacHistory", "pos", "checkout",
-            "waste_management")
+        val staffRoutes = listOf(
+            "home",
+            "transacHistory",
+            "pos",
+            "checkout",
+            "waste_management",
+            "queue_screen",
+            "time_log"
+        )
 
         staffRoutes.forEach { route ->
             composable(route) { MainScaffold(navController, route) }
         }
 
         // ADMIN ROUTES
-        val adminRoutes = listOf("admin_home", "admin_pos", "admin_transacHistory",
-            "admin_checkout", "admin_waste_management", "admin_manage_products",
-            "admin_manage_ingredients")
+        val adminRoutes = listOf(
+            "admin_home",
+            "admin_pos",
+            "admin_transacHistory",
+            "admin_checkout",
+            "admin_waste_management",
+            "admin_manage_products",
+            "admin_manage_ingredients",
+            "admin_queue",
+            "admin_users",
+            "admin_time_log"
+        )
 
         adminRoutes.forEach { route ->
             composable(route) { AdminScaffold(navController, route) }
@@ -79,6 +108,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "checkout" -> CheckoutScreen(navController, drawerState, scope)
             "waste_management" -> WasteManagementScreen(navController, drawerState, scope)
             "queue_screen" -> QueueScreen(navController, drawerState, scope)
+            "time_log" -> TimeLogRoute(drawerState, scope)
         }
     }
 }
@@ -101,6 +131,45 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_queue" -> QueueScreen(navController, drawerState, scope)
             "admin_manage_products" -> ManageProductsScreen(drawerState, scope)
             "admin_manage_ingredients" -> ManageIngredientsScreen(drawerState, scope)
+            "admin_users" -> UserManagementScreen(navController, drawerState, scope)
+            "admin_time_log" -> TimeLogRoute(drawerState, scope)
         }
     }
+}
+
+@Composable
+fun TimeLogRoute(
+    drawerState: androidx.compose.material3.DrawerState,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    var attendanceState by remember {
+        mutableStateOf(AttendanceState.CLOCKED_OUT)
+    }
+
+    var clockedInSince by remember {
+        mutableStateOf("10:34 AM")
+    }
+
+    TimeLogScreen(
+        uiState = TimeLogUiState(
+            fullName = "Eula Valdez",
+            username = "@staff",
+            attendanceState = attendanceState,
+            clockedInSince = clockedInSince
+        ),
+        onMenuClick = {
+            scope.launch { drawerState.open() }
+        },
+        onClockActionClick = {
+            if (attendanceState == AttendanceState.CLOCKED_OUT) {
+                attendanceState = AttendanceState.CLOCKED_IN
+                clockedInSince = java.text.SimpleDateFormat(
+                    "hh:mm a",
+                    java.util.Locale.getDefault()
+                ).format(java.util.Date())
+            } else {
+                attendanceState = AttendanceState.CLOCKED_OUT
+            }
+        }
+    )
 }

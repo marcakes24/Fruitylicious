@@ -97,7 +97,7 @@ fun AdminSideBarContent(
                 NavItem(Icons.Outlined.Dashboard, "Dashboard", "admin_home"),
                 NavItem(Icons.Outlined.PointOfSale, "POS Screen", "admin_pos"),
                 NavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", "admin_queue"),
-                NavItem(Icons.Outlined.AccessTime, "Time Log", ""),
+                NavItem(Icons.Outlined.AccessTime, "Time Log", "admin_time_log"),
                 NavItem(Icons.Outlined.Notifications, "Notifications", "admin_notification")
             )
 
