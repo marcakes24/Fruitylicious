@@ -56,7 +56,7 @@ fun AppNavigation() {
         val adminRoutes = listOf("admin_home", "admin_pos", "admin_transacHistory",
             "admin_checkout", "admin_restock", "admin_notification",
             "admin_waste_management", "admin_inventory_adjustment",
-            "admin_SalesSummary", "admin_queue")
+            "admin_SalesSummary", "admin_queue", "admin_users") // ADDED admin_users route
 
         adminRoutes.forEach { route ->
             composable(route) { AdminScaffold(navController, route) }
@@ -96,8 +96,8 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
         when (startScreen) {
             "admin_home" -> AdminDashboardScreen(navController, drawerState, scope)
             "admin_pos" -> POSScreen(navController, drawerState, scope)
-            // FIXED: Passed drawerState and scope to QueueScreen
             "admin_queue" -> QueueScreen(navController, drawerState, scope)
+            "admin_users" -> UserManagementScreen(navController, drawerState, scope) // ADDED this line
         }
     }
 }
