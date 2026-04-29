@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.shared
 
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,31 +27,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.fruitylicious.R
 import kotlinx.coroutines.CoroutineScope
 
 // ── Color constants ──────────────────────────────────────────────────────────
-private val StaffSidebarBg     = Color(0xFF2E7D32)
-private val StaffSidebarDarkBg = Color(0xFF1B5E20)
-private val StaffActiveItemBg  = Color(0xFF43A047)
-private val StaffWhiteFull     = Color.White
-private val StaffWhiteMid      = Color.White.copy(alpha = 0.75f)
-private val StaffWhiteDim      = Color.White.copy(alpha = 0.50f)
-private val StaffWhiteFaint    = Color.White.copy(alpha = 0.20f)
+private val SidebarBg       = Color(0xFF2E7D32)
+private val SidebarDarkBg   = Color(0xFF1B5E20)
+private val ActiveItemBg    = Color(0xFF43A047)   // lighter green pill for active
+private val WhiteFull       = Color.White
+private val WhiteMid        = Color.White.copy(alpha = 0.75f)
+private val WhiteDim        = Color.White.copy(alpha = 0.50f)
+private val WhiteFaint      = Color.White.copy(alpha = 0.20f)
 
 // ── Data model ───────────────────────────────────────────────────────────────
-private data class StaffNavItem(
-    val icon:  ImageVector,
+private data class NavItem(
+    val icon: ImageVector,
     val label: String,
     val route: String
 )
 
 @Composable
-fun StaffSideBarContent(
+fun AdminSideBarContent(
     navController: NavController,
-    drawerState:   DrawerState,
-    scope:         CoroutineScope,
-    staffName:     String = "Staff User",
-    branchName:    String = "Branch 1"
+    drawerState: DrawerState,
+    scope: CoroutineScope
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -59,25 +59,27 @@ fun StaffSideBarContent(
         modifier = Modifier
             .fillMaxHeight()
             .width(260.dp)
-            .background(StaffSidebarBg)
+            .background(SidebarBg)
     ) {
 
         // ── Logo header ──────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(StaffSidebarDarkBg)
+                .background(SidebarDarkBg)
                 .padding(top = 52.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Oval logo container
             Box(
-                modifier         = Modifier.size(width = 140.dp, height = 72.dp),
+                modifier = Modifier
+                    .size(width = 140.dp, height = 72.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter            = painterResource(id = R.drawable.logo),
+                    painter = painterResource(id = R.drawable.logo),
                     contentDescription = "Fruitylicious Logo",
-                    modifier           = Modifier
+                    modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .aspectRatio(2f)
                 )
@@ -91,63 +93,71 @@ fun StaffSideBarContent(
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 8.dp)
         ) {
-            // ── Main items (staff-visible only) ──────────────────────────────
+
+            // Main items
             val mainItems = listOf(
-                StaffNavItem(Icons.Outlined.Dashboard,              "Dashboard",     "home"),
-                StaffNavItem(Icons.Outlined.PointOfSale,            "POS Screen",    "pos"),
-                StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt,   "Order Queue",   ""),
-                StaffNavItem(Icons.Outlined.BarChart,               "Sales Summary", ""),
-                StaffNavItem(Icons.Outlined.AccessTime,             "Time Log",      ""),
-                StaffNavItem(Icons.Outlined.Search,              "Inventory Monitoring",  ""),
-                StaffNavItem(Icons.Outlined.Notifications,          "Notifications", "")
+                NavItem(Icons.Outlined.Dashboard,           "Dashboard",     "admin_home"),
+                NavItem(Icons.Outlined.PointOfSale,         "POS Screen",    "admin_pos"),
+                NavItem(Icons.AutoMirrored.Outlined.ListAlt,"Order Queue",   ""),
+                NavItem(Icons.Outlined.AccessTime,          "Time Log",      ""),
+                NavItem(Icons.Outlined.Notifications,       "Notifications", "")
             )
             mainItems.forEach { item ->
-                StaffSidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
-                    isActive = currentRoute == item.route,
-                    onClick  = {
+                SidebarNavItem(
+                    icon      = item.icon,
+                    label     = item.label,
+                    isActive  = currentRoute == item.route,
+                    onClick   = {
                         if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
+                            navigateTo(navController, drawerState, scope, item.route)
                         else
                             scope.launch { drawerState.close() }
                     }
                 )
             }
 
-            // ── Management section (staff-limited) ───────────────────────────
-            StaffSidebarSectionHeader("Management")
+            // Management section
+            SidebarSectionHeader("Management")
             val managementItems = listOf(
-                StaffNavItem(Icons.Outlined.Autorenew,   "Restock",              ""),
-                StaffNavItem(Icons.Outlined.DeleteOutline,"Waste Management",    "")
+                NavItem(Icons.Outlined.Inventory2,           "Manage Products",       ""),
+                NavItem(Icons.Outlined.SetMeal,              "Manage Ingredients",    ""),
+                NavItem(Icons.AutoMirrored.Outlined.MenuBook,"Recipe Management",     ""),
+                NavItem(Icons.Outlined.Group,                "User Management",       ""),
+                NavItem(Icons.Outlined.Search,               "Inventory Monitoring",  ""),
+                NavItem(Icons.Outlined.Tune,                 "Inventory Adjustment",  ""),
+                NavItem(Icons.Outlined.Autorenew,            "Restock",               ""),
+                NavItem(Icons.Outlined.DeleteOutline,        "Waste Management",      "")
             )
             managementItems.forEach { item ->
-                StaffSidebarNavItem(
+                SidebarNavItem(
                     icon     = item.icon,
                     label    = item.label,
                     isActive = currentRoute == item.route,
                     onClick  = {
                         if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
+                            navigateTo(navController, drawerState, scope, item.route)
                         else
                             scope.launch { drawerState.close() }
                     }
                 )
             }
 
-            // ── Reports section (staff-limited) ──────────────────────────────
-            StaffSidebarSectionHeader("Reports")
+            // Reports section
+            SidebarSectionHeader("Reports")
             val reportItems = listOf(
-                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "")
+                NavItem(Icons.Outlined.Receipt,       "Transaction History", ""),
+                NavItem(Icons.Outlined.BarChart,      "Reports",            ""),
+                NavItem(Icons.Outlined.AssignmentLate,"Audit Logs",         ""),
+                NavItem(Icons.Outlined.Groups,        "Staff Logs",         "")
             )
             reportItems.forEach { item ->
-                StaffSidebarNavItem(
+                SidebarNavItem(
                     icon     = item.icon,
                     label    = item.label,
                     isActive = currentRoute == item.route,
                     onClick  = {
                         if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
+                            navigateTo(navController, drawerState, scope, item.route)
                         else
                             scope.launch { drawerState.close() }
                     }
@@ -155,27 +165,30 @@ fun StaffSideBarContent(
             }
         }
 
-        // ── Bottom: Staff info + Log Out ─────────────────────────────────────
-        HorizontalDivider(color = StaffWhiteFaint, thickness = 1.dp)
+        // ── Bottom: Admin info + Log Out ─────────────────────────────────────
+        HorizontalDivider(
+            color     = WhiteFaint,
+            thickness = 1.dp
+        )
 
-        // Staff User row
+        // Admin User row
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar circle with initial "S"
+            // Avatar circle with initial "A"
             Box(
-                modifier         = Modifier
+                modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFFFA000)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text       = staffName.firstOrNull()?.uppercaseChar()?.toString() ?: "S",
-                    color      = StaffWhiteFull,
+                    text       = "A",
+                    color      = WhiteFull,
                     fontSize   = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -183,22 +196,21 @@ fun StaffSideBarContent(
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = staffName,
-                    color      = StaffWhiteFull,
+                    text       = "Admin User",
+                    color      = WhiteFull,
                     fontSize   = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    // "Staff · Branch 1" as shown in Figma
-                    text     = "Staff · $branchName",
-                    color    = StaffWhiteMid,
+                    text     = "admin",
+                    color    = WhiteMid,
                     fontSize = 12.sp
                 )
             }
         }
 
         // Log Out row
-        HorizontalDivider(color = StaffWhiteFaint, thickness = 1.dp)
+        HorizontalDivider(color = WhiteFaint, thickness = 1.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -213,13 +225,13 @@ fun StaffSideBarContent(
             Icon(
                 imageVector        = Icons.AutoMirrored.Outlined.Logout,
                 contentDescription = "Log Out",
-                tint               = StaffWhiteMid,
+                tint               = WhiteMid,
                 modifier           = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text       = "Log Out",
-                color      = StaffWhiteFull,
+                color      = WhiteFull,
                 fontSize   = 14.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -227,34 +239,36 @@ fun StaffSideBarContent(
     }
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
+// ── Section header ───────────────────────────────────────────────────────────
 @Composable
-private fun StaffSidebarSectionHeader(title: String) {
+private fun SidebarSectionHeader(title: String) {
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text          = title.uppercase(),
-        color         = StaffWhiteDim,
-        fontSize      = 11.sp,
-        fontWeight    = FontWeight.Bold,
+        text       = title.uppercase(),
+        color      = WhiteDim,
+        fontSize   = 11.sp,
+        fontWeight = FontWeight.Bold,
         letterSpacing = 1.sp,
-        modifier      = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
+        modifier   = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
     )
 }
 
-// ── Single nav item ───────────────────────────────────────────────────────────
+// ── Single nav item ──────────────────────────────────────────────────────────
 @Composable
-private fun StaffSidebarNavItem(
+private fun SidebarNavItem(
     icon:     ImageVector,
     label:    String,
     isActive: Boolean,
     onClick:  () -> Unit
 ) {
+    val bgColor = if (isActive) ActiveItemBg else Color.Transparent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isActive) StaffActiveItemBg else Color.Transparent)
+            .background(bgColor)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -262,21 +276,21 @@ private fun StaffSidebarNavItem(
         Icon(
             imageVector        = icon,
             contentDescription = label,
-            tint               = if (isActive) StaffWhiteFull else StaffWhiteMid,
+            tint               = if (isActive) WhiteFull else WhiteMid,
             modifier           = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(14.dp))
         Text(
             text       = label,
-            color      = if (isActive) StaffWhiteFull else StaffWhiteMid,
+            color      = if (isActive) WhiteFull else WhiteMid,
             fontSize   = 14.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
 
-// ── Navigation helper ─────────────────────────────────────────────────────────
-private fun staffNavigateTo(
+// ── Navigation helper ────────────────────────────────────────────────────────
+private fun navigateTo(
     navController: NavController,
     drawerState:   DrawerState,
     scope:         CoroutineScope,
@@ -284,7 +298,7 @@ private fun staffNavigateTo(
 ) {
     scope.launch { drawerState.close() }
     navController.navigate(route) {
-        popUpTo("home") { saveState = true }
+        popUpTo("admin_home") { saveState = true }
         launchSingleTop = true
         restoreState    = true
     }

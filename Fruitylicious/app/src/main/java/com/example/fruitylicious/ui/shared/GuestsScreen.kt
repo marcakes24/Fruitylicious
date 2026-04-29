@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.shared
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.fruitylicious.R
 
 @Composable
 fun GuestsScreen(navController: NavController) {

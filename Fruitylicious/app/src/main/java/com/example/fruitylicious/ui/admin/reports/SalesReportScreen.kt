@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.admin.reports
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.AppDatabase
 import java.util.*
+import kotlin.math.abs
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
 private val RptGreen     = Color(0xFF2C8C44)
@@ -168,7 +169,9 @@ fun SalesTabContent(branch: String, navController: NavController) {
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text       = "${if (isUp) "▲" else "▼"} ${String.format(Locale.US, "%.1f", kotlin.math.abs(pctChange))}%",
+                        text       = "${if (isUp) "▲" else "▼"} ${String.format(Locale.US, "%.1f",
+                            abs(pctChange)
+                        )}%",
                         color      = if (isUp) RptGreen else RptRed,
                         fontSize   = 12.sp,
                         fontWeight = FontWeight.Bold

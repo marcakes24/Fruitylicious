@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.staff.pos
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -27,6 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -214,7 +215,7 @@ fun POSScreen(
                         )
                     }
                     LaunchedEffect(addedToCartMsg) {
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000)
                         addedToCartMsg = false
                     }
                 }
