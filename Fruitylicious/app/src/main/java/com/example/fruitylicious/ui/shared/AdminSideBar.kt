@@ -95,13 +95,15 @@ fun AdminSideBarContent(
         ) {
 
             // Main items
+            // ... inside AdminSideBarContent function
             val mainItems = listOf(
-                NavItem(Icons.Outlined.Dashboard,           "Dashboard",     "admin_home"),
-                NavItem(Icons.Outlined.PointOfSale,         "POS Screen",    "admin_pos"),
-                NavItem(Icons.AutoMirrored.Outlined.ListAlt,"Order Queue",   ""),
-                NavItem(Icons.Outlined.AccessTime,          "Time Log",      ""),
-                NavItem(Icons.Outlined.Notifications,       "Notifications", "")
+                NavItem(Icons.Outlined.Dashboard, "Dashboard", "admin_home"),
+                NavItem(Icons.Outlined.PointOfSale, "POS Screen", "admin_pos"),
+                NavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", "admin_queue"), // Route added
+                NavItem(Icons.Outlined.AccessTime, "Time Log", ""),
+                NavItem(Icons.Outlined.Notifications, "Notifications", "admin_notification")
             )
+// ... rest of code remains same
             mainItems.forEach { item ->
                 SidebarNavItem(
                     icon      = item.icon,

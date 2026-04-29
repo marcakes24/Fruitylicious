@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.staff.transaction
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

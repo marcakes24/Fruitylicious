@@ -22,6 +22,8 @@ import com.example.fruitylicious.ui.shared.StaffSideBarContent
 import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
 import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.POSScreen
+import com.example.fruitylicious.ui.staff.transaction.TransactionHistoryScreen
+import com.example.fruitylicious.ui.staff.waste.WasteManagementScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,102 +39,30 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = "login"
-    ) {
-        // ✅ Login Screen
-        composable("login") {
-            FruityliciousLoginScreen(navController)
-        }
-
-        // ✅ Guest Screen (Added this)
-        composable("guests_screen") {
-            GuestsScreen(navController)
-        }
+    NavHost(navController = navController, startDestination = "login") {
+        composable("login") { FruityliciousLoginScreen(navController) }
+        composable("guests_screen") { GuestsScreen(navController) }
 
         // STAFF ROUTES
-        composable("home") {
-            MainScaffold(navController, "home")
-        }
-        composable("transacHistory") {
-            MainScaffold(navController, "transacHistory")
-        }
-        composable("pos") {
-            MainScaffold(navController, "pos")
-        }
-        composable("checkout") {
-            MainScaffold(navController, "checkout")
-        }
-        composable("restock") {
-            MainScaffold(navController, "restock")
-        }
-        composable("notification") {
-            MainScaffold(navController, "notification")
-        }
-        composable("waste_management") {
-            MainScaffold(navController, "waste_management")
-        }
-        composable("inventory_adjustment") {
-            MainScaffold(navController, "inventory_adjustment")
-        }
-        composable("SalesSummary") {
-            MainScaffold(navController, "SalesSummary")
+        val staffRoutes = listOf("home", "transacHistory", "pos", "checkout", "restock",
+            "notification", "waste_management", "inventory_adjustment",
+            "SalesSummary", "queue_screen")
+
+        staffRoutes.forEach { route ->
+            composable(route) { MainScaffold(navController, route) }
         }
 
         // ADMIN ROUTES
-        composable("admin_home") {
-            AdminScaffold(navController, "admin_home")
-        }
-        composable("admin_pos") {
-            AdminScaffold(navController, "pos")
-        }
-        composable("admin_transacHistory") {
-            AdminScaffold(navController, "transacHistory")
-        }
-        composable("admin_checkout") {
-            AdminScaffold(navController, "checkout")
-        }
-        composable("admin_restock") {
-            AdminScaffold(navController, "restock")
-        }
-        composable("admin_notification") {
-            AdminScaffold(navController, "notification")
-        }
-        composable("admin_waste_management") {
-            AdminScaffold(navController, "waste_management")
-        }
-        composable("admin_inventory_adjustment") {
-            AdminScaffold(navController, "inventory_adjustment")
-        }
-        composable("admin_SalesSummary") {
-            AdminScaffold(navController, "SalesSummary")
-        }
-        // Staff screens
-        composable("home")              { MainScaffold(navController, "home") }
-        composable("transacHistory")    { MainScaffold(navController, "transacHistory") }
-        composable("pos")               { MainScaffold(navController, "pos") }
-        composable("checkout")          { MainScaffold(navController, "checkout") }
-        composable("restock")           { MainScaffold(navController, "restock") }
-        composable("notification")      { MainScaffold(navController, "notification") }
-        composable("waste_management")  { MainScaffold(navController, "waste_management") }
-        composable("inventory_adjustment") { MainScaffold(navController, "inventory_adjustment") }
-        composable("SalesSummary")      { MainScaffold(navController, "SalesSummary") }
+        val adminRoutes = listOf("admin_home", "admin_pos", "admin_transacHistory",
+            "admin_checkout", "admin_restock", "admin_notification",
+            "admin_waste_management", "admin_inventory_adjustment",
+            "admin_SalesSummary", "admin_queue")
 
-        // Admin screens
-        composable("admin_home")                    { AdminScaffold(navController, "admin_home") }
-        composable("admin_pos")                     { AdminScaffold(navController, "pos") }
-        composable("admin_transacHistory")          { AdminScaffold(navController, "transacHistory") }
-        composable("admin_checkout")                { AdminScaffold(navController, "checkout") }
-        composable("admin_restock")                 { AdminScaffold(navController, "restock") }
-        composable("admin_notification")            { AdminScaffold(navController, "notification") }
-        composable("admin_waste_management")        { AdminScaffold(navController, "waste_management") }
-        composable("admin_inventory_adjustment")    { AdminScaffold(navController, "inventory_adjustment") }
-        composable("admin_SalesSummary")            { AdminScaffold(navController, "SalesSummary") }
+        adminRoutes.forEach { route ->
+            composable(route) { AdminScaffold(navController, route) }
+        }
     }
 }
-
-
 
 @Composable
 fun MainScaffold(navController: NavController, startScreen: String) {
@@ -141,20 +71,15 @@ fun MainScaffold(navController: NavController, startScreen: String) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        drawerContent = {
-            StaffSideBarContent(navController, drawerState, scope)
-        }
+        drawerContent = { StaffSideBarContent(navController, drawerState, scope) }
     ) {
         when (startScreen) {
-            "home"              -> StaffDashboardScreen(navController, drawerState, scope)
-            "transacHistory"    -> TransactionHistoryScreen(navController, drawerState, scope)
-            "pos"               -> POSScreen(navController, drawerState, scope)
-            "checkout"          -> CheckoutScreen(navController, drawerState, scope)
-            "restock"           -> RestockScreen(navController, drawerState, scope)
-            "notification"      -> NotificationsScreen(navController, drawerState, scope)
-            "SalesSummary"      -> SalesSummaryScreen(navController, drawerState, scope)
-            "waste_management"  -> WasteManagementScreen(navController, drawerState, scope)
-            "inventory_adjustment" -> InventoryAdjustmentScreen(navController, drawerState, scope)
+            "home" -> StaffDashboardScreen(navController, drawerState, scope)
+            "transacHistory" -> TransactionHistoryScreen(navController, drawerState, scope)
+            "pos" -> POSScreen(navController, drawerState, scope)
+            "checkout" -> CheckoutScreen(navController, drawerState, scope)
+            "waste_management" -> WasteManagementScreen(navController, drawerState, scope)
+            "queue_screen" -> QueueScreen(navController, drawerState, scope)
         }
     }
 }
@@ -166,24 +91,13 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        drawerContent = {
-            AdminSideBarContent(navController, drawerState, scope)  // updated file
-        }
+        drawerContent = { AdminSideBarContent(navController, drawerState, scope) }
     ) {
         when (startScreen) {
-            "admin_home"           -> AdminDashboardScreen(
-                navController,
-                drawerState,
-                scope
-            ) // updated file
-            "pos"               -> POSScreen(navController, drawerState, scope)
-            "checkout"          -> CheckoutScreen(navController, drawerState, scope)
-            "restock"           -> RestockScreen(navController, drawerState, scope)
-            "notification"      -> NotificationsScreen(navController, drawerState, scope)
-            "SalesSummary"      -> SalesSummaryScreen(navController, drawerState, scope)
-            "waste_management"  -> WasteManagementScreen(navController, drawerState, scope)
-            "inventory_adjustment"  -> InventoryAdjustmentScreen(navController, drawerState, scope)
-            "transacHistory"    -> TransactionHistoryScreen(navController, drawerState, scope)
+            "admin_home" -> AdminDashboardScreen(navController, drawerState, scope)
+            "admin_pos" -> POSScreen(navController, drawerState, scope)
+            // FIXED: Passed drawerState and scope to QueueScreen
+            "admin_queue" -> QueueScreen(navController, drawerState, scope)
         }
     }
 }
