@@ -93,15 +93,17 @@ fun StaffSideBarContent(
                 .padding(vertical = 8.dp)
         ) {
             // ── Main items (staff-visible only) ──────────────────────────────
+            // ... inside StaffSideBarContent function
             val mainItems = listOf(
-                StaffNavItem(Icons.Outlined.Dashboard,              "Dashboard",     "home"),
-                StaffNavItem(Icons.Outlined.PointOfSale,            "POS Screen",    "pos"),
-                StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt,   "Order Queue",   ""),
-                StaffNavItem(Icons.Outlined.BarChart,               "Sales Summary", ""),
-                StaffNavItem(Icons.Outlined.AccessTime,             "Time Log",      ""),
-                StaffNavItem(Icons.Outlined.Search,              "Inventory Monitoring",  ""),
-                StaffNavItem(Icons.Outlined.Notifications,          "Notifications", "")
+                StaffNavItem(Icons.Outlined.Dashboard, "Dashboard", "home"),
+                StaffNavItem(Icons.Outlined.PointOfSale, "POS Screen", "pos"),
+                StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", "queue_screen"), // Route added
+                StaffNavItem(Icons.Outlined.BarChart, "Sales Summary", "SalesSummary"),
+                StaffNavItem(Icons.Outlined.AccessTime, "Time Log", ""),
+                StaffNavItem(Icons.Outlined.Search, "Inventory Monitoring", ""),
+                StaffNavItem(Icons.Outlined.Notifications, "Notifications", "notification")
             )
+// ... rest of code remains same
             mainItems.forEach { item ->
                 StaffSidebarNavItem(
                     icon     = item.icon,
