@@ -1,585 +1,246 @@
 package com.example.fruitylicious.ui.admin.dashboard
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.Kitchen
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
-import com.example.fruitylicious.data.local.entity.AppDatabase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.math.ceil
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fruitylicious.ADMIN_AUDIT_LOGS
+import com.example.fruitylicious.ADMIN_INGREDIENTS
+import com.example.fruitylicious.ADMIN_INVENTORY
+import com.example.fruitylicious.ADMIN_PRODUCTS
+import com.example.fruitylicious.ADMIN_RECIPES
+import com.example.fruitylicious.ADMIN_REPORTS_DASHBOARD
+import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
+import com.example.fruitylicious.ADMIN_STAFF_LOGS
+import com.example.fruitylicious.ADMIN_USERS
+import com.example.fruitylicious.ADMIN_WASTE_HISTORY
+import com.example.fruitylicious.STAFF_POS
+import com.example.fruitylicious.STAFF_TRANSACTION_HISTORY
+import com.example.fruitylicious.ui.shared.BranchIndicator
+import com.example.fruitylicious.ui.shared.FruityInfoCard
+import com.example.fruitylicious.ui.shared.FruityMenuCard
+import com.example.fruitylicious.ui.shared.FruitySectionTitle
+import com.example.fruitylicious.ui.shared.LowStockAlertBanner
+import com.example.fruitylicious.ui.shared.SyncStatusBar
 
-// ── Brand colors (Renamed to avoid conflicts) ────────────────────────────────
-private val DashGreenPrimary = Color(0xFF2C8C44)
-private val DashGreenDark    = Color(0xFF1B5E20)
-private val PageBg           = Color(0xFFFFEAA0)   
-private val CardBg           = Color.White
-private val ChartBar         = Color(0xFFE53935)   // red bars in Figma
-private val TextPrimary      = Color(0xFF1A1A1A)
-private val TextSecondary    = Color(0xFF757575)
-
-// ── Selected branch state (lifted so header & card share it) ─────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(
-    navController: NavController,
-    drawerState:   DrawerState,
-    scope:         CoroutineScope
+    onNavigate: (String) -> Unit,
+    onLogout: () -> Unit,
+    viewModel: AdminDashboardViewModel = hiltViewModel()
 ) {
-    var selectedBranch by remember { mutableStateOf("B1") }
-    val context = LocalContext.current
-    val database = remember { AppDatabase.getDatabase(context) }
-    val transactionDao = database.transactionDao()
+    val uiState by viewModel.uiState.collectAsState()
 
-    // Map branch labels to actual database branch_ids
-    val branchIdFilter = when (selectedBranch) {
-        "B1"  -> "B1"
-        "B2"  -> "B2"
-        else  -> null // "All" branches
-    }
-
-    // Sales data state for the week (Monday to Sunday)
-    var weeklySalesData by remember { mutableStateOf(List(7) { 0f }) }
-    var totalAmount by remember { mutableStateOf(0.0) }
-    var transactionCount by remember { mutableStateOf(0) }
-
-    // Fetch and aggregate data whenever the branch filter changes
-    LaunchedEffect(selectedBranch) {
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        
-        // Find Monday of the current week
-        while (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-            calendar.add(Calendar.DAY_OF_YEAR, -1)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Admin Dashboard") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFFFFDF6),
+                    titleContentColor = Color(0xFF1B5E20)
+                ),
+                actions = {
+                    FloatingActionButton(
+                        onClick = {
+                            viewModel.logout()
+                            onLogout()
+                        },
+                        containerColor = Color(0xFFE8F5E9),
+                        contentColor = Color(0xFF1B5E20)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Logout"
+                        )
+                    }
+                }
+            )
         }
-        
-        val salesPerDay = mutableListOf<Float>()
-        var totalSales = 0.0
-        var totalCount = 0
-        
-        // Loop through each day of the week
-        for (i in 0 until 7) {
-            val dayStart = calendar.timeInMillis
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-            val dayEnd = calendar.timeInMillis
-            
-            val daySum: Double
-            if (branchIdFilter != null) {
-                daySum = transactionDao.getTotalSales(branchIdFilter, dayStart, dayEnd) ?: 0.0
-                // For transaction count, we might need a specific query in DAO, but here's a placeholder logic
-            } else {
-                // Sum for ALL branches
-                // We'd ideally have a getTotalSalesAllBranches in DAO, but let's approximate or use a simple loop
-                // (Optimally add @Query("SELECT SUM(total_amount) FROM transactions WHERE status = 'completed' AND date_time BETWEEN :from AND :to") to DAO)
-                daySum = 0.0 // Replace with actual DAO call if available
-            }
-            
-            salesPerDay.add(daySum.toFloat())
-            totalSales += daySum
-        }
-        
-        weeklySalesData = salesPerDay
-        totalAmount = totalSales
-        // transactionCount = totalCount // Update count if needed
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBg)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Header
-        DashboardHeader(
-            selectedBranch  = selectedBranch,
-            onBranchSelect  = { selectedBranch = it },
-            onMenuClick     = { scope.launch { drawerState.open() } }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Greeting card
-        GreetingCard(
-            navController  = navController,
-            selectedBranch = selectedBranch
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Quick actions
-        QuickActionsSection(navController)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Sales chart
-        SalesChartSection(weeklySalesData, totalAmount)
-
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-// ── Header ───────────────────────────────────────────────────────────────────
-@Composable
-private fun DashboardHeader(
-    selectedBranch: String,
-    onBranchSelect: (String) -> Unit,
-    onMenuClick:    () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DashGreenPrimary)
-            .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
-    ) {
-        // Hamburger
+    ) { padding ->
         Column(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .clickable { onMenuClick() },
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+                .fillMaxSize()
+                .background(Color(0xFFFFFDF6))
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            repeat(3) {
-                Box(
-                    modifier = Modifier
-                        .width(22.dp)
-                        .height(2.5.dp)
-                        .background(Color.White, RoundedCornerShape(2.dp))
-                )
-            }
-        }
+            SyncStatusBar(
+                isOnline = uiState.isOnline,
+                lastSyncAt = uiState.lastSyncAt,
+                lastSyncSuccessful = uiState.lastSyncSuccessful,
+                message = uiState.lastSyncMessage
+            )
 
-        // Title
-        Text(
-            text       = "DASHBOARD",
-            color      = Color.White,
-            fontSize   = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier   = Modifier.align(Alignment.Center)
-        )
+            LowStockAlertBanner(lowStockCount = uiState.lowStockCount)
 
-        // Branch selector pills
-        Row(
-            modifier            = Modifier.align(Alignment.CenterEnd),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            listOf("B1", "B2", "All").forEach { branch ->
-                val isActive = selectedBranch == branch
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (isActive) Color.White else Color.White.copy(alpha = 0.25f))
-                        .clickable { onBranchSelect(branch) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text       = branch,
-                        color      = if (isActive) DashGreenPrimary else Color.White,
-                        fontSize   = 12.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Greeting card ─────────────────────────────────────────────────────────────
-@Composable
-private fun GreetingCard(
-    navController:  NavController,
-    selectedBranch: String
-) {
-    val branchName = when (selectedBranch) {
-        "B1"  -> "Branch 1"
-        "B2"  -> "Branch 2"
-        "All" -> "All Branches"
-        else  -> selectedBranch
-    }
-
-    Surface(
-        modifier        = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        color           = CardBg,
-        shape           = RoundedCornerShape(16.dp),
-        shadowElevation = 3.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-
-            // Top row: greeting + branch badge
             Row(
-                modifier              = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text       = "Hello, Admin User",
-                        fontSize   = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color      = TextPrimary
+                        text = "Welcome, ${uiState.userName.ifBlank { "Admin" }}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFF1B5E20)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    val sdf = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US)
+
                     Text(
-                        text     = sdf.format(Date()),
-                        fontSize = 13.sp,
-                        color    = TextSecondary
+                        text = "Cross-branch management console",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF6D6D6D)
                     )
                 }
 
-                // "Viewing: Branch X" badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFFE8F5E9))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text       = "Viewing: $branchName",
-                        color      = DashGreenPrimary,
-                        fontSize   = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                BranchIndicator(branchName = uiState.selectedBranchName)
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Dark green "Ready to serve?" CTA row
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DashGreenDark)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                    Text(
-                        text       = "Ready to serve?",
-                        color      = Color.White,
-                        fontSize   = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text     = "Open POS to start taking orders.",
-                        color    = Color.White.copy(alpha = 0.8f),
-                        fontSize = 13.sp
-                    )
-                }
+                FruityInfoCard(
+                    title = "Products",
+                    value = uiState.productCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Start POS button
-                Button(
-                    onClick = {
-                        navController.navigate("pos") {
-                            popUpTo("admin_home") { saveState = true }
-                            launchSingleTop = true
-                            restoreState    = true
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape  = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Icon(
-                        imageVector        = Icons.Outlined.ShoppingCart,
-                        contentDescription = null,
-                        tint               = DashGreenPrimary,
-                        modifier           = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text       = "Start POS",
-                        color      = DashGreenPrimary,
-                        fontSize   = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Quick actions ─────────────────────────────────────────────────────────────
-@Composable
-private fun QuickActionsSection(navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text       = "Quick Actions",
-            fontSize   = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color      = TextPrimary,
-            modifier   = Modifier.padding(bottom = 10.dp)
-        )
-
-        // 2 × 2 grid - wala pa tong mga route
-        val actions = listOf(
-            Triple(Icons.Outlined.Inventory2,  "Products",    ""),
-            Triple(Icons.Outlined.SetMeal,     "Ingredients", ""),
-            Triple(Icons.AutoMirrored.Outlined.MenuBook, "Recipes", ""),
-            Triple(Icons.Outlined.Search,      "Inventory",   "")
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            actions.chunked(2).forEach { rowItems ->
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    rowItems.forEach { (icon, label, route) ->
-                        QuickActionCard(
-                            icon     = icon,
-                            label    = label,
-                            modifier = Modifier.weight(1f),
-                            onClick  = {
-                                if (route.isNotEmpty()) navController.navigate(route)
-                            }
-                        )
-                    }
-                    // Fill empty cell if odd number
-                    if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickActionCard(
-    icon:     ImageVector,
-    label:    String,
-    modifier: Modifier = Modifier,
-    onClick:  () -> Unit
-) {
-    Surface(
-        modifier        = modifier
-            .height(110.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable { onClick() },
-        color           = CardBg,
-        shape           = RoundedCornerShape(14.dp),
-        shadowElevation = 2.dp
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Outline icon in a light circle
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(50.dp))
-                        .background(Color(0xFFE8F5E9)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector        = icon,
-                        contentDescription = label,
-                        tint               = DashGreenPrimary,
-                        modifier           = Modifier.size(26.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text       = label,
-                    fontSize   = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color      = TextPrimary,
-                    textAlign  = TextAlign.Center
+                FruityInfoCard(
+                    title = "Ingredients",
+                    value = uiState.ingredientCount.toString(),
+                    modifier = Modifier.weight(1f)
                 )
             }
+
+            FruitySectionTitle(
+                title = "Staff Tools",
+                subtitle = "Admin can also access branch POS tools"
+            )
+
+            FruityMenuCard(
+                title = "Point of Sale",
+                subtitle = "Create branch transactions",
+                icon = Icons.Default.Store,
+                onClick = { onNavigate(STAFF_POS) }
+            )
+
+            FruityMenuCard(
+                title = "Transaction History",
+                subtitle = "View local branch transactions",
+                icon = Icons.Default.ReceiptLong,
+                onClick = { onNavigate(STAFF_TRANSACTION_HISTORY) }
+            )
+
+            FruitySectionTitle(
+                title = "Management",
+                subtitle = "Maintain global and branch-specific records"
+            )
+
+            FruityMenuCard(
+                title = "Manage Products",
+                subtitle = "Add, edit, and delete fruit shake products",
+                icon = Icons.Default.Fastfood,
+                onClick = { onNavigate(ADMIN_PRODUCTS) }
+            )
+
+            FruityMenuCard(
+                title = "Manage Ingredients",
+                subtitle = "Maintain ingredients, packaging, and thresholds",
+                icon = Icons.Default.Kitchen,
+                onClick = { onNavigate(ADMIN_INGREDIENTS) }
+            )
+
+            FruityMenuCard(
+                title = "Recipe Management",
+                subtitle = "Map products to required ingredients",
+                icon = Icons.Default.RestaurantMenu,
+                onClick = { onNavigate(ADMIN_RECIPES) }
+            )
+
+            FruityMenuCard(
+                title = "Inventory Monitoring",
+                subtitle = "View inventory by branch and adjust stock",
+                icon = Icons.Default.Inventory,
+                onClick = { onNavigate(ADMIN_INVENTORY) }
+            )
+
+            FruityMenuCard(
+                title = "Waste",
+                subtitle = "Review and enter waste logs",
+                icon = Icons.Default.Warning,
+                onClick = { onNavigate(ADMIN_WASTE_HISTORY) }
+            )
+
+            FruityMenuCard(
+                title = "Restock",
+                subtitle = "Review and enter restock logs",
+                icon = Icons.Default.Restore,
+                onClick = { onNavigate(ADMIN_RESTOCK_HISTORY) }
+            )
+
+            FruityMenuCard(
+                title = "Users",
+                subtitle = "Manage admin and staff accounts",
+                icon = Icons.Default.People,
+                onClick = { onNavigate(ADMIN_USERS) }
+            )
+
+            FruityMenuCard(
+                title = "Staff Logs",
+                subtitle = "Filter staff attendance logs",
+                icon = Icons.Default.People,
+                onClick = { onNavigate(ADMIN_STAFF_LOGS) }
+            )
+
+            FruityMenuCard(
+                title = "Reports",
+                subtitle = "Sales, inventory, waste, restock, and transactions",
+                icon = Icons.Default.Assessment,
+                onClick = { onNavigate(ADMIN_REPORTS_DASHBOARD) }
+            )
+
+            FruityMenuCard(
+                title = "Audit Logs",
+                subtitle = "Review user actions and syncable audit records",
+                icon = Icons.Default.FactCheck,
+                onClick = { onNavigate(ADMIN_AUDIT_LOGS) }
+            )
         }
     }
-}
-
-// ── Sales chart ───────────────────────────────────────────────────────────────
-@Composable
-private fun SalesChartSection(weeklySales: List<Float>, totalAmount: Double) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text       = "Sales This Week",
-            fontSize   = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color      = TextPrimary,
-            modifier   = Modifier.padding(bottom = 10.dp)
-        )
-
-        Surface(
-            modifier        = Modifier.fillMaxWidth(),
-            color           = CardBg,
-            shape           = RoundedCornerShape(16.dp),
-            shadowElevation = 3.dp
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-
-                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                
-                // Dynamically scale Y-axis based on data
-                val maxSales = (weeklySales.maxOrNull() ?: 0f).coerceAtLeast(100f)
-                val roundedMax = (ceil(maxSales / 100.0) * 100).toInt()
-                val yLabels = listOf("P$roundedMax", "P${roundedMax*3/4}", "P${roundedMax/2}", "P${roundedMax/4}", "P0")
-
-                // Y-axis labels + bars
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                ) {
-                    // Y-axis labels
-                    Column(
-                        modifier              = Modifier
-                            .width(40.dp)
-                            .fillMaxHeight()
-                            .padding(bottom = 20.dp),
-                        verticalArrangement   = Arrangement.SpaceBetween
-                    ) {
-                        yLabels.forEach { label ->
-                            Text(
-                                text      = label,
-                                fontSize  = 9.sp,
-                                color     = TextSecondary,
-                                textAlign = TextAlign.End,
-                                modifier  = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Bar chart canvas
-                    Canvas(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        val chartHeight  = size.height - 24.dp.toPx()
-                        val barAreaWidth = size.width
-                        val barCount     = weeklySales.size
-                        val gap          = barAreaWidth / barCount
-                        val barWidth     = gap * 0.55f
-
-                        // Horizontal grid lines
-                        for (i in 0..4) {
-                            val y = chartHeight * (1f - i / 4f)
-                            drawLine(
-                                color       = Color(0xFFE0E0E0),
-                                start       = Offset(0f, y),
-                                end         = Offset(size.width, y),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                        }
-
-                        weeklySales.forEachIndexed { idx, value ->
-                            val barHeight = (value / roundedMax) * chartHeight
-                            val left      = idx * gap + (gap - barWidth) / 2f
-                            val top       = chartHeight - barHeight
-
-                            // Bar
-                            drawRoundRect(
-                                color        = ChartBar,
-                                topLeft      = Offset(left, top),
-                                size         = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx())
-                            )
-                        }
-                    }
-                }
-
-                // Day labels
-                Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 46.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    days.forEach { day ->
-                        Text(
-                            text      = day,
-                            fontSize  = 10.sp,
-                            color     = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier  = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Summary row
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.Bottom
-                ) {
-                    Text(
-                        text       = "Total This Week",
-                        fontSize   = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color      = TextPrimary
-                    )
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text       = "₱${String.format(Locale.US, "%,.2f", totalAmount)}",
-                            fontSize   = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color      = TextPrimary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Preview ───────────────────────────────────────────────────────────────────
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun AdminDashboardPreview() {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope       = rememberCoroutineScope()
-    AdminDashboardScreen(
-        navController = rememberNavController(),
-        drawerState   = drawerState,
-        scope         = scope
-    )
 }
