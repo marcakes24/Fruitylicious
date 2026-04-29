@@ -57,6 +57,10 @@ interface TransactionDao {
     @Query("SELECT SUM(total_amount) FROM transactions WHERE branch_id = :branchId AND status = 'completed' AND date_time BETWEEN :from AND :to")
     suspend fun getTotalSales(branchId: String, from: Long, to: Long): Double?
 
+    /** Total sales amount for all branches within a date range */
+    @Query("SELECT SUM(total_amount) FROM transactions WHERE status = 'completed' AND date_time BETWEEN :from AND :to")
+    suspend fun getTotalSalesAll(from: Long, to: Long): Double?
+
     /** Void a transaction by updating its status */
     @Query("UPDATE transactions SET status = 'void', last_modified = :lastModified WHERE transaction_id = :transactionId")
     suspend fun voidTransaction(transactionId: String, lastModified: Long = System.currentTimeMillis())
