@@ -1,177 +1,161 @@
 package com.example.fruitylicious.ui.admin.reports
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.fruitylicious.data.local.entity.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fruitylicious.ui.shared.FruityEmptyState
+import com.example.fruitylicious.ui.shared.FruitySectionTitle
+import com.example.fruitylicious.ui.shared.LowStockAlertBanner
+import com.example.fruitylicious.util.DateTimeUtil
 
-// ── Brand colors ──────────────────────────────────────────────────────────────
-private val RptGreen    = Color(0xFF2C8C44)
-private val RptCardBg   = Color.White
-private val RptRed      = Color(0xFFE53935)
-private val RptTextMain = Color(0xFF1A1A1A)
-private val RptTextSub  = Color(0xFF757575)
-private val RptLowStock = Color(0xFFE53935)
-private val RptOkStock  = Color(0xFF2C8C44)
-
-// ── Data class for UI ─────────────────────────────────────────────────────────
-private data class StockItem(
-    val name: String,
-    val category: String,
-    val current: Int,
-    val unit: String,
-    val minStock: Int
-)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// TAB 4 — INVENTORY
-// ══════════════════════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InventoryTabContent(branch: String) {
-    val context      = LocalContext.current
-    val db           = remember { AppDatabase.getDatabase(context) }
-    val inventoryDao = db.inventoryDao()
+fun InventoryReportScreen(
+    onBack: () -> Unit,
+    viewModel: ReportsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val report = uiState.inventoryReport
 
-    var totalStock    by remember { mutableIntStateOf(0) }
-    var inStockCount  by remember { mutableIntStateOf(0) }
-    var lowStockCount by remember { mutableIntStateOf(0) }
-    var stockItems    by remember { mutableStateOf(listOf<StockItem>()) }
-
-    LaunchedEffect(branch) {
-        val branchId = branch.takeIf { it != "All" }
-        val items    = inventoryDao.getInventoryReport(branchId)
-            .map { reportItem ->
-                StockItem(
-                    name     = reportItem.ingredientName,
-                    category = if (reportItem.isPackaging) "Packaging" else "Raw Ingredient",
-                    current  = reportItem.currentStock.toInt(),
-                    unit     = reportItem.unitType,
-                    minStock = 10 // Default minimum threshold
-                )
-            }
-
-        stockItems    = items
-        totalStock    = items.size
-        lowStockCount = items.count { it.current <= it.minStock }
-        inStockCount  = items.count { it.current > it.minStock }
+    LaunchedEffect(Unit) {
+        viewModel.loadInventoryReport()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // ── Summary metrics row ───────────────────────────────────────────────
-        Surface(
-            modifier        = Modifier.fillMaxWidth(),
-            color           = RptCardBg,
-            shape           = RoundedCornerShape(12.dp),
-            shadowElevation = 2.dp
-        ) {
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text("Total Stock", fontSize = 11.sp, color = RptTextSub)
-                    Text("$totalStock", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("In Stock", fontSize = 11.sp, color = RptGreen)
-                    Text("$inStockCount", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = RptGreen)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Low Stock", fontSize = 11.sp, color = RptRed)
-                    Text("$lowStockCount", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = RptRed)
-                }
-            }
-        }
-
-        // ── Stock details list ────────────────────────────────────────────────
-        InventoryRptCard {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Stock Details",
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp,
-                    color      = RptTextMain
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Inventory Report") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.loadInventoryReport() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFFFFDF6),
+                    titleContentColor = Color(0xFF1B5E20)
                 )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(RptTextMain)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        "$totalStock total",
-                        fontSize   = 11.sp,
-                        color      = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFFFFDF6))
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            FruitySectionTitle(
+                title = "Inventory",
+                subtitle = report?.let { "${it.branchName} • Generated ${DateTimeUtil.formatDateTime(it.generatedAt)}" }
+                    ?: uiState.branchName
+            )
 
-            if (stockItems.isEmpty()) {
-                Text("No inventory data available", fontSize = 13.sp, color = RptTextSub)
+            val error = uiState.error
+            if (!error.isNullOrBlank()) {
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            if (report == null) {
+                FruityEmptyState(
+                    title = "No inventory report loaded",
+                    message = "Tap refresh to load server report."
+                )
             } else {
-                stockItems.forEach { item ->
-                    val isLow = item.current <= item.minStock
-                    Row(
-                        modifier              = Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(item.name,     fontSize = 14.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
-                            Text(item.category, fontSize = 11.sp, color = RptTextSub)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text       = "${item.current} ${item.unit}",
-                                fontSize   = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = if (isLow) RptLowStock else RptOkStock
+                LowStockAlertBanner(
+                    lowStockCount = report.items.count { it.isLowStock }
+                )
+
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(report.items, key = { it.ingredientId }) { item ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (item.isLowStock) Color(0xFFFFF8E1) else Color.White
                             )
-                            Text("Min ${item.minStock}", fontSize = 10.sp, color = RptTextSub)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Inventory,
+                                        contentDescription = item.ingredientName,
+                                        tint = Color(0xFF2E7D32)
+                                    )
+
+                                    Column {
+                                        Text(
+                                            text = item.ingredientName,
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+
+                                        Text(
+                                            text = if (item.isLowStock) "Low stock" else "Normal stock",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (item.isLowStock) Color(0xFFF57F17) else Color(0xFF6D6D6D)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "${item.currentStock} ${item.unitType}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color(0xFF1B5E20)
+                                )
+                            }
                         }
                     }
-                    HorizontalDivider(color = Color(0xFFF0F0F0))
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-// ── Shared card wrapper ───────────────────────────────────────────────────────
-@Composable
-private fun InventoryRptCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier        = Modifier.fillMaxWidth(),
-        color           = RptCardBg,
-        shape           = RoundedCornerShape(12.dp),
-        shadowElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
     }
 }
