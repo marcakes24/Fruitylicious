@@ -1,240 +1,160 @@
 package com.example.fruitylicious.ui.auth
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.navigation.NavController
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.fruitylicious.R
-
-// --- Final Color Calibration ---
-val GreenDark = Color(0xFF2E7D32)
-val CreamYellow = Color(0xFFFDEB95)
-val InputGray = Color(0xFFF1F1F1)
-val HintGray = Color(0xFFBDBDBD)
-val FooterGray = Color(0xFF757575)
-val BrownText = Color(0xFF5D4037)
-val GoldBorder = Color(0xFFFFD54F)
-
-// --- User Data Model ---
-data class User(
-    val username: String,
-    val password: String,
-    val role: String // "admin" or "staff"
-)
-
-// --- Authentication Repository ---
-object AuthRepository {
-    private val users = listOf(
-        User("admin", "admin", "admin"),
-        User("user", "123", "staff")
-    )
-
-    fun authenticate(username: String, password: String): User? {
-        return users.find { it.username == username && it.password == password }
-    }
-}
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fruitylicious.ui.shared.FruityPrimaryButton
+import com.example.fruitylicious.ui.shared.FruityTextField
 
 @Composable
-fun FruityliciousLoginScreen(navController: NavController) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
+fun LoginScreen(
+    onLoginSuccess: (String) -> Unit,
+    viewModel: LoginViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.loggedInRole) {
+        val role = uiState.loggedInRole
+        if (!role.isNullOrBlank()) {
+            onLoginSuccess(role)
+            viewModel.consumeLoginNavigation()
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CreamYellow)
+            .background(Color(0xFFFFFDF6))
+            .imePadding()
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 4.dp
+            )
         ) {
-            // --- Green Header (Background for the overlap) ---
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(GreenDark)
-                    .padding(top = 50.dp, bottom = 120.dp), // Large bottom padding allows the card to "sit" on top
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Logo",
+                Box(
                     modifier = Modifier
-                        .width(230.dp)
-                        .height(110.dp)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Welcome Back",
-                    color = Color.White,
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "Manage Fruitylicious Now!",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 15.sp
-                )
-            }
-
-            // --- The White Card (Identical Spacing) ---
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 25.dp)
-                    .offset(y = (-80).dp), // High negative offset to match your reference exactly
-                shape = RoundedCornerShape(35.dp), // Deeply rounded corners
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 15.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 30.dp)
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE8F5E9)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Username", color = BrownText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        placeholder = { Text("Enter your username here", color = HintGray, fontSize = 14.sp) },
-                        modifier = Modifier.fillMaxWidth().height(55.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = TextFieldDefaults.colors(
-                            unfocusedContainerColor = InputGray,
-                            focusedContainerColor = InputGray,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent
-                        ),
-                        singleLine = true
+                    Icon(
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = "Fruitylicious",
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Fruitylicious POS",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color(0xFF1B5E20)
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Text("Password", color = BrownText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        placeholder = { Text("Enter your password here", color = HintGray, fontSize = 14.sp) },
-                        modifier = Modifier.fillMaxWidth().height(55.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = null, tint = HintGray)
-                            }
-                        },
-                        colors = TextFieldDefaults.colors(
-                            unfocusedContainerColor = InputGray,
-                            focusedContainerColor = InputGray,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent
-                        ),
-                        singleLine = true
+                    Text(
+                        text = uiState.branchName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF6D6D6D)
                     )
 
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Text(
+                        text = "Login required every shift",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF8D8D8D)
+                    )
+                }
 
-                    Button(
-                        onClick = {
-                            val user = AuthRepository.authenticate(username, password)
-                            if (user != null) {
-                                // Navigate based on role
-                                val route = if (user.role == "admin") "admin_home" else "home"
-                                navController.navigate(route) {
-                                    popUpTo("login") { inclusive = true }
-                                }
-                                errorMessage = ""
-                            } else {
-                                errorMessage = "Invalid username or password"
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(55.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                    ) {
-                        Text("Log In", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                    // Error message display
-                    if (errorMessage.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = errorMessage,
-                            color = Color.Red,
-                            fontSize = 12.sp,
-                            modifier = Modifier.fillMaxWidth()
+                FruityTextField(
+                    value = uiState.username,
+                    onValueChange = viewModel::onUsernameChanged,
+                    label = "Username",
+                    isError = uiState.usernameError != null,
+                    errorText = uiState.usernameError,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Username"
                         )
                     }
+                )
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // "or" line
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = InputGray)
-                        Text(" or ", color = HintGray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp))
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = InputGray)
+                FruityTextField(
+                    value = uiState.password,
+                    onValueChange = viewModel::onPasswordChanged,
+                    label = "Password",
+                    isError = uiState.passwordError != null,
+                    errorText = uiState.passwordError,
+                    visualTransformation = PasswordVisualTransformation(),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Password"
+                        )
                     }
+                )
+                val errorMessage = uiState.error
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Continue as Guest button
-                    OutlinedButton(
-                        onClick = { navController.navigate("guests_screen") },
-                        modifier = Modifier.fillMaxWidth().height(55.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, GoldBorder),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BrownText)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(22.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Continue as Guest", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        }
-                    }
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-            }
 
-            // --- Bottom Spacer & Footer ---
-            Text(
-                text = "All rights reserved 2026.",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 40.dp)
-                    .offset(y = (-40).dp), // Adjust footer position relative to card offset
-                color = FooterGray,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center
-            )
+                FruityPrimaryButton(
+                    text = "Login",
+                    onClick = viewModel::login,
+                    isLoading = uiState.isLoading,
+                    enabled = uiState.username.isNotBlank() && uiState.password.isNotBlank()
+                )
+            }
         }
     }
 }
