@@ -70,6 +70,7 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("androidx.hilt:hilt-work:1.2.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
