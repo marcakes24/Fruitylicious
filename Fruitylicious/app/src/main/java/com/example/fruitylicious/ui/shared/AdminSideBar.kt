@@ -118,7 +118,7 @@ fun AdminSideBarContent(
             // Management section
             SidebarSectionHeader("Management")
             val managementItems = listOf(
-                NavItem(Icons.Outlined.Inventory2,           "Manage Products",       ""),
+                NavItem(Icons.Outlined.Inventory2,           "Manage Products",       "admin_manage_products"),
                 NavItem(Icons.Outlined.SetMeal,              "Manage Ingredients",    ""),
                 NavItem(Icons.AutoMirrored.Outlined.MenuBook,"Recipe Management",     ""),
                 NavItem(Icons.Outlined.Group,                "User Management",       "admin_users"),
