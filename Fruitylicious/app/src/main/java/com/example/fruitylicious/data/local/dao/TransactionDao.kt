@@ -61,6 +61,42 @@ interface TransactionDao {
     @Query("SELECT SUM(total_amount) FROM transactions WHERE status = 'completed' AND date_time BETWEEN :from AND :to")
     suspend fun getTotalSalesAll(from: Long, to: Long): Double?
 
+    @Query("""
+        SELECT SUM(total_amount) FROM transactions 
+        WHERE (:branchId IS NULL OR branch_id = :branchId) 
+        AND payment_type = :paymentType 
+        AND status = 'completed' 
+        AND date_time BETWEEN :from AND :to
+    """)
+    suspend fun getTotalByPayment(branchId: String?, paymentType: String, from: Long, to: Long): Double?
+
+    @Query("""
+        SELECT p.product_name as productName, SUM(ti.quantity) as totalQty 
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        JOIN products p ON ti.product_id = p.product_id
+        WHERE (:branchId IS NULL OR t.branch_id = :branchId)
+        AND t.status = 'completed'
+        AND t.date_time BETWEEN :from AND :to
+        GROUP BY ti.product_id
+        ORDER BY totalQty DESC
+        LIMIT 5
+    """)
+    suspend fun getTopSellingItems(branchId: String?, from: Long, to: Long): List<TopSellingItem>
+
+    @Query("""
+        SELECT p.product_name as productName, SUM(ti.quantity) as qty, SUM(ti.subtotal) as totalAmount
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        JOIN products p ON ti.product_id = p.product_id
+        WHERE (:branchId IS NULL OR t.branch_id = :branchId)
+        AND t.status = 'completed'
+        AND t.date_time BETWEEN :from AND :to
+        GROUP BY ti.product_id
+        ORDER BY qty DESC
+    """)
+    suspend fun getSalesBreakdown(branchId: String?, from: Long, to: Long): List<SalesBreakdownItem>
+
     /** Void a transaction by updating its status */
     @Query("UPDATE transactions SET status = 'void', last_modified = :lastModified WHERE transaction_id = :transactionId")
     suspend fun voidTransaction(transactionId: String, lastModified: Long = System.currentTimeMillis())
@@ -71,3 +107,14 @@ interface TransactionDao {
     @Query("UPDATE transactions SET is_synced = 1, synced_at = :syncedAt WHERE transaction_id = :transactionId")
     suspend fun markSynced(transactionId: String, syncedAt: Long)
 }
+
+data class TopSellingItem(
+    val productName: String,
+    val totalQty: Int
+)
+
+data class SalesBreakdownItem(
+    val productName: String,
+    val qty: Int,
+    val totalAmount: Double
+)

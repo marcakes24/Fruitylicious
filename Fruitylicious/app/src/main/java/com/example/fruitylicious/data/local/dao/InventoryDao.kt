@@ -41,6 +41,15 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory")
     fun getAll(): Flow<List<InventoryEntity>>
 
+    @Query("""
+        SELECT i.ingredient_name as ingredientName, i.is_packaging as isPackaging, 
+               inv.current_stock as currentStock, i.unit_type as unitType
+        FROM ingredients i
+        LEFT JOIN inventory inv ON i.ingredient_id = inv.ingredient_id
+        WHERE (:branchId IS NULL OR inv.branch_id = :branchId)
+    """)
+    suspend fun getInventoryReport(branchId: String?): List<InventoryReportItem>
+
     /** Returns stock entries where current_stock is at or below a threshold — useful for low-stock alerts */
     @Query("SELECT * FROM inventory WHERE branch_id = :branchId AND current_stock <= :threshold")
     fun getLowStock(branchId: String, threshold: Double): Flow<List<InventoryEntity>>
@@ -57,3 +66,10 @@ interface InventoryDao {
     @Query("UPDATE inventory SET is_synced = 1, synced_at = :syncedAt WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
     suspend fun markSynced(ingredientId: String, branchId: String, syncedAt: Long)
 }
+
+data class InventoryReportItem(
+    val ingredientName: String,
+    val isPackaging: Boolean,
+    val currentStock: Double,
+    val unitType: String
+)

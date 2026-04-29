@@ -51,9 +51,39 @@ interface WasteLogDao {
     @Query("SELECT SUM(quantity) FROM waste_logs WHERE ingredient_id = :ingredientId AND branch_id = :branchId")
     suspend fun getTotalWaste(ingredientId: String, branchId: String): Double?
 
+    @Query("""
+        SELECT SUM(quantity) FROM waste_logs 
+        WHERE (:branchId IS NULL OR branch_id = :branchId) 
+        AND date_time BETWEEN :from AND :to
+    """)
+    suspend fun getTotalWasteCount(branchId: String?, from: Long, to: Long): Int?
+
+    @Query("""
+        SELECT reason, COUNT(*) as count FROM waste_logs 
+        WHERE (:branchId IS NULL OR branch_id = :branchId) 
+        AND date_time BETWEEN :from AND :to 
+        GROUP BY reason 
+        ORDER BY count DESC
+    """)
+    suspend fun getWasteByReason(branchId: String?, from: Long, to: Long): List<WasteReasonSummary>
+
+    @Query("""
+        SELECT i.ingredient_name as itemName, SUM(w.quantity) as count 
+        FROM waste_logs w 
+        JOIN ingredients i ON w.ingredient_id = i.ingredient_id 
+        WHERE (:branchId IS NULL OR w.branch_id = :branchId) 
+        AND w.date_time BETWEEN :from AND :to 
+        GROUP BY w.ingredient_id 
+        ORDER BY count DESC
+    """)
+    suspend fun getWasteByItem(branchId: String?, from: Long, to: Long): List<WasteItemSummary>
+
     @Query("SELECT * FROM waste_logs WHERE is_synced = 0")
     suspend fun getUnsynced(): List<WasteLogEntity>
 
     @Query("UPDATE waste_logs SET is_synced = 1, synced_at = :syncedAt WHERE waste_id = :wasteId")
     suspend fun markSynced(wasteId: String, syncedAt: Long)
 }
+
+data class WasteReasonSummary(val reason: String, val count: Int)
+data class WasteItemSummary(val itemName: String, val count: Int)

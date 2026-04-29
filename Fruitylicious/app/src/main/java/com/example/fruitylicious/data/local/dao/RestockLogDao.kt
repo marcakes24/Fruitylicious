@@ -47,9 +47,38 @@ interface RestockLogDao {
     @Query("SELECT * FROM restock_logs ORDER BY date_time DESC")
     fun getAll(): Flow<List<RestockLogEntity>>
 
+    @Query("""
+        SELECT SUM(quantity_added) FROM restock_logs 
+        WHERE (:branchId IS NULL OR branch_id = :branchId) 
+        AND date_time BETWEEN :from AND :to
+    """)
+    suspend fun getTotalRestockedToday(branchId: String?, from: Long, to: Long): Int?
+
+    @Query("""
+        SELECT i.ingredient_name as ingredientName, COUNT(*) as count, AVG(r.quantity_added) as avgUnits
+        FROM restock_logs r
+        JOIN ingredients i ON r.ingredient_id = i.ingredient_id
+        WHERE (:branchId IS NULL OR r.branch_id = :branchId)
+        GROUP BY r.ingredient_id
+        ORDER BY count DESC
+    """)
+    suspend fun getRestockFrequency(branchId: String?): List<RestockFrequencySummary>
+
     @Query("SELECT * FROM restock_logs WHERE is_synced = 0")
     suspend fun getUnsynced(): List<RestockLogEntity>
 
     @Query("UPDATE restock_logs SET is_synced = 1, synced_at = :syncedAt WHERE restock_id = :restockId")
     suspend fun markSynced(restockId: String, syncedAt: Long)
+}
+
+data class RestockFrequencySummary(
+    val ingredientName: String,
+    val count: Int,
+    val avgUnits: Int
+) {
+    val frequencyLabel: String get() = when {
+        count >= 5 -> "High"
+        count >= 2 -> "Moderate"
+        else -> "Low"
+    }
 }
