@@ -35,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.fruitylicious.data.local.entity.AppDatabase
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -63,6 +64,23 @@ fun ManageIngredientsScreen(
     val ingredientDao = db.ingredientDao()
 
     val ingredients by ingredientDao.getAll().collectAsState(initial = emptyList())
+
+    // Automatically insert dummy data if the database is empty
+    LaunchedEffect(Unit) {
+        val currentIngredients = ingredientDao.getAll().first()
+        if (currentIngredients.isEmpty()) {
+            val dummyList = listOf(
+                IngredientEntity(UUID.randomUUID().toString(), null, "Dragon Fruit", "pcs", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Cheese", "box", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Avocado", "pcs", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Mango", "pcs", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Oreo", "pack", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Condensed Milk", "can", 0.0),
+                IngredientEntity(UUID.randomUUID().toString(), null, "Buko", "pcs", 0.0)
+            )
+            ingredientDao.insertAll(dummyList)
+        }
+    }
 
     var selectedBranch by remember { mutableStateOf("B1") }
     var searchQuery by remember { mutableStateOf("") }
@@ -293,7 +311,7 @@ fun IngredientEditDialog(
     var packagingChecked by remember { mutableStateOf(ingredient?.isPackaging ?: false) }
     var unitDropdownExpanded by remember { mutableStateOf(false) }
 
-    val units = listOf("pcs", "can", "pack", "grams", "ml")
+    val units = listOf("pcs", "can", "pack", "grams", "ml", "box")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
