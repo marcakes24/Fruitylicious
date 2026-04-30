@@ -1,8 +1,7 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.staff.sales
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.util.*
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
 private val RptGreen  = Color(0xFF2C8C44)
