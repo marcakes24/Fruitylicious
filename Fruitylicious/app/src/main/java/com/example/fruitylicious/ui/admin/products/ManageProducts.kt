@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,64 +25,99 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.fruitylicious.data.local.entity.AppDatabase
-import com.example.fruitylicious.data.local.entity.ProductEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
-private val MpGreen        = Color(0xFF2C8C44)
-private val MpGreenDark    = Color(0xFF1B5E20)
-private val MpPageBg       = Color(0xFFFFEAA0)
-private val MpCardBg       = Color.White
-private val MpRed          = Color(0xFFD32F2F)
-private val MpTextMain     = Color(0xFF1A1A1A)
-private val MpTextSub      = Color(0xFF757575)
-private val MpTabActive    = Color(0xFFFFB300)   // amber — selected tab pill
-private val MpTabInactive  = Color.White
+private val MpGreen         = Color(0xFF2C8C44)
+private val MpPageBg        = Color(0xFFFFEAA0)
+private val MpCardBg        = Color.White
+private val MpRed           = Color(0xFFE53935)
+private val MpTextMain      = Color(0xFF1A1A1A)
+private val MpTextSub       = Color(0xFF757575)
+private val MpTabActive     = Color(0xFFFFB300)   // amber — selected tab pill
+private val MpTabInactive   = Color.White
 
 // Dialog specific colors
-private val DialogBgGray   = Color(0xFFF5F5F5)
-private val DialogBlueIcon = Color(0xFF2196F3)
-private val DialogRedIcon  = Color(0xFFF44336)
-private val DialogBtnCancel= Color(0xFFE0E0E0)
-private val DialogBtnDelete= Color(0xFFFF8A80)
-private val DialogBtnCancelDark = Color(0xFF79867C) // For delete dialog cancel button
+private val DialogBgGray    = Color(0xFFF5F5F5)
+private val DialogBlueIcon  = Color(0xFF2196F3)
+private val DialogRedIcon   = Color(0xFFE53935)
+private val DialogBtnCancel = Color(0xFF5D6B60)
+private val DialogBtnDelete = Color(0xFFFF8A80)
+private val EditBtnColor    = Color(0xFF333333)
 
 private enum class MpTab(val label: String) {
     PRODUCTS("Product List"),
     ADDONS("Add ons List")
 }
 
+// ── Local Data Models ────────────────────────────────────────────────────────
+
+data class ManageProduct(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val size: String,
+    val price: Double,
+    val branch: String
+)
+
+data class ManageAddOn(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val price: Double,
+    val branch: String
+)
+
 // ── Root screen ───────────────────────────────────────────────────────────────
 @Composable
 fun ManageProductsScreen(
     drawerState:   DrawerState,
-    scope:         CoroutineScope,
-    onAddProduct:  () -> Unit = {},
-    onAddOn:       () -> Unit = {},
-    onEditProduct: (ProductEntity) -> Unit = {},
-    onEditAddOn:   (ProductEntity) -> Unit = {},
+    scope:         CoroutineScope
 ) {
     var selectedBranch by remember { mutableStateOf("B1") }
     var selectedTab    by remember { mutableStateOf(MpTab.PRODUCTS) }
+    var searchQuery    by remember { mutableStateOf("") }
+
+    // Mock Data for local functionality
+    val products = remember {
+        mutableStateListOf(
+            ManageProduct(name = "Dragon Fruit", size = "Small", price = 60.0, branch = "B1"),
+            ManageProduct(name = "Dragon Fruit", size = "Medium", price = 50.0, branch = "B1"),
+            ManageProduct(name = "Dragon Fruit", size = "Large", price = 80.0, branch = "B1"),
+            ManageProduct(name = "Mango", size = "Small", price = 60.0, branch = "B1"),
+            ManageProduct(name = "Mango", size = "Medium", price = 50.0, branch = "B1"),
+            ManageProduct(name = "Mango", size = "Large", price = 80.0, branch = "B1"),
+            ManageProduct(name = "Buko", size = "Small", price = 60.0, branch = "B1")
+        )
+    }
+
+    val addOns = remember {
+        mutableStateListOf(
+            ManageAddOn(name = "Nata De Coco", price = 10.0, branch = "B1"),
+            ManageAddOn(name = "Pearl", price = 10.0, branch = "B1"),
+            ManageAddOn(name = "Cheese", price = 10.0, branch = "B1")
+        )
+    }
 
     // Dialog States
     var showProductDialog by remember { mutableStateOf(false) }
     var showAddonDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    var currentProduct by remember { mutableStateOf<ProductEntity?>(null) }
-    var currentAddon by remember { mutableStateOf<ProductEntity?>(null) }
-    var itemToDelete by remember { mutableStateOf<ProductEntity?>(null) }
+    var currentProduct by remember { mutableStateOf<ManageProduct?>(null) }
+    var currentAddon by remember { mutableStateOf<ManageAddOn?>(null) }
+    var itemToDeleteId by remember { mutableStateOf<String?>(null) }
+    var itemToDeleteName by remember { mutableStateOf("") }
+    var isDeleteAddon by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -98,15 +135,15 @@ fun ManageProductsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // ── Action buttons ────────────────────────────────────────────────
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick  = {
@@ -115,9 +152,10 @@ fun ManageProductsScreen(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MpGreenDark),
-                        shape  = RoundedCornerShape(12.dp)
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MpGreen),
+                        shape  = RoundedCornerShape(10.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
                         Text(
                             "+ Add Product",
@@ -133,9 +171,10 @@ fun ManageProductsScreen(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MpGreenDark),
-                        shape  = RoundedCornerShape(12.dp)
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MpGreen),
+                        shape  = RoundedCornerShape(10.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
                         Text(
                             "+ Add Ons",
@@ -144,6 +183,30 @@ fun ManageProductsScreen(
                             fontSize   = 15.sp
                         )
                     }
+                }
+
+                // ── Search Bar ────────────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(Color.White)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        textStyle = TextStyle(fontSize = 14.sp, color = MpTextMain),
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (searchQuery.isEmpty()) Text("Search product, addons, etc.", color = Color.LightGray, fontSize = 14.sp)
+                            inner()
+                        },
+                        singleLine = true
+                    )
                 }
 
                 // ── Tab pills ─────────────────────────────────────────────────────
@@ -177,30 +240,72 @@ fun ManageProductsScreen(
                 Surface(
                     modifier        = Modifier.fillMaxSize(),
                     color           = MpCardBg,
-                    shape           = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                    shadowElevation = 2.dp
+                    shape           = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                 ) {
-                    when (selectedTab) {
-                        MpTab.PRODUCTS -> ProductListContent(
-                            onEdit   = { product ->
-                                currentProduct = product
-                                showProductDialog = true
-                            },
-                            onDelete = { product ->
-                                itemToDelete = product
-                                showDeleteDialog = true
+                    val filteredProducts = products.filter {
+                        (selectedBranch == "All" || it.branch == selectedBranch) &&
+                                it.name.contains(searchQuery, ignoreCase = true)
+                    }
+                    val filteredAddOns = addOns.filter {
+                        (selectedBranch == "All" || it.branch == selectedBranch) &&
+                                it.name.contains(searchQuery, ignoreCase = true)
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        when (selectedTab) {
+                            MpTab.PRODUCTS -> {
+                                if (filteredProducts.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("No products found", color = MpTextSub)
+                                    }
+                                } else {
+                                    filteredProducts.forEach { product ->
+                                        ProductRow(
+                                            product = product,
+                                            onEdit = {
+                                                currentProduct = product
+                                                showProductDialog = true
+                                            },
+                                            onDelete = {
+                                                itemToDeleteId = product.id
+                                                itemToDeleteName = product.name
+                                                isDeleteAddon = false
+                                                showDeleteDialog = true
+                                            }
+                                        )
+                                    }
+                                }
                             }
-                        )
-                        MpTab.ADDONS -> AddOnListContent(
-                            onEdit   = { addon ->
-                                currentAddon = addon
-                                showAddonDialog = true
-                            },
-                            onDelete = { addon ->
-                                itemToDelete = addon
-                                showDeleteDialog = true
+                            MpTab.ADDONS -> {
+                                if (filteredAddOns.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("No add-ons found", color = MpTextSub)
+                                    }
+                                } else {
+                                    filteredAddOns.forEach { addon ->
+                                        AddOnRow(
+                                            addon = addon,
+                                            onEdit = {
+                                                currentAddon = addon
+                                                showAddonDialog = true
+                                            },
+                                            onDelete = {
+                                                itemToDeleteId = addon.id
+                                                itemToDeleteName = addon.name
+                                                isDeleteAddon = true
+                                                showDeleteDialog = true
+                                            }
+                                        )
+                                    }
+                                }
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -211,7 +316,17 @@ fun ManageProductsScreen(
             ProductEditDialog(
                 product = currentProduct,
                 onDismiss = { showProductDialog = false },
-                onSave = { /* Handle save logic */ showProductDialog = false }
+                onSave = { name, price, size ->
+                    if (currentProduct != null) {
+                        val index = products.indexOfFirst { it.id == currentProduct!!.id }
+                        if (index != -1) {
+                            products[index] = currentProduct!!.copy(name = name, price = price.toDoubleOrNull() ?: 0.0, size = size)
+                        }
+                    } else {
+                        products.add(ManageProduct(name = name, size = size, price = price.toDoubleOrNull() ?: 0.0, branch = if(selectedBranch == "All") "B1" else selectedBranch))
+                    }
+                    showProductDialog = false
+                }
             )
         }
 
@@ -219,14 +334,33 @@ fun ManageProductsScreen(
             AddonEditDialog(
                 addon = currentAddon,
                 onDismiss = { showAddonDialog = false },
-                onSave = { /* Handle save logic */ showAddonDialog = false }
+                onSave = { name, price ->
+                    if (currentAddon != null) {
+                        val index = addOns.indexOfFirst { it.id == currentAddon!!.id }
+                        if (index != -1) {
+                            addOns[index] = currentAddon!!.copy(name = name, price = price.toDoubleOrNull() ?: 0.0)
+                        }
+                    } else {
+                        addOns.add(ManageAddOn(name = name, price = price.toDoubleOrNull() ?: 0.0, branch = if(selectedBranch == "All") "B1" else selectedBranch))
+                    }
+                    showAddonDialog = false
+                }
             )
         }
 
-        if (showDeleteDialog && itemToDelete != null) {
+        if (showDeleteDialog && itemToDeleteId != null) {
             DeleteConfirmationDialog(
+                itemName = itemToDeleteName,
+                isAddon = isDeleteAddon,
                 onDismiss = { showDeleteDialog = false },
-                onConfirm = { /* Handle delete logic */ showDeleteDialog = false }
+                onConfirm = {
+                    if (isDeleteAddon) {
+                        addOns.removeIf { it.id == itemToDeleteId }
+                    } else {
+                        products.removeIf { it.id == itemToDeleteId }
+                    }
+                    showDeleteDialog = false
+                }
             )
         }
     }
@@ -260,38 +394,44 @@ private fun DialogTextField(
 // ── Product Add/Edit Dialog ───────────────────────────────────────────────────
 @Composable
 private fun ProductEditDialog(
-    product: ProductEntity?,
+    product: ManageProduct?,
     onDismiss: () -> Unit,
-    onSave: () -> Unit
+    onSave: (String, String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf(product?.productName ?: "") }
+    var name by remember { mutableStateOf(product?.name ?: "") }
     var price by remember { mutableStateOf(product?.price?.toString() ?: "") }
-    var size by remember { mutableStateOf("") } // Assuming size is not in entity yet
+    var size by remember { mutableStateOf(product?.size ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             color = Color.White,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Edit Icon Header
+                // Blue edit icon circle
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
                         .background(DialogBlueIcon),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = "Add / Edit Product",
@@ -300,48 +440,47 @@ private fun ProductEditDialog(
                     color = MpTextMain
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Fields
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Column {
-                        Text("Product Name", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Product Name", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
                         DialogTextField(value = name, onValueChange = { name = it }, placeholder = "e.g. Mango")
                     }
                     Column {
-                        Text("Price", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Price", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
                         DialogTextField(value = price, onValueChange = { price = it }, placeholder = "₱ 0.00")
                     }
                     Column {
-                        Text("Size", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Size", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
                         DialogTextField(value = size, onValueChange = { size = it }, placeholder = "e.g. Small")
                     }
                     Column {
-                        Text("Insert Image", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Insert Image", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
 
                         // Dashed upload box
-                        val dashPath = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
+                        val dashPath = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(100.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(DialogBgGray)
+                                .height(90.dp)
                                 .drawBehind {
                                     drawRoundRect(
                                         color = Color.Gray,
-                                        style = Stroke(width = 4f, pathEffect = dashPath),
+                                        style = Stroke(width = 1.5f, pathEffect = dashPath),
                                         cornerRadius = CornerRadius(8.dp.toPx())
                                     )
                                 }
+                                .background(DialogBgGray, RoundedCornerShape(8.dp))
                                 .clickable { /* Upload image logic */ },
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Image, contentDescription = "Upload", tint = Color.Gray)
+                                Icon(Icons.Default.Image, contentDescription = "Upload", tint = Color.Gray, modifier = Modifier.size(28.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("Upload product image", fontSize = 12.sp, color = Color.Gray)
                             }
@@ -358,19 +497,20 @@ private fun ProductEditDialog(
                 ) {
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnCancel),
-                        shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEEEEEE)),
+                        shape = RoundedCornerShape(10.dp),
+                        elevation = ButtonDefaults.buttonElevation(0.dp)
                     ) {
-                        Text("Discard", color = MpTextMain, fontWeight = FontWeight.Bold)
+                        Text("Discard", color = MpTextMain, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Button(
-                        onClick = onSave,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        onClick = { onSave(name, price, size) },
+                        modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MpGreen),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }
@@ -381,37 +521,43 @@ private fun ProductEditDialog(
 // ── Addon Add/Edit Dialog ─────────────────────────────────────────────────────
 @Composable
 private fun AddonEditDialog(
-    addon: ProductEntity?,
+    addon: ManageAddOn?,
     onDismiss: () -> Unit,
-    onSave: () -> Unit
+    onSave: (String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf(addon?.productName ?: "") }
+    var name by remember { mutableStateOf(addon?.name ?: "") }
     var price by remember { mutableStateOf(addon?.price?.toString() ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             color = Color.White,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Edit Icon Header
+                // Blue edit icon circle
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
                         .background(DialogBlueIcon),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = "Add / Edit Add ons",
@@ -420,44 +566,43 @@ private fun AddonEditDialog(
                     color = MpTextMain
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Fields
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Column {
-                        Text("Add ons Name", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Add ons Name", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
                         DialogTextField(value = name, onValueChange = { name = it }, placeholder = "e.g. Pearl")
                     }
                     Column {
-                        Text("Price", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Price", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
                         DialogTextField(value = price, onValueChange = { price = it }, placeholder = "₱ 0.00")
                     }
                     Column {
-                        Text("Insert Image", fontSize = 12.sp, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
+                        Text("Insert Image", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MpTextMain, modifier = Modifier.padding(bottom = 4.dp))
 
                         // Dashed upload box
-                        val dashPath = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
+                        val dashPath = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(100.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(DialogBgGray)
+                                .height(90.dp)
                                 .drawBehind {
                                     drawRoundRect(
                                         color = Color.Gray,
-                                        style = Stroke(width = 4f, pathEffect = dashPath),
+                                        style = Stroke(width = 1.5f, pathEffect = dashPath),
                                         cornerRadius = CornerRadius(8.dp.toPx())
                                     )
                                 }
+                                .background(DialogBgGray, RoundedCornerShape(8.dp))
                                 .clickable { /* Upload image logic */ },
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Image, contentDescription = "Upload", tint = Color.Gray)
+                                Icon(Icons.Default.Image, contentDescription = "Upload", tint = Color.Gray, modifier = Modifier.size(28.dp))
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("Upload add ons image", fontSize = 12.sp, color = Color.Gray)
                             }
@@ -474,19 +619,20 @@ private fun AddonEditDialog(
                 ) {
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnCancel),
-                        shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEEEEEE)),
+                        shape = RoundedCornerShape(10.dp),
+                        elevation = ButtonDefaults.buttonElevation(0.dp)
                     ) {
-                        Text("Discard", color = MpTextMain, fontWeight = FontWeight.Bold)
+                        Text("Discard", color = MpTextMain, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Button(
-                        onClick = onSave,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        onClick = { onSave(name, price) },
+                        modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MpGreen),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }
@@ -497,36 +643,43 @@ private fun AddonEditDialog(
 // ── Delete Confirmation Dialog ────────────────────────────────────────────────
 @Composable
 private fun DeleteConfirmationDialog(
+    itemName: String,
+    isAddon: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             color = Color.White,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(28.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Delete Icon Header
+                // Red trash icon circle
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
                         .background(DialogRedIcon),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(32.dp))
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(34.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Delete Product",
+                    text = if (isAddon) "Delete Add on" else "Delete Product",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = MpTextMain
@@ -535,34 +688,43 @@ private fun DeleteConfirmationDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Are you sure you want\nto remove this product?",
+                    text = "Are you sure you want to\nremove $itemName?",
                     fontSize = 14.sp,
                     color = MpTextSub,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnCancelDark),
-                        shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnCancel),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Cancel", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Cancel", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Button(
                         onClick = onConfirm,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier.weight(1.4f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = DialogBtnDelete),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
-                        Text("Delete Product", color = MpTextMain, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isAddon) "Delete Add on" else "Delete Product",
+                            color = MpTextMain,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -570,152 +732,68 @@ private fun DeleteConfirmationDialog(
     }
 }
 
-
-// ── Product list ──────────────────────────────────────────────────────────────
-@Composable
-private fun ProductListContent(
-    onEdit:   (ProductEntity) -> Unit,
-    onDelete: (ProductEntity) -> Unit
-) {
-    val context      = LocalContext.current
-    val db           = remember { AppDatabase.getDatabase(context) }
-    val productDao   = db.productDao()
-
-    val products by productDao.getMainProducts().collectAsState(initial = emptyList())
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 8.dp)
-    ) {
-        if (products.isEmpty()) {
-            Box(
-                modifier         = Modifier.fillMaxWidth().padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No products found", fontSize = 14.sp, color = MpTextSub)
-            }
-        } else {
-            products.forEach { product ->
-                ProductRow(
-                    product  = product,
-                    onEdit   = { onEdit(product) },
-                    onDelete = { onDelete(product) }
-                )
-                HorizontalDivider(
-                    color     = Color(0xFFF0F0F0),
-                    modifier  = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun ProductRow(
-    product:  ProductEntity,
+    product:  ManageProduct,
     onEdit:   () -> Unit,
     onDelete: () -> Unit
 ) {
     Row(
-        modifier          = Modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFFFF9C4))
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Fruit emoji / image
         Box(
             modifier         = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF5F5F5)),
+                .background(Color.White),
             contentAlignment = Alignment.Center
         ) {
-            Text(fruitEmoji(product.productName), fontSize = 22.sp)
+            Text(fruitEmoji(product.name), fontSize = 22.sp)
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
-        // Name + price
+        // Name + size - price
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text       = product.productName,
-                fontSize   = 15.sp,
+                text       = product.name,
+                fontSize   = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color      = MpTextMain
             )
             Text(
-                text     = "₱${product.price.toInt()}",
+                text     = "${product.size} - ₱${product.price.toInt()}",
                 fontSize = 12.sp,
                 color    = MpTextSub
             )
         }
 
-        // Edit button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(MpTextMain)
-                .clickable { onEdit() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Edit", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        // Delete button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(MpRed)
-                .clickable { onDelete() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Delete", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ── Add-on list ───────────────────────────────────────────────────────────────
-@Composable
-private fun AddOnListContent(
-    onEdit:   (ProductEntity) -> Unit,
-    onDelete: (ProductEntity) -> Unit
-) {
-    val context      = LocalContext.current
-    val db           = remember { AppDatabase.getDatabase(context) }
-    val productDao   = db.productDao()
-
-    val addOns by productDao.getAddons().collectAsState(initial = emptyList())
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 8.dp)
-    ) {
-        if (addOns.isEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Edit button — dark background
             Box(
-                modifier         = Modifier.fillMaxWidth().padding(32.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(EditBtnColor)
+                    .clickable { onEdit() }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
-                Text("No add-ons found", fontSize = 14.sp, color = MpTextSub)
+                Text("Edit", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-        } else {
-            addOns.forEach { addOn ->
-                AddOnRow(
-                    addOn    = addOn,
-                    onEdit   = { onEdit(addOn) },
-                    onDelete = { onDelete(addOn) }
-                )
-                HorizontalDivider(
-                    color    = Color(0xFFF0F0F0),
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
+            // Delete button — red background
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(MpRed)
+                    .clickable { onDelete() }
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            ) {
+                Text("Delete", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -723,68 +801,67 @@ private fun AddOnListContent(
 
 @Composable
 private fun AddOnRow(
-    addOn:    ProductEntity,
+    addon:    ManageAddOn,
     onEdit:   () -> Unit,
     onDelete: () -> Unit
 ) {
     Row(
-        modifier          = Modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFFFF9C4))
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Icon circle
         Box(
             modifier         = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF5F5F5)),
+                .background(Color.White),
             contentAlignment = Alignment.Center
         ) {
-            Text(addOnEmoji(addOn.productName), fontSize = 22.sp)
+            Text(addOnEmoji(addon.name), fontSize = 22.sp)
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
         // Name + price
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text       = addOn.productName,
-                fontSize   = 15.sp,
+                text       = addon.name,
+                fontSize   = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color      = MpTextMain
             )
             Text(
-                text     = "₱${addOn.price.toInt()}",
+                text     = "₱${addon.price.toInt()}",
                 fontSize = 12.sp,
                 color    = MpTextSub
             )
         }
 
-        // Edit button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(MpTextMain)
-                .clickable { onEdit() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Edit", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        // Delete button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(MpRed)
-                .clickable { onDelete() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Delete", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Edit button — dark background
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(EditBtnColor)
+                    .clickable { onEdit() }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Text("Edit", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            // Delete button — red background
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(MpRed)
+                    .clickable { onDelete() }
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            ) {
+                Text("Delete", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -794,7 +871,7 @@ private fun AddOnRow(
 private fun MpHeader(
     selectedBranch: String,
     onBranchSelect: (String) -> Unit,
-    onMenuClick:    () -> Unit
+    onMenuClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -802,17 +879,15 @@ private fun MpHeader(
             .background(MpGreen)
             .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
     ) {
-
-        // Hamburger and Title Group
         Row(
             modifier = Modifier.align(Alignment.CenterStart),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Hamburger
             Column(
-                modifier            = Modifier
+                modifier = Modifier
                     .clickable { onMenuClick() }
-                    .padding(end = 12.dp), // Space between hamburger and title
+                    .padding(end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 repeat(3) {
@@ -824,12 +899,11 @@ private fun MpHeader(
                     )
                 }
             }
-
-            // Highlighted Title
+            // Yellow highlighted title
             Text(
-                text       = "MANAGE PRODUCTS",
-                color      = Color.White,
-                fontSize   = 18.sp,
+                text = "MANAGE PRODUCTS",
+                color = Color.White,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
         }
