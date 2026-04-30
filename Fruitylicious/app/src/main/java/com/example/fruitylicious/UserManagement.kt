@@ -34,6 +34,10 @@ private val LightBgYellow = Color(0xFFFDEB95)
 private val CardWhite = Color.White
 private val TextGrey = Color(0xFF757575)
 private val ErrorRed = Color(0xFFE57373)
+private val DialogBtnCancel = Color(0xFF5D6B60)
+private val DialogBtnDelete = Color(0xFFFF8A80)
+private val MpTextMain      = Color(0xFF1A1A1A)
+private val DialogRedIcon   = Color(0xFFE53935)
 
 data class User(
     val id: Int,
@@ -268,20 +272,43 @@ fun RoleSelectionButton(label: String, isSelected: Boolean, modifier: Modifier, 
 @Composable
 fun DeleteUserDialog(userName: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
-            Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(shape = CircleShape, color = Color(0xFFFFEBEE), modifier = Modifier.size(72.dp)) {
+        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Column(Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(shape = CircleShape, color = DialogRedIcon, modifier = Modifier.size(64.dp)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Delete, null, tint = ErrorRed, modifier = Modifier.size(36.dp))
+                        Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.size(34.dp))
                     }
                 }
-                Spacer(Modifier.height(20.dp))
-                Text("Delete User", fontWeight = FontWeight.ExtraBold, fontSize = 24.sp)
-                Text("Are you sure you want to\nremove this user?", textAlign = TextAlign.Center, color = TextGrey, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(32.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF90A4AE)), shape = RoundedCornerShape(12.dp)) { Text("Cancel") }
-                    Button(onClick = onConfirm, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = ErrorRed), shape = RoundedCornerShape(12.dp)) { Text("Delete User") }
+                Spacer(Modifier.height(16.dp))
+                Text("Delete User", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = MpTextMain)
+                Text("Are you sure you want to\nremove this user?", textAlign = TextAlign.Center, color = TextGrey, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp))
+                Spacer(Modifier.height(28.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnCancel),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Cancel", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1.4f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnDelete),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            "Delete\nUser",
+                            color = MpTextMain,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 14.sp
+                        )
+                    }
                 }
             }
         }
@@ -318,8 +345,31 @@ fun EditUserDialog(user: User, onDismiss: () -> Unit, onUpdate: (User) -> Unit, 
 
                 Spacer(Modifier.height(32.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onDeleteClick, modifier = Modifier.weight(1f).height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = ErrorRed), shape = RoundedCornerShape(10.dp)) { Text("Delete User") }
-                    Button(onClick = { onUpdate(User(user.id, name, username, selectedRole)) }, modifier = Modifier.weight(1f).height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = BrandGreen), shape = RoundedCornerShape(10.dp)) { Text("Update") }
+                    Button(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DialogBtnDelete),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            "Delete\nUser",
+                            color = MpTextMain,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 14.sp
+                        )
+                    }
+                    Button(
+                        onClick = { onUpdate(User(user.id, name, username, selectedRole)) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Update", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
                 }
             }
         }
