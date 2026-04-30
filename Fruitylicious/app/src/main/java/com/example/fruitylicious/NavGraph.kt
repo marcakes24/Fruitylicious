@@ -9,8 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
-import com.example.fruitylicious.ui.admin.ingredients.IngredientFormScreen
-import com.example.fruitylicious.ui.admin.ingredients.IngredientListScreen
+import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminAdjustmentScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminInventoryScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
@@ -63,7 +62,6 @@ const val STAFF_TRANSACTION_HISTORY = "staff_transaction_history"
 
 const val ADMIN_DASHBOARD = "admin_dashboard"
 const val ADMIN_PRODUCTS = "admin_products"
-const val ADMIN_PRODUCT_FORM = "admin_product_form"
 const val ADMIN_INGREDIENTS = "admin_ingredients"
 const val ADMIN_INGREDIENT_FORM = "admin_ingredient_form"
 const val ADMIN_RECIPES = "admin_recipes"
@@ -208,15 +206,8 @@ fun FruityliciousNavGraph(
         }
 
         composable(ADMIN_INGREDIENTS) {
-            IngredientListScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(ADMIN_INGREDIENT_FORM) {
-            IngredientFormScreen(
-                onBack = { navController.popBackStack() }
+            ManageIngredientsScreen(
+                navController = navController
             )
         }
 
