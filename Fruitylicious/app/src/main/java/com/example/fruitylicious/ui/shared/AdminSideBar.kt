@@ -148,7 +148,7 @@ fun AdminSideBarContent(
                 NavItem(Icons.Outlined.Receipt,       "Transaction History", "admin_transacHistory"),
                 NavItem(Icons.Outlined.BarChart,      "Reports",            "admin_reports"),
                 NavItem(Icons.Outlined.AssignmentLate,"Audit Logs",         "admin_audit_logs"),
-                NavItem(Icons.Outlined.Groups,        "Staff Logs",         "")
+                NavItem(Icons.Outlined.Groups,        "Staff Logs",         "admin_staff_logs")
             )
 
             reportItems.forEach { item ->

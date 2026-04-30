@@ -36,9 +36,11 @@ import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 // Corrected Imports
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen
+import com.example.fruitylicious.ui.admin.reports.StaffLogScreen
 import com.example.fruitylicious.ui.shared.AttendanceState
 import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.TimeLogUiState
+import com.example.fruitylicious.ui.staff.sales.StaffSalesSummaryScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,7 +99,8 @@ fun AppNavigation() {
             "admin_audit_logs",
             "admin_notification",
             "admin_inventory_adjustment",
-            "admin_restock"
+            "admin_restock",
+            "admin_staff_logs"
 
         )
 
@@ -161,6 +164,7 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_notification" -> NotificationsScreen(navController, drawerState, scope)
             "admin_inventory_adjustment" -> InventoryAdjustmentScreen(navController, drawerState, scope)
             "admin_restock" -> RestockScreen(navController, drawerState, scope)
+            "admin_staff_logs" -> StaffLogScreen(navController, drawerState, scope)
         }
     }
 }

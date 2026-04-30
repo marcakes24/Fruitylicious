@@ -1,4 +1,4 @@
-package com.example.fruitylicious
+package com.example.fruitylicious.ui.staff.inventory
 
 import androidx.compose.material3.DrawerState
 import kotlinx.coroutines.CoroutineScope
