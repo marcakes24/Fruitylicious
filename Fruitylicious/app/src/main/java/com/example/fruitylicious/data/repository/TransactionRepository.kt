@@ -5,22 +5,36 @@ import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
+import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.TransactionEntity
+import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class CartItem(
-    val productId: Int,
-    val productName: String,
+data class CartAddon(
+    val addonProductId: Int,
+    val addonName: String,
     val quantity: Int,
     val unitPrice: Double,
     val subtotal: Double
+)
+
+data class CartItem(
+    val cartLineId: String = UUID.randomUUID().toString(),
+    val productId: Int,
+    val variantId: Int,
+    val productName: String,
+    val sizeName: String,
+    val quantity: Int,
+    val unitPrice: Double,
+    val subtotal: Double,
+    val addons: List<CartAddon> = emptyList()
 )
 
 @Singleton
@@ -28,6 +42,7 @@ class TransactionRepository @Inject constructor(
     private val database: PosDatabase,
     private val transactionDao: TransactionDao,
     private val transactionItemDao: TransactionItemDao,
+    private val transactionItemAddonDao: TransactionItemAddonDao,
     private val productRecipeDao: ProductRecipeDao,
     private val inventoryDao: InventoryDao,
     private val auditLogDao: AuditLogDao
@@ -45,11 +60,19 @@ class TransactionRepository @Inject constructor(
         return transactionItemDao.observeItemsForTransaction(transactionId)
     }
 
-    fun observeTransactionsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<TransactionEntity>> {
+    fun observeTransactionsByDateRange(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): Flow<List<TransactionEntity>> {
         return transactionDao.observeTransactionsByDateRange(branchId, from, to)
     }
 
-    fun observeCompletedSalesTotal(branchId: Int, from: Long, to: Long): Flow<Double> {
+    fun observeCompletedSalesTotal(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): Flow<Double> {
         return transactionDao.observeCompletedSalesTotal(branchId, from, to)
     }
 
@@ -80,33 +103,57 @@ class TransactionRepository @Inject constructor(
         }
 
         val now = System.currentTimeMillis()
+        val transactionId = UUID.randomUUID().toString()
+        val totalAmount = cartItems.sumOf { it.subtotal }
+
         val requiredByIngredient = mutableMapOf<Int, Double>()
 
         for (cartItem in cartItems) {
             if (cartItem.quantity <= 0) {
-                return Result.failure(IllegalArgumentException("Item quantity must be greater than zero."))
+                return Result.failure(
+                    IllegalArgumentException("Item quantity must be greater than zero.")
+                )
             }
 
-            val recipes = productRecipeDao.getRecipesForProduct(cartItem.productId)
+            val baseRecipes = productRecipeDao.getRecipesForProduct(cartItem.productId)
 
-            for (recipe in recipes) {
+            for (recipe in baseRecipes) {
                 val totalRequired = recipe.quantityRequired * cartItem.quantity
                 requiredByIngredient[recipe.ingredientId] =
                     (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
             }
-        }
 
-        for ((ingredientId, requiredQuantity) in requiredByIngredient) {
-            val inventory = inventoryDao.getInventoryItem(ingredientId, branchId)
-                ?: return Result.failure(IllegalStateException("Missing inventory for ingredient $ingredientId."))
+            for (addon in cartItem.addons) {
+                val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
 
-            if (inventory.currentStock < requiredQuantity) {
-                return Result.failure(IllegalStateException("Insufficient stock for ingredient $ingredientId."))
+                for (recipe in addonRecipes) {
+                    val totalRequired =
+                        recipe.quantityRequired * addon.quantity * cartItem.quantity
+
+                    requiredByIngredient[recipe.ingredientId] =
+                        (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
+                }
             }
         }
 
-        val transactionId = UUID.randomUUID().toString()
-        val totalAmount = cartItems.sumOf { it.subtotal }
+        for ((ingredientId, requiredQuantity) in requiredByIngredient) {
+            val inventory = inventoryDao.getInventoryItem(
+                ingredientId = ingredientId,
+                branchId = branchId
+            )
+
+            if (inventory == null) {
+                return Result.failure(
+                    IllegalStateException("Inventory item not found for ingredient $ingredientId.")
+                )
+            }
+
+            if (inventory.currentStock < requiredQuantity) {
+                return Result.failure(
+                    IllegalStateException("Insufficient stock for ingredient $ingredientId.")
+                )
+            }
+        }
 
         database.withTransaction {
             transactionDao.upsertTransaction(
@@ -116,28 +163,51 @@ class TransactionRepository @Inject constructor(
                     branchId = branchId,
                     totalAmount = totalAmount,
                     paymentType = paymentType.trim(),
-                    dateTime = now,
                     status = "completed",
+                    dateTime = now,
                     lastModified = now,
                     isSynced = false,
                     syncedAt = null
                 )
             )
 
-            val transactionItems = cartItems.map {
-                TransactionItemEntity(
-                    transactionItemId = UUID.randomUUID().toString(),
-                    transactionId = transactionId,
-                    productId = it.productId,
-                    quantity = it.quantity,
-                    subtotal = it.subtotal,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
-            }
+            for (cartItem in cartItems) {
+                val transactionItemId = UUID.randomUUID().toString()
 
-            transactionItemDao.upsertTransactionItems(transactionItems)
+                transactionItemDao.upsertTransactionItem(
+                    TransactionItemEntity(
+                        transactionItemId = transactionItemId,
+                        transactionId = transactionId,
+                        productId = cartItem.productId,
+                        variantId = cartItem.variantId,
+                        sizeName = cartItem.sizeName,
+                        quantity = cartItem.quantity,
+                        subtotal = cartItem.subtotal,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                )
+
+                val addonEntities = cartItem.addons.map { addon ->
+                    val totalAddonQuantity = addon.quantity * cartItem.quantity
+
+                    TransactionItemAddonEntity(
+                        transactionItemAddonId = UUID.randomUUID().toString(),
+                        transactionItemId = transactionItemId,
+                        addonProductId = addon.addonProductId,
+                        quantity = totalAddonQuantity,
+                        subtotal = addon.unitPrice * totalAddonQuantity,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                }
+
+                if (addonEntities.isNotEmpty()) {
+                    transactionItemAddonDao.upsertAddons(addonEntities)
+                }
+            }
 
             for ((ingredientId, requiredQuantity) in requiredByIngredient) {
                 inventoryDao.deductStock(
@@ -209,11 +279,47 @@ class TransactionRepository @Inject constructor(
         return transactionItemDao.getUnsyncedTransactionItems()
     }
 
-    suspend fun markTransactionSynced(transactionId: String, syncedAt: Long) {
+    suspend fun getUnsyncedTransactionItemAddons(): List<TransactionItemAddonEntity> {
+        return transactionItemAddonDao.getUnsyncedTransactionItemAddons()
+    }
+
+    suspend fun markTransactionSynced(
+        transactionId: String,
+        syncedAt: Long
+    ) {
         transactionDao.markSynced(transactionId, syncedAt)
     }
 
-    suspend fun markTransactionItemSynced(transactionItemId: String, syncedAt: Long) {
+    suspend fun markTransactionItemSynced(
+        transactionItemId: String,
+        syncedAt: Long
+    ) {
         transactionItemDao.markSynced(transactionItemId, syncedAt)
+    }
+
+    suspend fun markTransactionItemAddonSynced(
+        transactionItemAddonId: String,
+        syncedAt: Long
+    ) {
+        transactionItemAddonDao.markSynced(transactionItemAddonId, syncedAt)
+    }
+
+    fun observeAddonsForTransactionItem(
+        transactionItemId: String
+    ): Flow<List<TransactionItemAddonEntity>> {
+        return transactionItemAddonDao.observeAddonsForTransactionItem(transactionItemId)
+    }
+
+    suspend fun getAddonsForTransactionItem(
+        transactionItemId: String
+    ): List<TransactionItemAddonEntity> {
+        return transactionItemAddonDao.getAddonsForTransactionItem(transactionItemId)
+    }
+
+    fun observeAllTransactionsByDateRange(
+        from: Long,
+        to: Long
+    ): Flow<List<TransactionEntity>> {
+        return transactionDao.observeAllTransactionsByDateRange(from, to)
     }
 }

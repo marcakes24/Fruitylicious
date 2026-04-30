@@ -6,43 +6,33 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
-    tableName = "transaction_items",
+    tableName = "transaction_item_addons",
     foreignKeys = [
         ForeignKey(
-            entity = TransactionEntity::class,
-            parentColumns = ["transactionId"],
-            childColumns = ["transactionId"],
+            entity = TransactionItemEntity::class,
+            parentColumns = ["transactionItemId"],
+            childColumns = ["transactionItemId"],
             onDelete = ForeignKey.CASCADE,
             onUpdate = ForeignKey.CASCADE
         ),
         ForeignKey(
             entity = ProductEntity::class,
             parentColumns = ["productId"],
-            childColumns = ["productId"],
+            childColumns = ["addonProductId"],
             onDelete = ForeignKey.RESTRICT,
-            onUpdate = ForeignKey.CASCADE
-        ),
-        ForeignKey(
-            entity = ProductVariantEntity::class,
-            parentColumns = ["variantId"],
-            childColumns = ["variantId"],
-            onDelete = ForeignKey.SET_NULL,
             onUpdate = ForeignKey.CASCADE
         )
     ],
     indices = [
-        Index(value = ["transactionId"]),
-        Index(value = ["productId"]),
-        Index(value = ["variantId"])
+        Index(value = ["transactionItemId"]),
+        Index(value = ["addonProductId"])
     ]
 )
-data class TransactionItemEntity(
+data class TransactionItemAddonEntity(
     @PrimaryKey
+    val transactionItemAddonId: String,
     val transactionItemId: String,
-    val transactionId: String,
-    val productId: Int,
-    val variantId: Int?,
-    val sizeName: String?,
+    val addonProductId: Int,
     val quantity: Int,
     val subtotal: Double,
     val lastModified: Long,

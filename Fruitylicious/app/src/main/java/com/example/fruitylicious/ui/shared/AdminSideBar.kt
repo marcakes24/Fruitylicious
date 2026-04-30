@@ -1,6 +1,5 @@
 package com.example.fruitylicious.ui.shared
 
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,9 +12,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.AssignmentLate
+import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SetMeal
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,19 +44,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.fruitylicious.ADMIN_ADJUSTMENT
+import com.example.fruitylicious.ADMIN_AUDIT_LOGS
+import com.example.fruitylicious.ADMIN_DASHBOARD
+import com.example.fruitylicious.ADMIN_INGREDIENTS
+import com.example.fruitylicious.ADMIN_INVENTORY
+import com.example.fruitylicious.ADMIN_PRODUCTS
+import com.example.fruitylicious.ADMIN_RECIPES
+import com.example.fruitylicious.ADMIN_REPORTS_DASHBOARD
+import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
+import com.example.fruitylicious.ADMIN_STAFF_LOGS
+import com.example.fruitylicious.ADMIN_USERS
+import com.example.fruitylicious.ADMIN_WASTE_HISTORY
+import com.example.fruitylicious.LOGIN
 import com.example.fruitylicious.R
+import com.example.fruitylicious.STAFF_POS
+import com.example.fruitylicious.STAFF_TRANSACTION_HISTORY
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
-// ── Color constants ──────────────────────────────────────────────────────────
-private val SidebarBg       = Color(0xFF2E7D32)
-private val SidebarDarkBg   = Color(0xFF1B5E20)
-private val ActiveItemBg    = Color(0xFF43A047)   // lighter green pill for active
-private val WhiteFull       = Color.White
-private val WhiteMid        = Color.White.copy(alpha = 0.75f)
-private val WhiteDim        = Color.White.copy(alpha = 0.50f)
-private val WhiteFaint      = Color.White.copy(alpha = 0.20f)
+private val SidebarBg = Color(0xFF2E7D32)
+private val SidebarDarkBg = Color(0xFF1B5E20)
+private val ActiveItemBg = Color(0xFF43A047)
+private val WhiteFull = Color.White
+private val WhiteMid = Color.White.copy(alpha = 0.75f)
+private val WhiteDim = Color.White.copy(alpha = 0.50f)
+private val WhiteFaint = Color.White.copy(alpha = 0.20f)
 
-// ── Data model ───────────────────────────────────────────────────────────────
 private data class NavItem(
     val icon: ImageVector,
     val label: String,
@@ -50,7 +81,9 @@ private data class NavItem(
 fun AdminSideBarContent(
     navController: NavController,
     drawerState: DrawerState,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    adminName: String,
+    onLogout: () -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -61,8 +94,6 @@ fun AdminSideBarContent(
             .width(260.dp)
             .background(SidebarBg)
     ) {
-
-        // ── Logo header ──────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -70,10 +101,8 @@ fun AdminSideBarContent(
                 .padding(top = 52.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Oval logo container
             Box(
-                modifier = Modifier
-                    .size(width = 140.dp, height = 72.dp),
+                modifier = Modifier.size(width = 140.dp, height = 72.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -86,99 +115,84 @@ fun AdminSideBarContent(
             }
         }
 
-        // ── Scrollable nav items ─────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 8.dp)
         ) {
-
-            // Main items
             val mainItems = listOf(
-                NavItem(Icons.Outlined.Dashboard,           "Dashboard",     "admin_home"),
-                NavItem(Icons.Outlined.PointOfSale,         "POS Screen",    "admin_pos"),
-                NavItem(Icons.AutoMirrored.Outlined.ListAlt,"Order Queue",   ""),
-                NavItem(Icons.Outlined.AccessTime,          "Time Log",      ""),
-                NavItem(Icons.Outlined.Notifications,       "Notifications", "")
+                NavItem(Icons.Outlined.Dashboard, "Dashboard", ADMIN_DASHBOARD),
+                NavItem(Icons.Outlined.PointOfSale, "POS Screen", STAFF_POS),
+                NavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", STAFF_TRANSACTION_HISTORY),
+                NavItem(Icons.Outlined.AccessTime, "Time Log", ADMIN_STAFF_LOGS),
+                NavItem(Icons.Outlined.Notifications, "Notifications", ADMIN_DASHBOARD)
             )
+
             mainItems.forEach { item ->
                 SidebarNavItem(
-                    icon      = item.icon,
-                    label     = item.label,
-                    isActive  = currentRoute == item.route,
-                    onClick   = {
-                        if (item.route.isNotEmpty())
-                            navigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    icon = item.icon,
+                    label = item.label,
+                    isActive = currentRoute == item.route,
+                    onClick = {
+                        navigateTo(navController, drawerState, scope, item.route)
                     }
                 )
             }
 
-            // Management section
             SidebarSectionHeader("Management")
+
             val managementItems = listOf(
-                NavItem(Icons.Outlined.Inventory2,           "Manage Products",       ""),
-                NavItem(Icons.Outlined.SetMeal,              "Manage Ingredients",    ""),
-                NavItem(Icons.AutoMirrored.Outlined.MenuBook,"Recipe Management",     ""),
-                NavItem(Icons.Outlined.Group,                "User Management",       ""),
-                NavItem(Icons.Outlined.Search,               "Inventory Monitoring",  ""),
-                NavItem(Icons.Outlined.Tune,                 "Inventory Adjustment",  ""),
-                NavItem(Icons.Outlined.Autorenew,            "Restock",               ""),
-                NavItem(Icons.Outlined.DeleteOutline,        "Waste Management",      "")
+                NavItem(Icons.Outlined.Inventory2, "Manage Products", ADMIN_PRODUCTS),
+                NavItem(Icons.Outlined.SetMeal, "Manage Ingredients", ADMIN_INGREDIENTS),
+                NavItem(Icons.AutoMirrored.Outlined.MenuBook, "Recipe Management", ADMIN_RECIPES),
+                NavItem(Icons.Outlined.Group, "User Management", ADMIN_USERS),
+                NavItem(Icons.Outlined.Search, "Inventory Monitoring", ADMIN_INVENTORY),
+                NavItem(Icons.Outlined.Tune, "Inventory Adjustment", ADMIN_ADJUSTMENT),
+                NavItem(Icons.Outlined.Autorenew, "Restock", ADMIN_RESTOCK_HISTORY),
+                NavItem(Icons.Outlined.DeleteOutline, "Waste Management", ADMIN_WASTE_HISTORY)
             )
+
             managementItems.forEach { item ->
                 SidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
+                    icon = item.icon,
+                    label = item.label,
                     isActive = currentRoute == item.route,
-                    onClick  = {
-                        if (item.route.isNotEmpty())
-                            navigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    onClick = {
+                        navigateTo(navController, drawerState, scope, item.route)
                     }
                 )
             }
 
-            // Reports section
             SidebarSectionHeader("Reports")
+
             val reportItems = listOf(
-                NavItem(Icons.Outlined.Receipt,       "Transaction History", ""),
-                NavItem(Icons.Outlined.BarChart,      "Reports",            ""),
-                NavItem(Icons.Outlined.AssignmentLate,"Audit Logs",         ""),
-                NavItem(Icons.Outlined.Groups,        "Staff Logs",         "")
+                NavItem(Icons.Outlined.Receipt, "Transaction History", STAFF_TRANSACTION_HISTORY),
+                NavItem(Icons.Outlined.BarChart, "Reports", ADMIN_REPORTS_DASHBOARD),
+                NavItem(Icons.Outlined.AssignmentLate, "Audit Logs", ADMIN_AUDIT_LOGS),
+                NavItem(Icons.Outlined.Groups, "Staff Logs", ADMIN_STAFF_LOGS)
             )
+
             reportItems.forEach { item ->
                 SidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
+                    icon = item.icon,
+                    label = item.label,
                     isActive = currentRoute == item.route,
-                    onClick  = {
-                        if (item.route.isNotEmpty())
-                            navigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    onClick = {
+                        navigateTo(navController, drawerState, scope, item.route)
                     }
                 )
             }
         }
 
-        // ── Bottom: Admin info + Log Out ─────────────────────────────────────
-        HorizontalDivider(
-            color     = WhiteFaint,
-            thickness = 1.dp
-        )
+        HorizontalDivider(color = WhiteFaint, thickness = 1.dp)
 
-        // Admin User row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar circle with initial "A"
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -187,119 +201,136 @@ fun AdminSideBarContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text       = "A",
-                    color      = WhiteFull,
-                    fontSize   = 16.sp,
+                    text = adminName.firstOrNull()?.uppercaseChar()?.toString() ?: "A",
+                    color = WhiteFull,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+
             Spacer(modifier = Modifier.width(10.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = "Admin User",
-                    color      = WhiteFull,
-                    fontSize   = 14.sp,
+                    text = adminName.ifBlank { "Admin User" },
+                    color = WhiteFull,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
+
                 Text(
-                    text     = "admin",
-                    color    = WhiteMid,
+                    text = "admin",
+                    color = WhiteMid,
                     fontSize = 12.sp
                 )
             }
         }
 
-        // Log Out row
         HorizontalDivider(color = WhiteFaint, thickness = 1.dp)
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
+                    onLogout()
+
+                    scope.launch {
+                        drawerState.close()
+                    }
+
+                    navController.navigate(LOGIN) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector        = Icons.AutoMirrored.Outlined.Logout,
+                imageVector = Icons.AutoMirrored.Outlined.Logout,
                 contentDescription = "Log Out",
-                tint               = WhiteMid,
-                modifier           = Modifier.size(20.dp)
+                tint = WhiteMid,
+                modifier = Modifier.size(20.dp)
             )
+
             Spacer(modifier = Modifier.width(14.dp))
+
             Text(
-                text       = "Log Out",
-                color      = WhiteFull,
-                fontSize   = 14.sp,
+                text = "Log Out",
+                color = WhiteFull,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
         }
     }
 }
 
-// ── Section header ───────────────────────────────────────────────────────────
 @Composable
 private fun SidebarSectionHeader(title: String) {
     Spacer(modifier = Modifier.height(8.dp))
+
     Text(
-        text       = title.uppercase(),
-        color      = WhiteDim,
-        fontSize   = 11.sp,
+        text = title.uppercase(),
+        color = WhiteDim,
+        fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.sp,
-        modifier   = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
+        modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
     )
 }
 
-// ── Single nav item ──────────────────────────────────────────────────────────
 @Composable
 private fun SidebarNavItem(
-    icon:     ImageVector,
-    label:    String,
+    icon: ImageVector,
+    label: String,
     isActive: Boolean,
-    onClick:  () -> Unit
+    onClick: () -> Unit
 ) {
-    val bgColor = if (isActive) ActiveItemBg else Color.Transparent
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(bgColor)
+            .background(if (isActive) ActiveItemBg else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector        = icon,
+            imageVector = icon,
             contentDescription = label,
-            tint               = if (isActive) WhiteFull else WhiteMid,
-            modifier           = Modifier.size(20.dp)
+            tint = if (isActive) WhiteFull else WhiteMid,
+            modifier = Modifier.size(20.dp)
         )
+
         Spacer(modifier = Modifier.width(14.dp))
+
         Text(
-            text       = label,
-            color      = if (isActive) WhiteFull else WhiteMid,
-            fontSize   = 14.sp,
+            text = label,
+            color = if (isActive) WhiteFull else WhiteMid,
+            fontSize = 14.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
 
-// ── Navigation helper ────────────────────────────────────────────────────────
 private fun navigateTo(
     navController: NavController,
-    drawerState:   DrawerState,
-    scope:         CoroutineScope,
-    route:         String
+    drawerState: DrawerState,
+    scope: CoroutineScope,
+    route: String
 ) {
-    scope.launch { drawerState.close() }
+    scope.launch {
+        drawerState.close()
+    }
+
     navController.navigate(route) {
-        popUpTo("admin_home") { saveState = true }
+        popUpTo(ADMIN_DASHBOARD) {
+            saveState = true
+        }
         launchSingleTop = true
-        restoreState    = true
+        restoreState = true
     }
 }

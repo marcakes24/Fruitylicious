@@ -2,38 +2,34 @@ package com.example.fruitylicious.ui.staff.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.repository.TransactionRepository
 import com.example.fruitylicious.domain.usecase.auth.LogoutUseCase
-import com.example.fruitylicious.domain.usecase.inventory.CheckLowStockUseCase
-import com.example.fruitylicious.domain.usecase.staff.ClockInUseCase
-import com.example.fruitylicious.domain.usecase.staff.ClockOutUseCase
-import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.DateTimeUtil
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 data class StaffDashboardUiState(
     val branchName: String = "",
     val userName: String = "",
-    val userId: Int = 0,
     val branchId: Int = 0,
     val isOnline: Boolean = false,
-    val lastSyncAt: Long = 0L,
-    val lastSyncSuccessful: Boolean = false,
-    val lastSyncMessage: String = "Not synced yet.",
-    val currentTimeText: String = "",
-    val isClockedIn: Boolean = false,
-    val isClockActionLoading: Boolean = false,
-    val lowStockCount: Int = 0,
+    val dateText: String = "",
+    val weeklySalesData: List<Float> = List(7) { 0f },
+    val weeklyTotalSales: Double = 0.0,
+    val weeklyTransactionCount: Int = 0,
     val error: String? = null
 )
 
@@ -42,126 +38,112 @@ class StaffDashboardViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
     private val networkMonitor: NetworkMonitor,
-    private val checkLowStockUseCase: CheckLowStockUseCase,
-    private val clockInUseCase: ClockInUseCase,
-    private val clockOutUseCase: ClockOutUseCase,
-    private val staffLogRepository: StaffLogRepository,
+    private val transactionRepository: TransactionRepository,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    private val branchId: Int = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
-    private val userId: Int = sessionManager.getUserId()
+    private val branchId: Int =
+        sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         StaffDashboardUiState(
             branchName = branchConfig.branchName,
             userName = sessionManager.getUserName(),
-            userId = userId,
             branchId = branchId,
-            lastSyncAt = sessionManager.getLastSyncAt(),
-            lastSyncSuccessful = sessionManager.wasLastSyncSuccessful(),
-            lastSyncMessage = sessionManager.getLastSyncMessage(),
-            currentTimeText = DateTimeUtil.formatDateTime(System.currentTimeMillis())
+            dateText = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US).format(Date())
         )
     )
+
     val uiState: StateFlow<StaffDashboardUiState> = _uiState.asStateFlow()
 
     init {
         observeNetwork()
-        observeLowStock()
-        startClock()
-        refreshClockStatus()
+        observeWeeklySales()
     }
 
     private fun observeNetwork() {
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { isOnline ->
                 _uiState.update {
-                    it.copy(
-                        isOnline = isOnline,
-                        lastSyncAt = sessionManager.getLastSyncAt(),
-                        lastSyncSuccessful = sessionManager.wasLastSyncSuccessful(),
-                        lastSyncMessage = sessionManager.getLastSyncMessage()
-                    )
+                    it.copy(isOnline = isOnline)
                 }
             }
         }
     }
 
-    private fun observeLowStock() {
+    private fun observeWeeklySales() {
+        val weekRange = getCurrentWeekRange()
+
         viewModelScope.launch {
-            checkLowStockUseCase(branchId).collectLatest { lowStock ->
-                _uiState.update {
-                    it.copy(lowStockCount = lowStock.size)
-                }
-            }
-        }
-    }
-
-    private fun startClock() {
-        viewModelScope.launch {
-            while (true) {
-                _uiState.update {
-                    it.copy(currentTimeText = DateTimeUtil.formatDateTime(System.currentTimeMillis()))
-                }
-                delay(60_000L)
-            }
-        }
-    }
-
-    fun refreshClockStatus() {
-        viewModelScope.launch {
-            val openLog = staffLogRepository.getOpenStaffLog(userId, branchId)
-            _uiState.update {
-                it.copy(isClockedIn = openLog != null)
-            }
-        }
-    }
-
-    fun clockIn(image: String?) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(isClockActionLoading = true, error = null)
-            }
-
-            val result = clockInUseCase(
-                userId = userId,
-                branchId = branchId,
-                image = image
-            )
-
-            _uiState.update {
-                it.copy(
-                    isClockActionLoading = false,
-                    isClockedIn = result.isSuccess,
-                    error = result.exceptionOrNull()?.message
+            transactionRepository
+                .observeTransactionsByDateRange(
+                    branchId = branchId,
+                    from = weekRange.first,
+                    to = weekRange.second
                 )
-            }
-        }
-    }
+                .collectLatest { transactions ->
+                    val completedTransactions = transactions.filter {
+                        it.status.equals("completed", ignoreCase = true)
+                    }
 
-    fun clockOut() {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(isClockActionLoading = true, error = null)
-            }
+                    val salesPerDay = MutableList(7) { 0f }
 
-            val result = clockOutUseCase(
-                userId = userId,
-                branchId = branchId
-            )
+                    completedTransactions.forEach { transaction ->
+                        val index = getMondayBasedDayIndex(transaction.dateTime)
+                        salesPerDay[index] += transaction.totalAmount.toFloat()
+                    }
 
-            _uiState.update {
-                it.copy(
-                    isClockActionLoading = false,
-                    isClockedIn = if (result.isSuccess) false else it.isClockedIn,
-                    error = result.exceptionOrNull()?.message
-                )
-            }
+                    _uiState.update {
+                        it.copy(
+                            weeklySalesData = salesPerDay,
+                            weeklyTotalSales = completedTransactions.sumOf { transaction ->
+                                transaction.totalAmount
+                            },
+                            weeklyTransactionCount = completedTransactions.size,
+                            error = null
+                        )
+                    }
+                }
         }
     }
 
     fun logout() {
         logoutUseCase()
+    }
+
+    private fun getCurrentWeekRange(): Pair<Long, Long> {
+        val calendar = Calendar.getInstance()
+
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+
+        while (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+            calendar.add(Calendar.DAY_OF_YEAR, -1)
+        }
+
+        val start = calendar.timeInMillis
+
+        calendar.add(Calendar.DAY_OF_YEAR, 7)
+        val end = calendar.timeInMillis - 1
+
+        return start to end
+    }
+
+    private fun getMondayBasedDayIndex(timestamp: Long): Int {
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = timestamp
+
+        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> 0
+            Calendar.TUESDAY -> 1
+            Calendar.WEDNESDAY -> 2
+            Calendar.THURSDAY -> 3
+            Calendar.FRIDAY -> 4
+            Calendar.SATURDAY -> 5
+            Calendar.SUNDAY -> 6
+            else -> 0
+        }
     }
 }

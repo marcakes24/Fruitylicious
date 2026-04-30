@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "3e8611f7b7f393b57d4e89d652e85328",
+    "identityHash": "1717c3f11ad4fee744510ee23381ba05",
     "entities": [
       {
         "tableName": "products",
@@ -1201,7 +1201,7 @@
       },
       {
         "tableName": "transaction_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`transactionItemId` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `productId` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, `subtotal` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`transactionItemId`), FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`transactionId`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`productId`) REFERENCES `products`(`productId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`transactionItemId` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `productId` INTEGER NOT NULL, `variantId` INTEGER, `sizeName` TEXT, `quantity` INTEGER NOT NULL, `subtotal` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`transactionItemId`), FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`transactionId`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`productId`) REFERENCES `products`(`productId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`variantId`) REFERENCES `product_variants`(`variantId`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "transactionItemId",
@@ -1220,6 +1220,16 @@
             "columnName": "productId",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "variantId",
+            "columnName": "variantId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sizeName",
+            "columnName": "sizeName",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "quantity",
@@ -1275,6 +1285,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_transaction_items_productId` ON `${TABLE_NAME}` (`productId`)"
+          },
+          {
+            "name": "index_transaction_items_variantId",
+            "unique": false,
+            "columnNames": [
+              "variantId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaction_items_variantId` ON `${TABLE_NAME}` (`variantId`)"
           }
         ],
         "foreignKeys": [
@@ -1298,6 +1317,17 @@
             ],
             "referencedColumns": [
               "productId"
+            ]
+          },
+          {
+            "table": "product_variants",
+            "onDelete": "SET NULL",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "variantId"
+            ],
+            "referencedColumns": [
+              "variantId"
             ]
           }
         ]
@@ -1430,7 +1460,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e8611f7b7f393b57d4e89d652e85328')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1717c3f11ad4fee744510ee23381ba05')"
     ]
   }
 }

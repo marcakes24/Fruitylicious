@@ -3,6 +3,7 @@ package com.example.fruitylicious.data.repository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,66 +23,41 @@ class CartRepository @Inject constructor() {
     private val _lastReceiptSummary = MutableStateFlow<ReceiptSummary?>(null)
     val lastReceiptSummary: StateFlow<ReceiptSummary?> = _lastReceiptSummary.asStateFlow()
 
-    fun addProduct(
-        productId: Int,
-        productName: String,
-        unitPrice: Double
-    ) {
-        val currentCart = _cartItems.value
-        val existingItem = currentCart.firstOrNull { it.productId == productId }
-
-        val updatedCart = if (existingItem == null) {
-            currentCart + CartItem(
-                productId = productId,
-                productName = productName,
-                quantity = 1,
-                unitPrice = unitPrice,
-                subtotal = unitPrice
-            )
-        } else {
-            currentCart.map { item ->
-                if (item.productId == productId) {
-                    val newQuantity = item.quantity + 1
-                    item.copy(
-                        quantity = newQuantity,
-                        subtotal = newQuantity * item.unitPrice
-                    )
-                } else {
-                    item
-                }
-            }
-        }
-
-        _cartItems.value = updatedCart
+    fun addCustomItem(item: CartItem) {
+        _cartItems.value = _cartItems.value + item
     }
 
-    fun removeProduct(productId: Int) {
-        val updatedCart = _cartItems.value.mapNotNull { item ->
-            if (item.productId == productId) {
-                val newQuantity = item.quantity - 1
+    fun updateQuantity(cartLineId: String, delta: Int) {
+        _cartItems.value = _cartItems.value.mapNotNull { item ->
+            if (item.cartLineId == cartLineId) {
+                val newQuantity = item.quantity + delta
 
                 if (newQuantity <= 0) {
                     null
                 } else {
                     item.copy(
                         quantity = newQuantity,
-                        subtotal = newQuantity * item.unitPrice
+                        subtotal = computeSubtotal(
+                            unitPrice = item.unitPrice,
+                            quantity = newQuantity,
+                            addons = item.addons
+                        )
                     )
                 }
             } else {
                 item
             }
         }
+    }
 
-        _cartItems.value = updatedCart
+    fun removeLine(cartLineId: String) {
+        _cartItems.value = _cartItems.value.filterNot {
+            it.cartLineId == cartLineId
+        }
     }
 
     fun clearCart() {
         _cartItems.value = emptyList()
-    }
-
-    fun getTotalAmount(): Double {
-        return _cartItems.value.sumOf { it.subtotal }
     }
 
     fun saveReceiptSummary(
@@ -96,5 +72,14 @@ class CartRepository @Inject constructor() {
             totalAmount = totalAmount,
             completedAt = completedAt
         )
+    }
+
+    private fun computeSubtotal(
+        unitPrice: Double,
+        quantity: Int,
+        addons: List<CartAddon>
+    ): Double {
+        val addonTotalPerItem = addons.sumOf { it.subtotal }
+        return (unitPrice + addonTotalPerItem) * quantity
     }
 }

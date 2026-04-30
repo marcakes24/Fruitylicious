@@ -9,6 +9,7 @@ import com.example.fruitylicious.data.local.dao.InventoryAdjustmentDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.ProductDao
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
+import com.example.fruitylicious.data.local.dao.ProductVariantDao
 import com.example.fruitylicious.data.local.dao.RestockLogDao
 import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
@@ -28,12 +29,17 @@ import com.example.fruitylicious.data.local.entity.TransactionEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
+import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
+import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
+import com.example.fruitylicious.data.local.entity.ProductVariantEntity
+
 
 @Database(
     entities = [
         BranchEntity::class,
         UserEntity::class,
         ProductEntity::class,
+        ProductVariantEntity::class,
         IngredientEntity::class,
         ProductRecipeEntity::class,
         InventoryEntity::class,
@@ -42,17 +48,18 @@ import com.example.fruitylicious.data.local.entity.WasteLogEntity
         WasteLogEntity::class,
         TransactionEntity::class,
         TransactionItemEntity::class,
+        TransactionItemAddonEntity::class,
         AuditLogEntity::class,
         StaffLogEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = true
 )
-
 abstract class PosDatabase : RoomDatabase() {
     abstract fun branchDao(): BranchDao
     abstract fun userDao(): UserDao
     abstract fun productDao(): ProductDao
+    abstract fun productVariantDao(): ProductVariantDao
     abstract fun ingredientDao(): IngredientDao
     abstract fun productRecipeDao(): ProductRecipeDao
     abstract fun inventoryDao(): InventoryDao
@@ -61,6 +68,7 @@ abstract class PosDatabase : RoomDatabase() {
     abstract fun wasteLogDao(): WasteLogDao
     abstract fun transactionDao(): TransactionDao
     abstract fun transactionItemDao(): TransactionItemDao
+    abstract fun transactionItemAddonDao(): TransactionItemAddonDao
     abstract fun auditLogDao(): AuditLogDao
     abstract fun staffLogDao(): StaffLogDao
 }

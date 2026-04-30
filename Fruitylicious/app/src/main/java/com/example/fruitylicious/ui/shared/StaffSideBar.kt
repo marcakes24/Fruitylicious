@@ -1,6 +1,5 @@
 package com.example.fruitylicious.ui.shared
 
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,9 +11,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Inventory
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PointOfSale
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,21 +38,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.fruitylicious.LOGIN
 import com.example.fruitylicious.R
+import com.example.fruitylicious.STAFF_DASHBOARD
+import com.example.fruitylicious.STAFF_INVENTORY
+import com.example.fruitylicious.STAFF_POS
+import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
+import com.example.fruitylicious.STAFF_SALES_SUMMARY
+import com.example.fruitylicious.STAFF_TRANSACTION_HISTORY
+import com.example.fruitylicious.STAFF_WASTE_HISTORY
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
-// ── Color constants ──────────────────────────────────────────────────────────
-private val StaffSidebarBg     = Color(0xFF2E7D32)
+private val StaffSidebarBg = Color(0xFF2E7D32)
 private val StaffSidebarDarkBg = Color(0xFF1B5E20)
-private val StaffActiveItemBg  = Color(0xFF43A047)
-private val StaffWhiteFull     = Color.White
-private val StaffWhiteMid      = Color.White.copy(alpha = 0.75f)
-private val StaffWhiteDim      = Color.White.copy(alpha = 0.50f)
-private val StaffWhiteFaint    = Color.White.copy(alpha = 0.20f)
+private val StaffActiveItemBg = Color(0xFF43A047)
+private val StaffWhiteFull = Color.White
+private val StaffWhiteMid = Color.White.copy(alpha = 0.75f)
+private val StaffWhiteDim = Color.White.copy(alpha = 0.50f)
+private val StaffWhiteFaint = Color.White.copy(alpha = 0.20f)
 
-// ── Data model ───────────────────────────────────────────────────────────────
 private data class StaffNavItem(
-    val icon:  ImageVector,
+    val icon: ImageVector,
     val label: String,
     val route: String
 )
@@ -48,10 +67,11 @@ private data class StaffNavItem(
 @Composable
 fun StaffSideBarContent(
     navController: NavController,
-    drawerState:   DrawerState,
-    scope:         CoroutineScope,
-    staffName:     String = "Staff User",
-    branchName:    String = "Branch 1"
+    drawerState: DrawerState,
+    scope: CoroutineScope,
+    staffName: String,
+    branchName: String,
+    onLogout: () -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -62,8 +82,6 @@ fun StaffSideBarContent(
             .width(260.dp)
             .background(StaffSidebarBg)
     ) {
-
-        // ── Logo header ──────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -71,184 +89,191 @@ fun StaffSideBarContent(
                 .padding(top = 52.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier         = Modifier.size(width = 140.dp, height = 72.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter            = painterResource(id = R.drawable.logo),
-                    contentDescription = "Fruitylicious Logo",
-                    modifier           = Modifier
-                        .fillMaxWidth(0.85f)
-                        .aspectRatio(2f)
-                )
-            }
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Fruitylicious Logo",
+                modifier = Modifier
+                    .width(140.dp)
+                    .height(72.dp)
+            )
         }
 
-        // ── Scrollable nav items ─────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 8.dp)
         ) {
-            // ── Main items (staff-visible only) ──────────────────────────────
             val mainItems = listOf(
-                StaffNavItem(Icons.Outlined.Dashboard,              "Dashboard",     "home"),
-                StaffNavItem(Icons.Outlined.PointOfSale,            "POS Screen",    "pos"),
-                StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt,   "Order Queue",   ""),
-                StaffNavItem(Icons.Outlined.BarChart,               "Sales Summary", ""),
-                StaffNavItem(Icons.Outlined.AccessTime,             "Time Log",      ""),
-                StaffNavItem(Icons.Outlined.Search,              "Inventory Monitoring",  ""),
-                StaffNavItem(Icons.Outlined.Notifications,          "Notifications", "")
+                StaffNavItem(Icons.Outlined.Dashboard, "Dashboard", STAFF_DASHBOARD),
+                StaffNavItem(Icons.Outlined.PointOfSale, "POS Screen", STAFF_POS),
+                StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", STAFF_TRANSACTION_HISTORY),
+                StaffNavItem(Icons.Outlined.BarChart, "Sales Summary", STAFF_SALES_SUMMARY),
+                StaffNavItem(Icons.Outlined.AccessTime, "Time Log", STAFF_DASHBOARD),
+                StaffNavItem(Icons.Outlined.Search, "Inventory Monitoring", STAFF_INVENTORY),
+                StaffNavItem(Icons.Outlined.Notifications, "Notifications", STAFF_DASHBOARD)
             )
+
             mainItems.forEach { item ->
                 StaffSidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
+                    icon = item.icon,
+                    label = item.label,
                     isActive = currentRoute == item.route,
-                    onClick  = {
-                        if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    onClick = {
+                        staffNavigateTo(
+                            navController = navController,
+                            drawerState = drawerState,
+                            scope = scope,
+                            route = item.route
+                        )
                     }
                 )
             }
 
-            // ── Management section (staff-limited) ───────────────────────────
             StaffSidebarSectionHeader("Management")
+
             val managementItems = listOf(
-                StaffNavItem(Icons.Outlined.Autorenew,   "Restock",              ""),
-                StaffNavItem(Icons.Outlined.DeleteOutline,"Waste Management",    "")
+                StaffNavItem(Icons.Outlined.Autorenew, "Restock", STAFF_RESTOCK_HISTORY),
+                StaffNavItem(Icons.Outlined.DeleteOutline, "Waste Management", STAFF_WASTE_HISTORY)
             )
+
             managementItems.forEach { item ->
                 StaffSidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
+                    icon = item.icon,
+                    label = item.label,
                     isActive = currentRoute == item.route,
-                    onClick  = {
-                        if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    onClick = {
+                        staffNavigateTo(
+                            navController = navController,
+                            drawerState = drawerState,
+                            scope = scope,
+                            route = item.route
+                        )
                     }
                 )
             }
 
-            // ── Reports section (staff-limited) ──────────────────────────────
             StaffSidebarSectionHeader("Reports")
+
             val reportItems = listOf(
-                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", "")
+                StaffNavItem(Icons.Outlined.Receipt, "Transaction History", STAFF_TRANSACTION_HISTORY)
             )
+
             reportItems.forEach { item ->
                 StaffSidebarNavItem(
-                    icon     = item.icon,
-                    label    = item.label,
+                    icon = item.icon,
+                    label = item.label,
                     isActive = currentRoute == item.route,
-                    onClick  = {
-                        if (item.route.isNotEmpty())
-                            staffNavigateTo(navController, drawerState, scope, item.route)
-                        else
-                            scope.launch { drawerState.close() }
+                    onClick = {
+                        staffNavigateTo(
+                            navController = navController,
+                            drawerState = drawerState,
+                            scope = scope,
+                            route = item.route
+                        )
                     }
                 )
             }
         }
 
-        // ── Bottom: Staff info + Log Out ─────────────────────────────────────
         HorizontalDivider(color = StaffWhiteFaint, thickness = 1.dp)
 
-        // Staff User row
         Row(
-            modifier          = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar circle with initial "S"
             Box(
-                modifier         = Modifier
+                modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFFFA000)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text       = staffName.firstOrNull()?.uppercaseChar()?.toString() ?: "S",
-                    color      = StaffWhiteFull,
-                    fontSize   = 16.sp,
+                    text = staffName.firstOrNull()?.uppercaseChar()?.toString() ?: "S",
+                    color = StaffWhiteFull,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+
             Spacer(modifier = Modifier.width(10.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = staffName,
-                    color      = StaffWhiteFull,
-                    fontSize   = 14.sp,
+                    text = staffName.ifBlank { "Staff User" },
+                    color = StaffWhiteFull,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
+
                 Text(
-                    // "Staff · Branch 1" as shown in Figma
-                    text     = "Staff · $branchName",
-                    color    = StaffWhiteMid,
+                    text = "Staff · $branchName",
+                    color = StaffWhiteMid,
                     fontSize = 12.sp
                 )
             }
         }
 
-        // Log Out row
         HorizontalDivider(color = StaffWhiteFaint, thickness = 1.dp)
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
+                    onLogout()
+                    scope.launch { drawerState.close() }
+                    navController.navigate(LOGIN) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
                 }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector        = Icons.AutoMirrored.Outlined.Logout,
+                imageVector = Icons.AutoMirrored.Outlined.Logout,
                 contentDescription = "Log Out",
-                tint               = StaffWhiteMid,
-                modifier           = Modifier.size(20.dp)
+                tint = StaffWhiteMid,
+                modifier = Modifier.size(20.dp)
             )
+
             Spacer(modifier = Modifier.width(14.dp))
+
             Text(
-                text       = "Log Out",
-                color      = StaffWhiteFull,
-                fontSize   = 14.sp,
+                text = "Log Out",
+                color = StaffWhiteFull,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
         }
     }
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
 @Composable
 private fun StaffSidebarSectionHeader(title: String) {
     Spacer(modifier = Modifier.height(8.dp))
+
     Text(
-        text          = title.uppercase(),
-        color         = StaffWhiteDim,
-        fontSize      = 11.sp,
-        fontWeight    = FontWeight.Bold,
+        text = title.uppercase(),
+        color = StaffWhiteDim,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
         letterSpacing = 1.sp,
-        modifier      = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
+        modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 2.dp)
     )
 }
 
-// ── Single nav item ───────────────────────────────────────────────────────────
 @Composable
 private fun StaffSidebarNavItem(
-    icon:     ImageVector,
-    label:    String,
+    icon: ImageVector,
+    label: String,
     isActive: Boolean,
-    onClick:  () -> Unit
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -261,32 +286,38 @@ private fun StaffSidebarNavItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector        = icon,
+            imageVector = icon,
             contentDescription = label,
-            tint               = if (isActive) StaffWhiteFull else StaffWhiteMid,
-            modifier           = Modifier.size(20.dp)
+            tint = if (isActive) StaffWhiteFull else StaffWhiteMid,
+            modifier = Modifier.size(20.dp)
         )
+
         Spacer(modifier = Modifier.width(14.dp))
+
         Text(
-            text       = label,
-            color      = if (isActive) StaffWhiteFull else StaffWhiteMid,
-            fontSize   = 14.sp,
+            text = label,
+            color = if (isActive) StaffWhiteFull else StaffWhiteMid,
+            fontSize = 14.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
 
-// ── Navigation helper ─────────────────────────────────────────────────────────
 private fun staffNavigateTo(
     navController: NavController,
-    drawerState:   DrawerState,
-    scope:         CoroutineScope,
-    route:         String
+    drawerState: DrawerState,
+    scope: CoroutineScope,
+    route: String
 ) {
-    scope.launch { drawerState.close() }
+    scope.launch {
+        drawerState.close()
+    }
+
     navController.navigate(route) {
-        popUpTo("home") { saveState = true }
+        popUpTo(STAFF_DASHBOARD) {
+            saveState = true
+        }
         launchSingleTop = true
-        restoreState    = true
+        restoreState = true
     }
 }

@@ -102,4 +102,16 @@ interface TransactionDao {
         upsertTransaction(transaction)
         block()
     }
+
+    @Query(
+        """
+    SELECT * FROM transactions
+    WHERE dateTime BETWEEN :from AND :to
+    ORDER BY dateTime DESC
+    """
+    )
+    fun observeAllTransactionsByDateRange(
+        from: Long,
+        to: Long
+    ): Flow<List<TransactionEntity>>
 }

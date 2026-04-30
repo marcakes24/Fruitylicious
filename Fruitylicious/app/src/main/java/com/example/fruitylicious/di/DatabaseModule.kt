@@ -17,6 +17,8 @@ import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import androidx.room.RoomDatabase
+import com.example.fruitylicious.data.local.dao.ProductVariantDao
+import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -190,5 +192,15 @@ object DatabaseModule {
     @Provides
     fun provideStaffLogDao(database: PosDatabase): StaffLogDao {
         return database.staffLogDao()
+    }
+
+    @Provides
+    fun provideTransactionItemAddonDao(database: PosDatabase): TransactionItemAddonDao {
+        return database.transactionItemAddonDao()
+    }
+
+    @Provides
+    fun provideProductVariantDao(database: PosDatabase): ProductVariantDao {
+        return database.productVariantDao()
     }
 }

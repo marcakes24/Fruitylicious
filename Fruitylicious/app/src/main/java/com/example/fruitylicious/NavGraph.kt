@@ -1,6 +1,9 @@
 package com.example.fruitylicious
 
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -10,8 +13,7 @@ import com.example.fruitylicious.ui.admin.ingredients.IngredientFormScreen
 import com.example.fruitylicious.ui.admin.ingredients.IngredientListScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminAdjustmentScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminInventoryScreen
-import com.example.fruitylicious.ui.admin.products.ProductFormScreen
-import com.example.fruitylicious.ui.admin.products.ProductListScreen
+import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeFormScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeListScreen
 import com.example.fruitylicious.ui.admin.reports.InventoryReportScreen
@@ -112,15 +114,7 @@ fun FruityliciousNavGraph(
 
         composable(STAFF_DASHBOARD) {
             StaffDashboardScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onLogout = {
-                    navController.navigate(LOGIN) {
-                        popUpTo(LOGIN) {
-                            inclusive = true
-                        }
-                        launchSingleTop = true
-                    }
-                }
+                navController = navController
             )
         }
 
@@ -203,28 +197,13 @@ fun FruityliciousNavGraph(
 
         composable(ADMIN_DASHBOARD) {
             AdminDashboardScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onLogout = {
-                    navController.navigate(LOGIN) {
-                        popUpTo(LOGIN) {
-                            inclusive = true
-                        }
-                        launchSingleTop = true
-                    }
-                }
+                navController = navController
             )
         }
 
         composable(ADMIN_PRODUCTS) {
-            ProductListScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(ADMIN_PRODUCT_FORM) {
-            ProductFormScreen(
-                onBack = { navController.popBackStack() }
+            ManageProductsScreen(
+                navController = navController
             )
         }
 
