@@ -17,19 +17,37 @@ class ManageRecipeUseCase @Inject constructor(
         return recipeRepository.observeRecipesForProduct(productId)
     }
 
+    fun observeRecipesForVariant(variantId: Int): Flow<List<ProductRecipeEntity>> {
+        return recipeRepository.observeRecipesForVariant(variantId)
+    }
+
+    fun observeRecipesUsingIngredient(ingredientId: Int): Flow<List<ProductRecipeEntity>> {
+        return recipeRepository.observeRecipesUsingIngredient(ingredientId)
+    }
+
     suspend fun getRecipe(recipeId: Int): ProductRecipeEntity? {
         return recipeRepository.getRecipe(recipeId)
+    }
+
+    suspend fun getRecipesForProduct(productId: Int): List<ProductRecipeEntity> {
+        return recipeRepository.getRecipesForProduct(productId)
+    }
+
+    suspend fun getRecipesForVariant(variantId: Int): List<ProductRecipeEntity> {
+        return recipeRepository.getRecipesForVariant(variantId)
     }
 
     suspend fun saveRecipe(
         recipeId: Int,
         productId: Int,
+        variantId: Int?,
         ingredientId: Int,
         quantityRequired: Double
     ): Result<Unit> {
         return recipeRepository.saveRecipe(
             recipeId = recipeId,
             productId = productId,
+            variantId = variantId,
             ingredientId = ingredientId,
             quantityRequired = quantityRequired
         )
@@ -41,5 +59,9 @@ class ManageRecipeUseCase @Inject constructor(
 
     suspend fun deleteRecipesForProduct(productId: Int): Result<Unit> {
         return recipeRepository.deleteRecipesForProduct(productId)
+    }
+
+    suspend fun deleteRecipesForVariant(variantId: Int): Result<Unit> {
+        return recipeRepository.deleteRecipesForVariant(variantId)
     }
 }

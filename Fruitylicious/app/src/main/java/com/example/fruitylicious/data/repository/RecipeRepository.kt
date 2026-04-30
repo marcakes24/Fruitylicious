@@ -12,11 +12,15 @@ class RecipeRepository @Inject constructor(
 ) {
 
     fun observeRecipes(): Flow<List<ProductRecipeEntity>> {
-        return productRecipeDao.observeAllRecipes()
+        return productRecipeDao.observeRecipes()
     }
 
     fun observeRecipesForProduct(productId: Int): Flow<List<ProductRecipeEntity>> {
         return productRecipeDao.observeRecipesForProduct(productId)
+    }
+
+    fun observeRecipesForVariant(variantId: Int): Flow<List<ProductRecipeEntity>> {
+        return productRecipeDao.observeRecipesForVariant(variantId)
     }
 
     fun observeRecipesUsingIngredient(ingredientId: Int): Flow<List<ProductRecipeEntity>> {
@@ -24,7 +28,7 @@ class RecipeRepository @Inject constructor(
     }
 
     suspend fun getRecipes(): List<ProductRecipeEntity> {
-        return productRecipeDao.getAllRecipes()
+        return productRecipeDao.getRecipes()
     }
 
     suspend fun getRecipe(recipeId: Int): ProductRecipeEntity? {
@@ -35,9 +39,14 @@ class RecipeRepository @Inject constructor(
         return productRecipeDao.getRecipesForProduct(productId)
     }
 
+    suspend fun getRecipesForVariant(variantId: Int): List<ProductRecipeEntity> {
+        return productRecipeDao.getRecipesForVariant(variantId)
+    }
+
     suspend fun saveRecipe(
         recipeId: Int,
         productId: Int,
+        variantId: Int?,
         ingredientId: Int,
         quantityRequired: Double
     ): Result<Unit> {
@@ -59,6 +68,7 @@ class RecipeRepository @Inject constructor(
             ProductRecipeEntity(
                 recipeId = recipeId,
                 productId = productId,
+                variantId = variantId,
                 ingredientId = ingredientId,
                 quantityRequired = quantityRequired,
                 lastModified = now,
@@ -80,6 +90,11 @@ class RecipeRepository @Inject constructor(
         return Result.success(Unit)
     }
 
+    suspend fun deleteRecipesForVariant(variantId: Int): Result<Unit> {
+        productRecipeDao.deleteRecipesForVariant(variantId)
+        return Result.success(Unit)
+    }
+
     suspend fun getUnsyncedRecipes(): List<ProductRecipeEntity> {
         return productRecipeDao.getUnsyncedRecipes()
     }
@@ -89,6 +104,15 @@ class RecipeRepository @Inject constructor(
     }
 
     suspend fun savePulledRecipes(recipes: List<ProductRecipeEntity>) {
-        productRecipeDao.upsertRecipes(recipes.map { it.copy(isSynced = true, syncedAt = it.syncedAt ?: System.currentTimeMillis()) })
+        val syncedAt = System.currentTimeMillis()
+
+        productRecipeDao.upsertRecipes(
+            recipes.map {
+                it.copy(
+                    isSynced = true,
+                    syncedAt = it.syncedAt ?: syncedAt
+                )
+            }
+        )
     }
 }

@@ -2,6 +2,7 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
@@ -45,7 +46,8 @@ class TransactionRepository @Inject constructor(
     private val transactionItemAddonDao: TransactionItemAddonDao,
     private val productRecipeDao: ProductRecipeDao,
     private val inventoryDao: InventoryDao,
-    private val auditLogDao: AuditLogDao
+    private val auditLogDao: AuditLogDao,
+    private val ingredientDao: IngredientDao,
 ) {
 
     fun observeTransactions(branchId: Int): Flow<List<TransactionEntity>> {
@@ -115,10 +117,23 @@ class TransactionRepository @Inject constructor(
                 )
             }
 
-            val baseRecipes = productRecipeDao.getRecipesForProduct(cartItem.productId)
+            val baseRecipes = productRecipeDao.getRecipesForVariant(cartItem.variantId)
 
             for (recipe in baseRecipes) {
-                val totalRequired = recipe.quantityRequired * cartItem.quantity
+                val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
+                    ?: return Result.failure(
+                        IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+                    )
+
+                val deductionPerItem = computeInventoryDeduction(
+                    recipeQuantity = recipe.quantityRequired,
+                    unitType = ingredient.unitType,
+                    estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
+                    ingredientName = ingredient.ingredientName
+                )
+
+                val totalRequired = deductionPerItem * cartItem.quantity
+
                 requiredByIngredient[recipe.ingredientId] =
                     (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
             }
@@ -127,8 +142,19 @@ class TransactionRepository @Inject constructor(
                 val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
 
                 for (recipe in addonRecipes) {
-                    val totalRequired =
-                        recipe.quantityRequired * addon.quantity * cartItem.quantity
+                    val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
+                        ?: return Result.failure(
+                            IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+                        )
+
+                    val deductionPerAddon = computeInventoryDeduction(
+                        recipeQuantity = recipe.quantityRequired,
+                        unitType = ingredient.unitType,
+                        estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
+                        ingredientName = ingredient.ingredientName
+                    )
+
+                    val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
 
                     requiredByIngredient[recipe.ingredientId] =
                         (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
@@ -321,5 +347,24 @@ class TransactionRepository @Inject constructor(
         to: Long
     ): Flow<List<TransactionEntity>> {
         return transactionDao.observeAllTransactionsByDateRange(from, to)
+    }
+
+    private fun computeInventoryDeduction(
+        recipeQuantity: Double,
+        unitType: String,
+        estimatedWeightPerUnit: Double,
+        ingredientName: String
+    ): Double {
+        return if (unitType.equals("pcs", ignoreCase = true)) {
+            if (estimatedWeightPerUnit <= 0.0) {
+                throw IllegalStateException(
+                    "$ingredientName uses pcs but estimated weight per unit is not set."
+                )
+            }
+
+            recipeQuantity / estimatedWeightPerUnit
+        } else {
+            recipeQuantity
+        }
     }
 }

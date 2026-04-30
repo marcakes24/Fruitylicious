@@ -18,7 +18,7 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId LIMIT 1")
     fun observeIngredient(ingredientId: Int): Flow<IngredientEntity?>
 
-    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId LIMIT 1")
+    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId")
     suspend fun getIngredientById(ingredientId: Int): IngredientEntity?
 
     @Query("SELECT * FROM ingredients WHERE isPackaging = :isPackaging ORDER BY ingredientName ASC")

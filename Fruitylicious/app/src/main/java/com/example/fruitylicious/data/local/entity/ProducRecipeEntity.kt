@@ -16,6 +16,13 @@ import androidx.room.PrimaryKey
             onUpdate = ForeignKey.CASCADE
         ),
         ForeignKey(
+            entity = ProductVariantEntity::class,
+            parentColumns = ["variantId"],
+            childColumns = ["variantId"],
+            onDelete = ForeignKey.CASCADE,
+            onUpdate = ForeignKey.CASCADE
+        ),
+        ForeignKey(
             entity = IngredientEntity::class,
             parentColumns = ["ingredientId"],
             childColumns = ["ingredientId"],
@@ -25,6 +32,7 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["productId"]),
+        Index(value = ["variantId"]),
         Index(value = ["ingredientId"])
     ]
 )
@@ -32,6 +40,7 @@ data class ProductRecipeEntity(
     @PrimaryKey
     val recipeId: Int,
     val productId: Int,
+    val variantId: Int?,
     val ingredientId: Int,
     val quantityRequired: Double,
     val lastModified: Long,

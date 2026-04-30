@@ -10,8 +10,7 @@ import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminAdjustmentScreen
 import com.example.fruitylicious.ui.admin.inventory.AdminInventoryScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
-import com.example.fruitylicious.ui.admin.recipes.RecipeFormScreen
-import com.example.fruitylicious.ui.admin.recipes.RecipeListScreen
+import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
 import com.example.fruitylicious.ui.admin.reports.InventoryReportScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsDashboardScreen
 import com.example.fruitylicious.ui.admin.reports.RestockReportScreen
@@ -208,15 +207,8 @@ fun FruityliciousNavGraph(
         }
 
         composable(ADMIN_RECIPES) {
-            RecipeListScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(ADMIN_RECIPE_FORM) {
-            RecipeFormScreen(
-                onBack = { navController.popBackStack() }
+            RecipeManagementScreen(
+                navController = navController
             )
         }
 
