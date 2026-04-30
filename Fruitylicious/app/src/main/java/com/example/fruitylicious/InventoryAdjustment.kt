@@ -147,37 +147,29 @@ fun InventoryAdjustmentScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Branch Selector Toggle
-                Surface(
-                    color = Color(0xFF1B5E20),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(32.dp)
+                // Branch Selector Toggle (Updated radius to 16dp outer, 12dp inner)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFF5F5F5))
+                        .padding(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        listOf("B1", "B2", "All").forEach { branch ->
-                            val isSelected = selectedBranch == branch
-                            Surface(
-                                color = if (isSelected) Color.White else Color.Transparent,
-                                shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .clickable { selectedBranch = branch }
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(horizontal = 10.dp)
-                                ) {
-                                    Text(
-                                        text = branch,
-                                        color = if (isSelected) Color(0xFF2E7D32) else Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+                    listOf("B1", "B2", "All").forEach { branch ->
+                        val isSelected = selectedBranch == branch
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) Color(0xFF2E7D32) else Color.Transparent)
+                                .clickable { selectedBranch = branch }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = branch,
+                                color = if (isSelected) Color.White else Color(0xFF666E7A),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

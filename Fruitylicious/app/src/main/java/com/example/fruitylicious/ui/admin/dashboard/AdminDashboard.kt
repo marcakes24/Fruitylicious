@@ -98,8 +98,6 @@ fun AdminDashboardScreen(
                 // For transaction count, we might need a specific query in DAO, but here's a placeholder logic
             } else {
                 // Sum for ALL branches
-                // We'd ideally have a getTotalSalesAllBranches in DAO, but let's approximate or use a simple loop
-                // (Optimally add @Query("SELECT SUM(total_amount) FROM transactions WHERE status = 'completed' AND date_time BETWEEN :from AND :to") to DAO)
                 daySum = 0.0 // Replace with actual DAO call if available
             }
             
@@ -109,7 +107,6 @@ fun AdminDashboardScreen(
         
         weeklySalesData = salesPerDay
         totalAmount = totalSales
-        // transactionCount = totalCount // Update count if needed
     }
 
     Column(
@@ -189,37 +186,29 @@ private fun DashboardHeader(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Branch Selector Toggle
-            Surface(
-                color = DashGreenDark,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(32.dp)
+            // Branch Selector Toggle (Updated to match AuditLogScreen)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .padding(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
-                        Surface(
-                            color = if (isSelected) Color.White else Color.Transparent,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .clickable { onBranchSelect(branch) }
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            ) {
-                                Text(
-                                    text = branch,
-                                    color = if (isSelected) DashGreenPrimary else Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                listOf("B1", "B2", "All").forEach { branch ->
+                    val isSelected = selectedBranch == branch
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) DashGreenPrimary else Color.Transparent)
+                            .clickable { onBranchSelect(branch) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = branch,
+                            color = if (isSelected) Color.White else Color(0xFF666E7A),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
