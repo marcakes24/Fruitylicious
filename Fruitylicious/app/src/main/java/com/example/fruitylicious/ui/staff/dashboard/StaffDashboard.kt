@@ -300,7 +300,7 @@ private fun StaffQuickActionsSection(navController: NavController) {
 
         // Staff quick actions: wala pang route
         val actions = listOf(
-            Triple(Icons.Outlined.BarChart,      "Sales Summary",           "sales_summary"),
+            Triple(Icons.Outlined.BarChart,      "Sales Summary",           "staff_sales_summary"),
             Triple(Icons.Outlined.Autorenew,     "Restock",                 "restock"),
             Triple(Icons.Outlined.Search,        "Inventory Monitoring",    "inventory_monitoring"),
             Triple(Icons.Outlined.DeleteOutline, "Waste Management",        "waste_management")

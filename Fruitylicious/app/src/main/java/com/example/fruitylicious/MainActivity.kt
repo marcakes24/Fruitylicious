@@ -31,10 +31,9 @@ import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.POSScreen
 import com.example.fruitylicious.ui.staff.transaction.TransactionHistoryScreen
 import com.example.fruitylicious.ui.staff.waste.WasteManagementScreen
+import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 
 // Corrected Imports
-import com.example.fruitylicious.QueueScreen
-import com.example.fruitylicious.UserManagementScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen
 import com.example.fruitylicious.ui.shared.AttendanceState
@@ -69,7 +68,10 @@ fun AppNavigation() {
             "queue_screen",
             "time_log",
             "inventory_monitoring",
-            "sales_summary"
+            "sales_summary",
+            "notification",
+            "restock",
+            "staff_sales_summary"
         )
 
         staffRoutes.forEach { route ->
@@ -91,7 +93,12 @@ fun AppNavigation() {
             "admin_recipe_management",
             "admin_inventory_monitoring",
             "admin_reports",
-            "admin_sales_summary"
+            "admin_sales_summary",
+            "admin_audit_logs",
+            "admin_notification",
+            "admin_inventory_adjustment",
+            "admin_restock"
+
         )
 
         adminRoutes.forEach { route ->
@@ -119,6 +126,9 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "time_log" -> TimeLogRoute(drawerState, scope)
             "inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
             "sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
+            "notification" -> NotificationsScreen(navController, drawerState, scope)
+            "restock" -> RestockScreen(navController, drawerState, scope)
+            "staff_sales_summary" -> StaffSalesSummaryScreen(navController, drawerState, scope)
         }
     }
 }
@@ -147,6 +157,10 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
             "admin_reports" -> ReportsScreen(navController, drawerState, scope)
             "admin_sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
+            "admin_audit_logs" -> AuditLogScreen(drawerState)
+            "admin_notification" -> NotificationsScreen(navController, drawerState, scope)
+            "admin_inventory_adjustment" -> InventoryAdjustmentScreen(navController, drawerState, scope)
+            "admin_restock" -> RestockScreen(navController, drawerState, scope)
         }
     }
 }
