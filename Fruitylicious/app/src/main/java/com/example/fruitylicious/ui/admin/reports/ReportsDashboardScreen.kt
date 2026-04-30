@@ -24,7 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
-val RptGreen      = Color(0xFF2C8C44)
+val RptGreen      = Color(0xFF2E7D32)
 val RptGreenDark  = Color(0xFF1B5E20)
 val RptPageBg     = Color(0xFFFFEAA0) // Yellowish background
 val RptCardBg     = Color.White
@@ -99,7 +99,7 @@ fun ReportsScreen(
                             text = b,
                             color = if (isB) Color.White else RptTextSub,
                             fontSize = 12.sp,
-                            fontWeight = if(isB) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
