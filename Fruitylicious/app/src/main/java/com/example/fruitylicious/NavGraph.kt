@@ -1,9 +1,6 @@
 package com.example.fruitylicious
 
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,7 +60,6 @@ const val STAFF_TRANSACTION_HISTORY = "staff_transaction_history"
 const val ADMIN_DASHBOARD = "admin_dashboard"
 const val ADMIN_PRODUCTS = "admin_products"
 const val ADMIN_INGREDIENTS = "admin_ingredients"
-const val ADMIN_INGREDIENT_FORM = "admin_ingredient_form"
 const val ADMIN_RECIPES = "admin_recipes"
 const val ADMIN_RECIPE_FORM = "admin_recipe_form"
 const val ADMIN_INVENTORY = "admin_inventory"
