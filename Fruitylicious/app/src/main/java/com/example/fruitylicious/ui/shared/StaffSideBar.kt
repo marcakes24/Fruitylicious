@@ -98,7 +98,7 @@ fun StaffSideBarContent(
                 StaffNavItem(Icons.Outlined.Dashboard, "Dashboard", "home"),
                 StaffNavItem(Icons.Outlined.PointOfSale, "POS Screen", "pos"),
                 StaffNavItem(Icons.AutoMirrored.Outlined.ListAlt, "Order Queue", "queue_screen"), // Route added
-                StaffNavItem(Icons.Outlined.BarChart, "Sales Summary", "SalesSummary"),
+                StaffNavItem(Icons.Outlined.BarChart, "Sales Summary", "sales_summary"),
                 StaffNavItem(Icons.Outlined.AccessTime, "Time Log", "time_log"),
                 StaffNavItem(Icons.Outlined.Search, "Inventory Monitoring", "inventory_monitoring"),
                 StaffNavItem(Icons.Outlined.Notifications, "Notifications", "notification")

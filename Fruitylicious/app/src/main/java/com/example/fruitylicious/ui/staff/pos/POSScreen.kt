@@ -1,6 +1,7 @@
 package com.example.fruitylicious.ui.staff.pos
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +40,7 @@ val GreenPrimary = Color(0xFF2E7D32)
 val GreenLight   = Color(0xFFE8F5E9)
 val AmberAccent  = Color(0xFFFFC107)
 val RedRemove    = Color(0xFFE53935)
+val CheckboxBlue = Color(0xFF2196F3)
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -51,6 +56,7 @@ data class CartItem(
     val sizePrice: Int,
     val mixFlavor: String?,
     val addOns: List<String>,
+    val optionalAddOns: List<String> = emptyList(),
     var quantity: Int
 ) {
     val total: Int get() {
@@ -75,11 +81,16 @@ val posProducts = listOf(
 )
 
 val flavorChoices = listOf(
-    "Avocado","Mango","Dragon Fruit","Banana",
-    "Guyabano","Buko","Apple","Strawberry","Melon","Cheesecake","Oreo"
+    "Avocado", "Mango", "Dragon Fruit", "Banana",
+    "Guyabano", "Buko", "Apple", "Strawberry", "Melon", "Cheesecake", "Oreo"
 )
 
 val addOnChoices = listOf("Pearls", "Nata", "Cheese")
+
+val optionalAddOnChoices = listOf(
+    "Crashed Graham", "Crashed Oreo", "Chocolate Syrup",
+    "Strawberry Syrup", "Caramel Syrup", "Mango Syrup"
+)
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -122,19 +133,11 @@ fun POSScreen(
                     .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 16.dp)
             ) {
                 // Hamburger
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .clickable { scope.launch { drawerState.open() } },
-                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                IconButton(
+                    onClick = { scope.launch { drawerState.open() } },
+                    modifier = Modifier.align(Alignment.CenterStart)
                 ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(22.dp).height(2.dp)
-                                .background(Color.White, RoundedCornerShape(1.dp))
-                        )
-                    }
+                    Icon(Icons.Default.Menu, contentDescription = null, tint = Color.White)
                 }
                 Text(
                     text = "POS",
@@ -169,7 +172,7 @@ fun POSScreen(
                             .padding(horizontal = 12.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "11 Flavors",
+                            text = "${posProducts.size} Flavors",
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -265,11 +268,10 @@ fun POSScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (cartExpanded) "∧" else "∨",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = if (cartExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                            contentDescription = null,
+                            tint = Color.White
                         )
                     }
                 }
@@ -345,6 +347,7 @@ fun ProductCustomizeDialog(
     var selectedFlavor   by remember { mutableStateOf<String?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var selectedAddOns   by remember { mutableStateOf(setOf<String>()) }
+    var selectedOptionalAddOns by remember { mutableStateOf(setOf<String>()) }
     var quantity         by remember { mutableStateOf(1) }
 
     val sizePrice = if (selectedSize == "Medium") product.basePrice else product.basePrice + 20
@@ -354,13 +357,13 @@ fun ProductCustomizeDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             color = Color.White,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .padding(24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
 
@@ -373,72 +376,69 @@ fun ProductCustomizeDialog(
                     Column {
                         Text(
                             text = product.name,
-                            fontSize = 18.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1B1B1B)
                         )
                         Text(
                             text = "Customize your shake",
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             color = Color(0xFF888888)
                         )
                     }
-                    Text(
-                        text = "✕",
-                        fontSize = 18.sp,
-                        color = Color(0xFF888888),
-                        modifier = Modifier.clickable { onDismiss() }
-                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.Gray
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── Select Size ───────────────────────────────────────
-                Text("Select Size", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1B1B1B))
-                Spacer(modifier = Modifier.height(10.dp))
+                Text("Select Size", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     listOf("Medium" to product.basePrice, "Large" to product.basePrice + 20).forEach { (size, price) ->
                         val isSelected = selectedSize == size
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .border(
                                     width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) GreenPrimary else Color(0xFFDDDDDD),
-                                    shape = RoundedCornerShape(10.dp)
+                                    color = if (isSelected) GreenPrimary else Color(0xFFEEEEEE),
+                                    shape = RoundedCornerShape(12.dp)
                                 )
-                                .background(if (isSelected) GreenPrimary else Color.White)
+                                .background(Color.White)
                                 .clickable { selectedSize = size }
-                                .padding(vertical = 14.dp),
+                                .padding(vertical = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = size,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else Color(0xFF1B1B1B)
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) GreenPrimary else Color(0xFF1B1B1B)
                                 )
                                 Text(
-                                    text = "₱$price",
-                                    fontSize = 12.sp,
-                                    color = if (isSelected) Color.White.copy(alpha = 0.8f) else Color(0xFF888888)
+                                    text = "₱ $price",
+                                    fontSize = 13.sp,
+                                    color = if (isSelected) GreenPrimary else Color(0xFF888888)
                                 )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── Mix Flavor ────────────────────────────────────────
                 Row(
@@ -446,81 +446,69 @@ fun ProductCustomizeDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Mix Flavor", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1B1B1B))
-                    if (mixFlavor && selectedFlavor != null) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(GreenLight)
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text("+ ₱15", fontSize = 11.sp, color = GreenPrimary, fontWeight = FontWeight.Bold)
-                        }
+                    Text("Mix Flavor", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF0F0F0))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("+ ₱ 15", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Checkbox row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
                         .clickable { mixFlavor = !mixFlavor; if (!mixFlavor) selectedFlavor = null }
-                        .padding(12.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (mixFlavor) GreenPrimary else Color.White)
-                            .border(1.5.dp, if (mixFlavor) GreenPrimary else Color(0xFFAAAAAA), RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (mixFlavor) Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Add two-fruit combination", fontSize = 13.sp, color = Color(0xFF1B1B1B))
+                    Checkbox(
+                        checked = mixFlavor,
+                        onCheckedChange = { mixFlavor = it; if (!it) selectedFlavor = null },
+                        colors = CheckboxDefaults.colors(checkedColor = CheckboxBlue)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add two-fruit combination", fontSize = 14.sp, color = Color(0xFF1B1B1B))
                 }
 
-                // Flavor dropdown (only when checked)
                 if (mixFlavor) {
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                    Spacer(modifier = Modifier.height(12.dp))
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(8.dp))
-                                .background(Color.White)
-                                .clickable { dropdownExpanded = true }
-                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                        OutlinedCard(
+                            onClick = { dropdownExpanded = true },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFEEEEEE)),
+                            colors = CardDefaults.outlinedCardColors(containerColor = Color.White),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = selectedFlavor ?: "Select second flavor...",
-                                    fontSize = 13.sp,
-                                    color = if (selectedFlavor != null) Color(0xFF1B1B1B) else Color(0xFFAAAAAA)
+                                    text = selectedFlavor ?: "Select flavor",
+                                    fontSize = 14.sp,
+                                    color = if (selectedFlavor != null) Color.Black else Color.Gray
                                 )
-                                Text("∨", fontSize = 13.sp, color = Color(0xFF888888))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
                             }
                         }
 
                         DropdownMenu(
                             expanded = dropdownExpanded,
                             onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f).background(Color.White)
+                            modifier = Modifier.fillMaxWidth(0.8f).background(Color.White)
                         ) {
                             flavorChoices.forEach { flavor ->
                                 DropdownMenuItem(
-                                    text = { Text(flavor, fontSize = 13.sp) },
+                                    text = { Text(flavor) },
                                     onClick = {
                                         selectedFlavor = flavor
                                         dropdownExpanded = false
@@ -531,48 +519,87 @@ fun ProductCustomizeDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── Add-ons ───────────────────────────────────────────
-                Text("Add-ons", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1B1B1B))
-                Spacer(modifier = Modifier.height(10.dp))
+                Text("Add-ons", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     addOnChoices.forEach { addOn ->
                         val isSelected = addOn in selectedAddOns
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(if (isSelected) GreenPrimary else Color.White)
-                                .border(1.dp, if (isSelected) GreenPrimary else Color(0xFFDDDDDD), RoundedCornerShape(8.dp))
+                                .border(1.dp, if (isSelected) GreenPrimary else Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
                                 .clickable {
                                     selectedAddOns = if (isSelected) selectedAddOns - addOn else selectedAddOns + addOn
                                 }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = addOn,
-                                    fontSize = 12.sp,
+                                    fontSize = 13.sp,
                                     color = if (isSelected) Color.White else Color(0xFF1B1B1B),
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
                                 Text(
-                                    text = "+ ₱10",
-                                    fontSize = 10.sp,
-                                    color = if (isSelected) Color.White.copy(alpha = 0.8f) else Color(0xFF888888)
+                                    text = "+ ₱ 10",
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) Color.White.copy(alpha = 0.8f) else Color.Gray
                                 )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // ── Add-ons (optional) ────────────────────────────────
+                Text("Add-ons (optional)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    optionalAddOnChoices.chunked(3).forEach { rowItems ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowItems.forEach { addOn ->
+                                val isSelected = addOn in selectedOptionalAddOns
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(20.dp))
+                                        .background(if (isSelected) GreenPrimary.copy(alpha = 0.1f) else Color.White)
+                                        .clickable {
+                                            selectedOptionalAddOns = if (isSelected) selectedOptionalAddOns - addOn else selectedOptionalAddOns + addOn
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = addOn,
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) GreenPrimary else Color.Black,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                            if (rowItems.size < 3) {
+                                repeat(3 - rowItems.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── Quantity ──────────────────────────────────────────
                 Row(
@@ -580,55 +607,51 @@ fun ProductCustomizeDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Quantity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF1B1B1B))
+                    Text("Quantity", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
 
                     Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFF5F5F5))
+                            .padding(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .border(1.dp, Color(0xFFDDDDDD), CircleShape)
-                                .clickable { if (quantity > 1) quantity-- },
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = { if (quantity > 1) quantity-- },
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)
                         ) {
-                            Text("−", fontSize = 18.sp, color = Color(0xFF333333))
+                            Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
                         Text(
                             text = "$quantity",
-                            fontSize = 16.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1B1B1B)
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .border(1.dp, Color(0xFFDDDDDD), CircleShape)
-                                .clickable { quantity++ },
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = { quantity++ },
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)
                         ) {
-                            Text("+", fontSize = 18.sp, color = Color(0xFF333333))
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-                // ── Footer: Total + Add to Order ──────────────────────
+                // ── Footer ────────────────────────────────────────────
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Item Total", fontSize = 11.sp, color = Color(0xFF888888))
+                        Text("Item Total", fontSize = 12.sp, color = Color.Gray)
                         Text(
-                            text = "₱${"%.2f".format(itemTotal.toDouble())}",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = "₱${String.format(Locale.US, "%.2f", itemTotal.toDouble())}",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
                             color = GreenPrimary
                         )
                     }
@@ -642,17 +665,18 @@ fun ProductCustomizeDialog(
                                     sizePrice = sizePrice,
                                     mixFlavor = if (mixFlavor && selectedFlavor != null) selectedFlavor else null,
                                     addOns    = selectedAddOns.toList(),
+                                    optionalAddOns = selectedOptionalAddOns.toList(),
                                     quantity  = quantity
                                 )
                             )
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(54.dp).weight(1f).padding(start = 24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                        modifier = Modifier.height(48.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("⊕", fontSize = 16.sp, color = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add to Order", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Add to Order", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -723,6 +747,7 @@ fun CartPanel(
                                 text = buildString {
                                     append(item.size)
                                     if (item.addOns.isNotEmpty()) append(" • ${item.addOns.joinToString(", ")}")
+                                    if (item.optionalAddOns.isNotEmpty()) append(" • ${item.optionalAddOns.joinToString(", ")}")
                                 },
                                 fontSize = 12.sp,
                                 color = Color(0xFF888888)
