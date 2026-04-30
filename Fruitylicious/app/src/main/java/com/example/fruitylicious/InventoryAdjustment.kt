@@ -58,7 +58,6 @@ fun InventoryAdjustmentScreen(
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
-    var selectedBranch by remember { mutableStateOf("B1") }
 
     // Mock history data (Mutable for functionality)
     val recentAdjustments = remember {
@@ -112,9 +111,6 @@ fun InventoryAdjustmentScreen(
         )
     }
 
-    val filteredAdjustments = if (selectedBranch == "All") recentAdjustments 
-                             else recentAdjustments.filter { it.branch == selectedBranch }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -144,35 +140,6 @@ fun InventoryAdjustmentScreen(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Branch Selector Toggle (Updated radius to 16dp outer, 12dp inner)
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) Color(0xFF2E7D32) else Color.Transparent)
-                                .clickable { selectedBranch = branch }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -396,7 +363,7 @@ fun InventoryAdjustmentScreen(
                                         time = timeFormat.format(now),
                                         change = if (adjustmentType == "Add") "+$qtyInt" else "-$qtyInt",
                                         flow = "$oldStock -> $newStock",
-                                        branch = if(selectedBranch == "All") "B1" else selectedBranch
+                                        branch = "B1" // Default branch
                                     ))
                                     
                                     // Reset form
@@ -451,14 +418,14 @@ fun InventoryAdjustmentScreen(
 
                         HorizontalDivider(color = Color(0xFFF1F5F9))
 
-                        if (filteredAdjustments.isEmpty()) {
+                        if (recentAdjustments.isEmpty()) {
                             Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                                Text("No adjustments found for this branch", color = Color.Gray, fontSize = 14.sp)
+                                Text("No adjustments found", color = Color.Gray, fontSize = 14.sp)
                             }
                         } else {
-                            filteredAdjustments.forEachIndexed { index, item ->
+                            recentAdjustments.forEachIndexed { index, item ->
                                 AdjustmentItemUI(item)
-                                if (index < filteredAdjustments.size - 1) {
+                                if (index < recentAdjustments.size - 1) {
                                     HorizontalDivider(color = Color(0xFFF1F5F9))
                                 }
                             }

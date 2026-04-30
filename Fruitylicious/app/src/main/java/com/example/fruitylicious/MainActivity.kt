@@ -36,7 +36,7 @@ import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 // Corrected Imports
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen
-import com.example.fruitylicious.ui.admin.reports.StaffLogScreen
+import com.example.fruitylicious.ui.staff.stafflog.StaffLogScreen
 import com.example.fruitylicious.ui.shared.AttendanceState
 import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.TimeLogUiState

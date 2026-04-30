@@ -119,7 +119,7 @@ fun AuditLogScreen(
                         modifier = Modifier.weight(1f)
                     )
                     
-                    // Branch Filter Segmented Controls
+                    // Branch Filter Segmented Controls - Consistent with WasteManagement
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
@@ -133,13 +133,13 @@ fun AuditLogScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) GreenPrimary else Color.Transparent)
                                     .clickable { selectedBranch = branch }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = branch,
                                     color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
