@@ -15,9 +15,11 @@ import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.remote.api.SyncApi
 import com.example.fruitylicious.data.remote.dto.PushRequestDto
+import com.example.fruitylicious.data.remote.dto.SyncRecordResultDto
 import com.example.fruitylicious.util.BranchConfig
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.collections.getOrNull
 
 data class SyncResult(
     val success: Boolean,
@@ -46,33 +48,11 @@ class SyncRepository @Inject constructor(
 ) {
 
     suspend fun sync(lastPulledAt: Long): SyncResult {
-        val pushResult = pushUnsynced()
-
-        if (!pushResult.success) {
-            return pushResult
-        }
-
-        val pullResult = pullUpdates(lastPulledAt)
-
-        return SyncResult(
-            success = pullResult.success,
-            pushedCount = pushResult.pushedCount,
-            pulledCount = pullResult.pulledCount,
-            message = if (pullResult.success) {
-                "Sync completed successfully."
-            } else {
-                pullResult.message
-            }
-        )
+        return pushUnsynced()
     }
 
     suspend fun pushUnsynced(): SyncResult {
         return try {
-            val branches = branchDao.getUnsyncedBranches()
-            val users = userDao.getUnsyncedUsers()
-            val products = productDao.getUnsyncedProducts()
-            val ingredients = ingredientDao.getUnsyncedIngredients()
-            val recipes = productRecipeDao.getUnsyncedRecipes()
             val inventory = inventoryDao.getUnsyncedInventory()
             val restockLogs = restockLogDao.getUnsyncedRestockLogs()
             val adjustments = inventoryAdjustmentDao.getUnsyncedAdjustments()
@@ -83,12 +63,7 @@ class SyncRepository @Inject constructor(
             val staffLogs = staffLogDao.getUnsyncedStaffLogs()
 
             val totalCount =
-                branches.size +
-                        users.size +
-                        products.size +
-                        ingredients.size +
-                        recipes.size +
-                        inventory.size +
+                inventory.size +
                         restockLogs.size +
                         adjustments.size +
                         wasteLogs.size +
@@ -96,6 +71,18 @@ class SyncRepository @Inject constructor(
                         transactionItems.size +
                         auditLogs.size +
                         staffLogs.size
+
+            println(
+                "FRUITY_PUSH_COUNT: inventory=${inventory.size}, " +
+                        "restockLogs=${restockLogs.size}, " +
+                        "adjustments=${adjustments.size}, " +
+                        "wasteLogs=${wasteLogs.size}, " +
+                        "transactions=${transactions.size}, " +
+                        "transactionItems=${transactionItems.size}, " +
+                        "auditLogs=${auditLogs.size}, " +
+                        "staffLogs=${staffLogs.size}, " +
+                        "total=$totalCount"
+            )
 
             if (totalCount == 0) {
                 return SyncResult(
@@ -108,13 +95,6 @@ class SyncRepository @Inject constructor(
 
             val response = syncApi.push(
                 PushRequestDto(
-                    branchId = branchConfig.branchId,
-                    pushedAt = System.currentTimeMillis(),
-                    branches = branches,
-                    users = users,
-                    products = products,
-                    ingredients = ingredients,
-                    recipes = recipes,
                     inventory = inventory,
                     restockLogs = restockLogs,
                     inventoryAdjustments = adjustments,
@@ -126,6 +106,8 @@ class SyncRepository @Inject constructor(
                 )
             )
 
+            println("FRUITY_PUSH_RESPONSE: code=${response.code()}, successful=${response.isSuccessful}")
+
             if (!response.isSuccessful) {
                 return SyncResult(
                     success = false,
@@ -136,40 +118,110 @@ class SyncRepository @Inject constructor(
             }
 
             val body = response.body()
-                ?: return SyncResult(false, 0, 0, "Push failed: empty server response.")
 
-            for (result in body.results) {
-                if (result.success) {
-                    when (result.tableName) {
-                        "branches" -> branchDao.markSynced(result.recordId.toInt(), body.syncedAt)
-                        "users" -> userDao.markSynced(result.recordId.toInt(), body.syncedAt)
-                        "products" -> productDao.markSynced(result.recordId.toInt(), body.syncedAt)
-                        "ingredients" -> ingredientDao.markSynced(result.recordId.toInt(), body.syncedAt)
-                        "product_recipes" -> productRecipeDao.markSynced(result.recordId.toInt(), body.syncedAt)
-                        "inventory" -> {
-                            val ids = result.recordId.split(":")
-                            if (ids.size == 2) {
-                                inventoryDao.markSynced(ids[0].toInt(), ids[1].toInt(), body.syncedAt)
-                            }
-                        }
-                        "restock_logs" -> restockLogDao.markSynced(result.recordId, body.syncedAt)
-                        "inventory_adjustments" -> inventoryAdjustmentDao.markSynced(result.recordId, body.syncedAt)
-                        "waste_logs" -> wasteLogDao.markSynced(result.recordId, body.syncedAt)
-                        "transactions" -> transactionDao.markSynced(result.recordId, body.syncedAt)
-                        "transaction_items" -> transactionItemDao.markSynced(result.recordId, body.syncedAt)
-                        "audit_logs" -> auditLogDao.markSynced(result.recordId, body.syncedAt)
-                        "staff_logs" -> staffLogDao.markSynced(result.recordId, body.syncedAt)
-                    }
+            val syncedAt = System.currentTimeMillis()
+
+            val inventoryResults = body?.inventory.orEmpty()
+            val restockResults = body?.restockLogs.orEmpty()
+            val adjustmentResults = body?.inventoryAdjustments.orEmpty()
+            val wasteResults = body?.wasteLogs.orEmpty()
+            val transactionResults = body?.transactions.orEmpty()
+            val transactionItemResults = body?.transactionItems.orEmpty()
+            val auditResults = body?.auditLogs.orEmpty()
+            val staffResults = body?.staffLogs.orEmpty()
+
+            inventory.forEachIndexed { index, item ->
+                if (isPushSuccess(inventoryResults, index)) {
+                    inventoryDao.markSynced(
+                        ingredientId = item.ingredientId,
+                        branchId = item.branchId,
+                        syncedAt = syncedAt
+                    )
                 }
             }
 
+            restockLogs.forEachIndexed { index, item ->
+                if (isPushSuccess(restockResults, index)) {
+                    restockLogDao.markSynced(
+                        restockId = item.restockId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            adjustments.forEachIndexed { index, item ->
+                if (isPushSuccess(adjustmentResults, index)) {
+                    inventoryAdjustmentDao.markSynced(
+                        adjustmentId = item.adjustmentId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            wasteLogs.forEachIndexed { index, item ->
+                if (isPushSuccess(wasteResults, index)) {
+                    wasteLogDao.markSynced(
+                        wasteId = item.wasteId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            transactions.forEachIndexed { index, item ->
+                if (isPushSuccess(transactionResults, index)) {
+                    transactionDao.markSynced(
+                        transactionId = item.transactionId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            transactionItems.forEachIndexed { index, item ->
+                if (isPushSuccess(transactionItemResults, index)) {
+                    transactionItemDao.markSynced(
+                        transactionItemId = item.transactionItemId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            auditLogs.forEachIndexed { index, item ->
+                if (isPushSuccess(auditResults, index)) {
+                    auditLogDao.markSynced(
+                        logId = item.logId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            staffLogs.forEachIndexed { index, item ->
+                if (isPushSuccess(staffResults, index)) {
+                    staffLogDao.markSynced(
+                        logId = item.logId,
+                        syncedAt = syncedAt
+                    )
+                }
+            }
+
+            val pushedCount =
+                countSuccess(inventoryResults, inventory.size) +
+                        countSuccess(restockResults, restockLogs.size) +
+                        countSuccess(adjustmentResults, adjustments.size) +
+                        countSuccess(wasteResults, wasteLogs.size) +
+                        countSuccess(transactionResults, transactions.size) +
+                        countSuccess(transactionItemResults, transactionItems.size) +
+                        countSuccess(auditResults, auditLogs.size) +
+                        countSuccess(staffResults, staffLogs.size)
+
             SyncResult(
-                success = body.success,
-                pushedCount = body.results.count { it.success },
+                success = true,
+                pushedCount = pushedCount,
                 pulledCount = 0,
-                message = body.message ?: "Push completed."
+                message = "Push completed. Pushed $pushedCount of $totalCount local records."
             )
         } catch (exception: Exception) {
+            println("FRUITY_PUSH_ERROR: ${exception.message}")
+
             SyncResult(
                 success = false,
                 pushedCount = 0,
@@ -179,7 +231,7 @@ class SyncRepository @Inject constructor(
         }
     }
 
-    suspend fun pullUpdates(since: Long): SyncResult {
+    suspend fun pullUpdates(since: String): SyncResult {
         return try {
             val response = syncApi.pull(since)
 
@@ -193,32 +245,78 @@ class SyncRepository @Inject constructor(
             }
 
             val body = response.body()
-                ?: return SyncResult(false, 0, 0, "Pull failed: empty server response.")
+                ?: return SyncResult(
+                    success = false,
+                    pushedCount = 0,
+                    pulledCount = 0,
+                    message = "Pull failed: empty server response."
+                )
 
-            if (!body.success) {
-                return SyncResult(false, 0, 0, body.message ?: "Pull failed.")
-            }
+            val pulledAt = System.currentTimeMillis()
 
-            branchDao.upsertBranches(body.branches.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
-            userDao.upsertUsers(body.users.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
-            productDao.upsertProducts(body.products.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
-            ingredientDao.upsertIngredients(body.ingredients.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
-            productRecipeDao.upsertRecipes(body.recipes.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
-            inventoryDao.upsertInventoryItems(body.inventory.map { it.copy(isSynced = true, syncedAt = body.pulledAt) })
+            val pulledBranches = body.branches.orEmpty()
+            val pulledUsers = body.users.orEmpty()
+            val pulledProducts = body.products.orEmpty()
+            val pulledIngredients = body.ingredients.orEmpty()
+            val pulledRecipes = body.recipes.orEmpty()
+
+            branchDao.upsertBranches(
+                pulledBranches.map {
+                    it.copy(
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+            )
+
+            userDao.upsertUsers(
+                pulledUsers.map {
+                    it.copy(
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+            )
+
+            productDao.upsertProducts(
+                pulledProducts.map {
+                    it.copy(
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+            )
+
+            ingredientDao.upsertIngredients(
+                pulledIngredients.map {
+                    it.copy(
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+            )
+
+            productRecipeDao.upsertRecipes(
+                pulledRecipes.map {
+                    it.copy(
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+            )
 
             val pulledCount =
-                body.branches.size +
-                        body.users.size +
-                        body.products.size +
-                        body.ingredients.size +
-                        body.recipes.size +
-                        body.inventory.size
+                pulledBranches.size +
+                        pulledUsers.size +
+                        pulledProducts.size +
+                        pulledIngredients.size +
+                        pulledRecipes.size
 
             SyncResult(
                 success = true,
                 pushedCount = 0,
                 pulledCount = pulledCount,
-                message = body.message ?: "Pull completed."
+                message = "Pull completed. Pulled $pulledCount records."
             )
         } catch (exception: Exception) {
             SyncResult(
@@ -227,6 +325,28 @@ class SyncRepository @Inject constructor(
                 pulledCount = 0,
                 message = exception.message ?: "Pull failed."
             )
+        }
+    }
+
+    private fun isPushSuccess(
+        results: List<SyncRecordResultDto>,
+        index: Int
+    ): Boolean {
+        return if (results.isEmpty()) {
+            true
+        } else {
+            results.getOrNull(index)?.success == true
+        }
+    }
+
+    private fun countSuccess(
+        results: List<SyncRecordResultDto>,
+        submittedCount: Int
+    ): Int {
+        return if (results.isEmpty()) {
+            submittedCount
+        } else {
+            results.count { it.success }
         }
     }
 }

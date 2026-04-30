@@ -18,24 +18,24 @@ class BranchConfig @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    private val config: BranchConfigData by lazy {
+    private val branchConfigData: BranchConfigData by lazy {
         loadBranchConfig()
     }
 
     val branchId: Int
-        get() = config.branchId
+        get() = branchConfigData.branchId
 
     val branchName: String
-        get() = config.branchName
+        get() = branchConfigData.branchName
 
     val apiBaseUrl: String
-        get() = config.apiBaseUrl
+        get() = branchConfigData.apiBaseUrl
 
     val apiKey: String
-        get() = config.apiKey
+        get() = branchConfigData.apiKey
 
-    fun getConfig(): BranchConfigData {
-        return config
+    fun asData(): BranchConfigData {
+        return branchConfigData
     }
 
     private fun loadBranchConfig(): BranchConfigData {
@@ -46,7 +46,11 @@ class BranchConfig @Inject constructor(
         val jsonObject = JSONObject(json)
 
         val rawBaseUrl = jsonObject.getString("apiBaseUrl").trim()
-        val normalizedBaseUrl = if (rawBaseUrl.endsWith("/")) rawBaseUrl else "$rawBaseUrl/"
+        val normalizedBaseUrl = if (rawBaseUrl.endsWith("/")) {
+            rawBaseUrl
+        } else {
+            "$rawBaseUrl/"
+        }
 
         return BranchConfigData(
             branchId = jsonObject.getInt("branchId"),

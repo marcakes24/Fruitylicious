@@ -16,6 +16,7 @@ import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.db.PosDatabase
+import androidx.room.RoomDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,6 +39,91 @@ object DatabaseModule {
             "fruitylicious_pos.db"
         )
             .fallbackToDestructiveMigration(false)
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    super.onCreate(db)
+                    seedDatabase(db)
+                }
+
+                override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    super.onOpen(db)
+                    seedDatabase(db)
+                }
+
+                private fun seedDatabase(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    val now = System.currentTimeMillis()
+
+                    db.execSQL(
+                        """
+                    INSERT OR IGNORE INTO branches (
+                        branchId,
+                        branchName,
+                        address,
+                        contactNumber,
+                        lastModified,
+                        isSynced,
+                        syncedAt
+                    ) VALUES (
+                        1,
+                        'Branch 1',
+                        'Default Branch Address',
+                        'N/A',
+                        $now,
+                        1,
+                        $now
+                    )
+                    """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                    INSERT OR IGNORE INTO users (
+                        userId,
+                        name,
+                        role,
+                        username,
+                        password,
+                        lastModified,
+                        isSynced,
+                        syncedAt
+                    ) VALUES (
+                        1,
+                        'Default Admin',
+                        'admin',
+                        'admin',
+                        'admin123',
+                        $now,
+                        1,
+                        $now
+                    )
+                    """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                    INSERT OR IGNORE INTO users (
+                        userId,
+                        name,
+                        role,
+                        username,
+                        password,
+                        lastModified,
+                        isSynced,
+                        syncedAt
+                    ) VALUES (
+                        2,
+                        'Default Staff',
+                        'staff',
+                        'staff',
+                        'staff123',
+                        $now,
+                        1,
+                        $now
+                    )
+                    """.trimIndent()
+                    )
+                }
+            })
             .build()
     }
 

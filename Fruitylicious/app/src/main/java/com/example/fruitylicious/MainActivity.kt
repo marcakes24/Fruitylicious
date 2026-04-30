@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         syncManager.start(applicationContext)
+        syncManager.syncNow(applicationContext)
 
         setContent {
             MaterialTheme {

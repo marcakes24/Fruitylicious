@@ -16,7 +16,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.staff.pos.GreenPrimary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -36,7 +35,7 @@ fun SalesSummaryScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(GreenPrimary)
+                .background(Color(0xFF1B5E20))
                 .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {

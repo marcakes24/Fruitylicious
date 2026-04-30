@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
 import com.example.fruitylicious.ui.admin.ingredients.IngredientFormScreen
@@ -26,11 +25,13 @@ import com.example.fruitylicious.ui.admin.restock.AdminRestockHistoryScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogsScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserFormScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserListScreen
+import com.example.fruitylicious.ui.admin.system.AuditLogsScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteEntryScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteHistoryScreen
 import com.example.fruitylicious.ui.auth.LoginScreen
 import com.example.fruitylicious.ui.staff.adjustment.AdjustmentScreen
 import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
+import com.example.fruitylicious.ui.staff.inventory.InventoryScreen
 import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.PosScreen
 import com.example.fruitylicious.ui.staff.pos.ReceiptScreen
@@ -44,7 +45,6 @@ import com.example.fruitylicious.ui.staff.waste.WasteHistoryScreen
 
 const val LOGIN = "login"
 
-const val STAFF_GRAPH = "staff_graph"
 const val STAFF_DASHBOARD = "staff_dashboard"
 const val STAFF_POS = "staff_pos"
 const val STAFF_CHECKOUT = "staff_checkout"
@@ -59,7 +59,6 @@ const val STAFF_RESTOCK_HISTORY = "staff_restock_history"
 const val STAFF_SALES_SUMMARY = "staff_sales_summary"
 const val STAFF_TRANSACTION_HISTORY = "staff_transaction_history"
 
-const val ADMIN_GRAPH = "admin_graph"
 const val ADMIN_DASHBOARD = "admin_dashboard"
 const val ADMIN_PRODUCTS = "admin_products"
 const val ADMIN_PRODUCT_FORM = "admin_product_form"
@@ -111,253 +110,249 @@ fun FruityliciousNavGraph(
             )
         }
 
-        navigation(
-            route = STAFF_GRAPH,
-            startDestination = STAFF_DASHBOARD
-        ) {
-            composable(STAFF_DASHBOARD) {
-                StaffDashboardScreen(
-                    onNavigate = navController::navigate,
-                    onLogout = {
-                        navController.navigate(LOGIN) {
-                            popUpTo(0)
+        composable(STAFF_DASHBOARD) {
+            StaffDashboardScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onLogout = {
+                    navController.navigate(LOGIN) {
+                        popUpTo(LOGIN) {
+                            inclusive = true
                         }
+                        launchSingleTop = true
                     }
-                )
-            }
-
-            composable(STAFF_POS) {
-                PosScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_CHECKOUT) {
-                CheckoutScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_RECEIPT) {
-                ReceiptScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_LOG) {
-                StaffLogScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_WASTE_ENTRY) {
-                WasteEntryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_WASTE_HISTORY) {
-                WasteHistoryScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_INVENTORY) {
-                InventoryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_ADJUSTMENT) {
-                AdjustmentScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_RESTOCK_ENTRY) {
-                RestockEntryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_RESTOCK_HISTORY) {
-                RestockHistoryScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_SALES_SUMMARY) {
-                SalesSummaryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
-
-            composable(STAFF_TRANSACTION_HISTORY) {
-                TransactionHistoryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+                }
+            )
         }
 
-        navigation(
-            route = ADMIN_GRAPH,
-            startDestination = ADMIN_DASHBOARD
-        ) {
-            composable(ADMIN_DASHBOARD) {
-                AdminDashboardScreen(
-                    onNavigate = navController::navigate,
-                    onLogout = {
-                        navController.navigate(LOGIN) {
-                            popUpTo(0)
+        composable(STAFF_POS) {
+            PosScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_CHECKOUT) {
+            CheckoutScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_RECEIPT) {
+            ReceiptScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_LOG) {
+            StaffLogScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_WASTE_ENTRY) {
+            WasteEntryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_WASTE_HISTORY) {
+            WasteHistoryScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_INVENTORY) {
+            InventoryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_ADJUSTMENT) {
+            AdjustmentScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_RESTOCK_ENTRY) {
+            RestockEntryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_RESTOCK_HISTORY) {
+            RestockHistoryScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_SALES_SUMMARY) {
+            SalesSummaryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(STAFF_TRANSACTION_HISTORY) {
+            TransactionHistoryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(ADMIN_DASHBOARD) {
+            AdminDashboardScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onLogout = {
+                    navController.navigate(LOGIN) {
+                        popUpTo(LOGIN) {
+                            inclusive = true
                         }
+                        launchSingleTop = true
                     }
-                )
-            }
+                }
+            )
+        }
 
-            composable(ADMIN_PRODUCTS) {
-                ProductListScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_PRODUCTS) {
+            ProductListScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_PRODUCT_FORM) {
-                ProductFormScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_PRODUCT_FORM) {
+            ProductFormScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_INGREDIENTS) {
-                IngredientListScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_INGREDIENTS) {
+            IngredientListScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_INGREDIENT_FORM) {
-                IngredientFormScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_INGREDIENT_FORM) {
+            IngredientFormScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_RECIPES) {
-                RecipeListScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_RECIPES) {
+            RecipeListScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_RECIPE_FORM) {
-                RecipeFormScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_RECIPE_FORM) {
+            RecipeFormScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_INVENTORY) {
-                AdminInventoryScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_INVENTORY) {
+            AdminInventoryScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_ADJUSTMENT) {
-                AdminAdjustmentScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_ADJUSTMENT) {
+            AdminAdjustmentScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_WASTE_ENTRY) {
-                AdminWasteEntryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_WASTE_ENTRY) {
+            AdminWasteEntryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_WASTE_HISTORY) {
-                AdminWasteHistoryScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_WASTE_HISTORY) {
+            AdminWasteHistoryScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_RESTOCK_ENTRY) {
-                AdminRestockEntryScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_RESTOCK_ENTRY) {
+            AdminRestockEntryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_RESTOCK_HISTORY) {
-                AdminRestockHistoryScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_RESTOCK_HISTORY) {
+            AdminRestockHistoryScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_USERS) {
-                UserListScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_USERS) {
+            UserListScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_USER_FORM) {
-                UserFormScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_USER_FORM) {
+            UserFormScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_STAFF_LOGS) {
-                StaffLogsScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_STAFF_LOGS) {
+            StaffLogsScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORTS_DASHBOARD) {
-                ReportsDashboardScreen(
-                    onNavigate = navController::navigate,
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORTS_DASHBOARD) {
+            ReportsDashboardScreen(
+                onNavigate = { route -> navController.navigate(route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORT_SALES) {
-                SalesReportScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORT_SALES) {
+            SalesReportScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORT_INVENTORY) {
-                InventoryReportScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORT_INVENTORY) {
+            InventoryReportScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORT_WASTE) {
-                WasteReportScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORT_WASTE) {
+            WasteReportScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORT_RESTOCK) {
-                RestockReportScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORT_RESTOCK) {
+            RestockReportScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_REPORT_TRANSACTIONS) {
-                TransactionReportScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_REPORT_TRANSACTIONS) {
+            TransactionReportScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
 
-            composable(ADMIN_AUDIT_LOGS) {
-                AuditLogsScreen(
-                    onBack = navController::popBackStack
-                )
-            }
+        composable(ADMIN_AUDIT_LOGS) {
+            AuditLogsScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

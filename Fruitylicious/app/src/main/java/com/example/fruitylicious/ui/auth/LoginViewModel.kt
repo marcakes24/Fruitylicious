@@ -3,8 +3,10 @@ package com.example.fruitylicious.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.repository.LoginResult
+import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.domain.usecase.auth.LoginUseCase
 import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,8 @@ data class LoginUiState(
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
+    private val syncRepository: SyncRepository,
+    private val sessionManager: SessionManager,
     branchConfig: BranchConfig
 ) : ViewModel() {
 
@@ -88,6 +92,7 @@ class LoginViewModel @Inject constructor(
 
             when (val result = loginUseCase(username, password)) {
                 is LoginResult.Success -> {
+                    runImmediateSync()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -97,6 +102,7 @@ class LoginViewModel @Inject constructor(
                 }
 
                 is LoginResult.OfflineSuccess -> {
+                    runImmediateSync()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -115,6 +121,24 @@ class LoginViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun runImmediateSync() {
+        val lastPulledAt = sessionManager.getLastPulledAt()
+        val syncResult = syncRepository.sync(lastPulledAt)
+        val now = System.currentTimeMillis()
+
+        sessionManager.saveSyncStatus(
+            syncedAt = now,
+            success = syncResult.success,
+            message = syncResult.message
+        )
+
+        if (syncResult.success) {
+            sessionManager.saveLastPulledAt(now)
+        }
+
+        println("FRUITY_SYNC_LOGIN: success=${syncResult.success}, pushed=${syncResult.pushedCount}, pulled=${syncResult.pulledCount}, message=${syncResult.message}")
     }
 
     fun consumeLoginNavigation() {

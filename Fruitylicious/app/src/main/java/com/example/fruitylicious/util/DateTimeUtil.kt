@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 object DateTimeUtil {
 
@@ -88,6 +89,12 @@ object DateTimeUtil {
 
     private fun format(timestamp: Long, pattern: String): String {
         val formatter = SimpleDateFormat(pattern, Locale.getDefault())
+        return formatter.format(Date(timestamp))
+    }
+
+    fun formatIsoInstant(timestamp: Long): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        formatter.timeZone = TimeZone.getTimeZone("UTC")
         return formatter.format(Date(timestamp))
     }
 }
