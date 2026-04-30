@@ -147,7 +147,7 @@ fun AdminSideBarContent(
             val reportItems = listOf(
                 NavItem(Icons.Outlined.Receipt,       "Transaction History", "admin_transacHistory"),
                 NavItem(Icons.Outlined.BarChart,      "Reports",            "admin_reports"),
-                NavItem(Icons.Outlined.AssignmentLate,"Audit Logs",         ""),
+                NavItem(Icons.Outlined.AssignmentLate,"Audit Logs",         "admin_audit_logs"),
                 NavItem(Icons.Outlined.Groups,        "Staff Logs",         "")
             )
 
