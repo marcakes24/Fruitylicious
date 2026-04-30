@@ -31,6 +31,7 @@ import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.POSScreen
 import com.example.fruitylicious.ui.staff.transaction.TransactionHistoryScreen
 import com.example.fruitylicious.ui.staff.waste.WasteManagementScreen
+import com.example.fruitylicious.StaffSalesSummaryScreen
 
 // Corrected Imports
 import com.example.fruitylicious.QueueScreen
@@ -69,7 +70,10 @@ fun AppNavigation() {
             "queue_screen",
             "time_log",
             "inventory_monitoring",
-            "sales_summary"
+            "sales_summary",
+            "restock",
+            "notification",
+            "inventory_adjustment"
         )
 
         staffRoutes.forEach { route ->
@@ -90,8 +94,11 @@ fun AppNavigation() {
             "admin_time_log",
             "admin_recipe_management",
             "admin_inventory_monitoring",
+            "admin_inventory_adjustment",
             "admin_reports",
-            "admin_sales_summary"
+            "admin_sales_summary",
+            "admin_restock",
+            "admin_notification"
         )
 
         adminRoutes.forEach { route ->
@@ -118,7 +125,10 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "queue_screen" -> QueueScreen(navController, drawerState, scope)
             "time_log" -> TimeLogRoute(drawerState, scope)
             "inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
-            "sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
+            "sales_summary" -> StaffSalesSummaryScreen(navController, drawerState, scope)
+            "restock" -> RestockScreen(navController, drawerState, scope)
+            "notification" -> NotificationsScreen(navController, drawerState, scope)
+            "inventory_adjustment" -> InventoryAdjustmentScreen(navController, drawerState, scope)
         }
     }
 }
@@ -145,8 +155,11 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_time_log" -> TimeLogRoute(drawerState, scope)
             "admin_recipe_management" -> RecipeManagementScreen(navController, drawerState, scope)
             "admin_inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
+            "admin_inventory_adjustment" -> InventoryAdjustmentScreen(navController, drawerState, scope)
             "admin_reports" -> ReportsScreen(navController, drawerState, scope)
             "admin_sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
+            "admin_restock" -> RestockScreen(navController, drawerState, scope)
+            "admin_notification" -> NotificationsScreen(navController, drawerState, scope)
         }
     }
 }

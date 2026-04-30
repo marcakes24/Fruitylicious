@@ -23,11 +23,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
-private val RptGreen  = Color(0xFF2C8C44)
-private val RptPageBg = Color(0xFFFFEAA0)
+val RptGreen     = Color(0xFF2C8C44)
+val RptGreenDark = Color(0xFF1B5E20)
+val RptPageBg    = Color(0xFFFFEAA0)
+val RptCardBg    = Color.White
+val RptRed       = Color(0xFFE53935)
+val RptTextMain  = Color(0xFF1A1A1A)
+val RptTextSub   = Color(0xFF757575)
 
 // ── Tab enum ──────────────────────────────────────────────────────────────────
-private enum class ReportTab(val label: String) {
+enum class ReportTab(val label: String) {
     SALES("Sales"), WASTE("Waste"), RESTOCK("Restock"), INVENTORY("Inventory")
 }
 
@@ -38,7 +43,7 @@ fun ReportsScreen(
     drawerState:   DrawerState,
     scope:         CoroutineScope
 ) {
-    var selectedTab    by remember { mutableStateOf(ReportTab.SALES) }
+    var selectedTab    by remember { mutableStateOf<ReportTab>(ReportTab.SALES) }
     var selectedBranch by remember { mutableStateOf("All") }
 
     Column(

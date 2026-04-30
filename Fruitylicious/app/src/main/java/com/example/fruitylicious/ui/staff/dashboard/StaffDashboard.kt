@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -105,7 +106,10 @@ fun StaffDashboardScreen(
             .verticalScroll(rememberScrollState())
     ) {
         // Header — no branch selector pills for staff
-        StaffDashboardHeader(onMenuClick = { scope.launch { drawerState.open() } })
+        StaffDashboardHeader(
+            navController = navController,
+            onMenuClick = { scope.launch { drawerState.open() } }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -132,38 +136,37 @@ fun StaffDashboardScreen(
 
 // ── Header (no branch pills) ──────────────────────────────────────────────────
 @Composable
-private fun StaffDashboardHeader(onMenuClick: () -> Unit) {
+private fun StaffDashboardHeader(navController: NavController, onMenuClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(StaffGreenPrimary)
             .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
     ) {
-        // Hamburger
-        Column(
-            modifier            = Modifier
-                .align(Alignment.CenterStart)
-                .clickable { onMenuClick() },
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(3) {
-                Box(
-                    modifier = Modifier
-                        .width(22.dp)
-                        .height(2.5.dp)
-                        .background(Color.White, RoundedCornerShape(2.dp))
-                )
+            // Hamburger
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text       = "DASHBOARD",
+                color      = Color.White,
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier   = Modifier.weight(1f)
+            )
+
+            // Notification Icon
+            IconButton(onClick = { navController.navigate("notification") }) {
+                Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.White)
             }
         }
-
-        Text(
-            text       = "DASHBOARD",
-            color      = Color.White,
-            fontSize   = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier   = Modifier.align(Alignment.Center)
-        )
-        // No branch pills — staff only sees their assigned branch
     }
 }
 
@@ -298,9 +301,9 @@ private fun StaffQuickActionsSection(navController: NavController) {
         // Staff quick actions: wala pang route
         val actions = listOf(
             Triple(Icons.Outlined.BarChart,      "Sales Summary",           "sales_summary"),
-            Triple(Icons.Outlined.Autorenew,     "Restock",                 ""),
-            Triple(Icons.Outlined.Search,        "Inventory Monitoring",    ""),
-            Triple(Icons.Outlined.DeleteOutline, "Waste Management",        "")
+            Triple(Icons.Outlined.Autorenew,     "Restock",                 "restock"),
+            Triple(Icons.Outlined.Search,        "Inventory Monitoring",    "inventory_monitoring"),
+            Triple(Icons.Outlined.DeleteOutline, "Waste Management",        "waste_management")
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

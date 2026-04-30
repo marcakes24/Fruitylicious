@@ -5,9 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 // ── DATA MODELS ──────────────────────────────────────────────────────────────
 
@@ -34,12 +34,13 @@ data class AdjustmentHistoryItem(
     val date: String,
     val time: String,
     val change: String,
-    val flow: String // e.g. "1997 -> 1897"
+    val flow: String, // e.g. "1997 -> 1897"
+    val branch: String
 )
 
 data class IngredientStock(
     val name: String,
-    val stock: Int,
+    var stock: Int,
     val unit: String
 )
 
@@ -57,13 +58,62 @@ fun InventoryAdjustmentScreen(
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var selectedBranch by remember { mutableStateOf("B1") }
 
-    // Mock history data
-    val recentAdjustments = listOf(
-        AdjustmentHistoryItem("Strawberry", "spoilage", "Admin User", "4/15/2026", "10:44 PM", "-100", "1997 -> 1897"),
-        AdjustmentHistoryItem("Dragon Fruit", "spoilage", "Staff User", "4/14/2026", "10:38 PM", "-7", "15 -> 8"),
-        AdjustmentHistoryItem("Melon", "spoilage", "Admin User", "4/13/2026", "10:38 PM", "-5", "10 -> 5")
-    )
+    // Mock history data (Mutable for functionality)
+    val recentAdjustments = remember {
+        mutableStateListOf(
+            AdjustmentHistoryItem("Strawberry", "spoilage", "Admin User", "4/15/2026", "10:44 PM", "-100", "1997 -> 1897", "B1"),
+            AdjustmentHistoryItem("Dragon Fruit", "spoilage", "Staff User", "4/14/2026", "10:38 PM", "-7", "15 -> 8", "B1"),
+            AdjustmentHistoryItem("Melon", "spoilage", "Admin User", "4/13/2026", "10:38 PM", "-5", "10 -> 5", "B2")
+        )
+    }
+
+    // Master list of ingredients for the dropdown (Mutable to reflect changes)
+    val ingredientsList = remember {
+        mutableStateMapOf(
+            "Fruits" to listOf(
+                IngredientStock("Mango", 30, "pcs"),
+                IngredientStock("Dragon Fruit", 8, "pcs"),
+                IngredientStock("Guyabano", 12, "pcs"),
+                IngredientStock("Strawberry", 10, "pack"),
+                IngredientStock("Buko", 20, "pcs"),
+                IngredientStock("Avocado", 25, "pcs"),
+                IngredientStock("Melon", 5, "pcs"),
+                IngredientStock("Banana", 40, "pcs"),
+                IngredientStock("Apple", 18, "pcs")
+            ),
+            "Toppings & Mix-ins" to listOf(
+                IngredientStock("Oreo", 20, "pack"),
+                IngredientStock("Crashed Graham", 15, "pack"),
+                IngredientStock("Cheese", 12, "pack"),
+                IngredientStock("Lemon Square Cheesecake", 10, "pack"),
+                IngredientStock("Nata de Coco", 18, "pack"),
+                IngredientStock("Pearl", 14, "pack")
+            ),
+            "Syrups" to listOf(
+                IngredientStock("Syrup - Caramel", 8, "pack"),
+                IngredientStock("Syrup - Mango", 8, "pack"),
+                IngredientStock("Syrup - Chocolate", 8, "pack"),
+                IngredientStock("Syrup - Strawberry", 8, "pack")
+            ),
+            "Dairy & Sweeteners" to listOf(
+                IngredientStock("Evap", 24, "can"),
+                IngredientStock("Condense", 20, "can"),
+                IngredientStock("Sugar", 15, "pack")
+            ),
+            "Others" to listOf(
+                IngredientStock("Ice", 10, "sack"),
+                IngredientStock("Medium Cups", 10, "packs"),
+                IngredientStock("Large Cups", 10, "packs"),
+                IngredientStock("Lids", 10, "packs"),
+                IngredientStock("Straws", 15, "packs")
+            )
+        )
+    }
+
+    val filteredAdjustments = if (selectedBranch == "All") recentAdjustments 
+                             else recentAdjustments.filter { it.branch == selectedBranch }
 
     Column(
         modifier = Modifier
@@ -83,30 +133,54 @@ fun InventoryAdjustmentScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // Sidebar Menu Trigger
-                Column(
-                    modifier = Modifier
-                        .clickable { scope.launch { drawerState.open() } }
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(20.dp)
-                                .height(2.dp)
-                                .background(Color.White)
-                        )
-                    }
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
+                // Highlighted Title
                 Text(
                     text = "INVENTORY ADJUSTMENT",
                     color = Color.White,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Branch Selector Toggle
+                Surface(
+                    color = Color(0xFF1B5E20),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("B1", "B2", "All").forEach { branch ->
+                            val isSelected = selectedBranch == branch
+                            Surface(
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clickable { selectedBranch = branch }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 10.dp)
+                                ) {
+                                    Text(
+                                        text = branch,
+                                        color = if (isSelected) Color(0xFF2E7D32) else Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -161,7 +235,7 @@ fun InventoryAdjustmentScreen(
                                     onDismissRequest = { dropdownExpanded = false },
                                     modifier = Modifier.fillMaxWidth(0.85f).background(Color.White).heightIn(max = 400.dp)
                                 ) {
-                                    CategorizedAdjustmentDropdown { ingredient ->
+                                    CategorizedAdjustmentDropdown(ingredientsList) { ingredient ->
                                         selectedIngredient = ingredient
                                         dropdownExpanded = false
                                     }
@@ -169,11 +243,11 @@ fun InventoryAdjustmentScreen(
                             }
                         }
 
-                        // 2. Current Stock Display (Shows only when ingredient is selected)
+                        // 2. Current Stock Display
                         if (selectedIngredient != null) {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                color = Color(0xFFFFFBEB), // Light yellow highlight
+                                color = Color(0xFFFFFBEB),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Row(
@@ -308,7 +382,37 @@ fun InventoryAdjustmentScreen(
                         // 6. Submit Button
                         val isFormValid = selectedIngredient != null && quantity.isNotEmpty()
                         Button(
-                            onClick = { /* Handle Submit */ },
+                            onClick = {
+                                if (isFormValid) {
+                                    val qtyInt = quantity.toInt()
+                                    val oldStock = selectedIngredient!!.stock
+                                    val newStock = if (adjustmentType == "Add") oldStock + qtyInt else oldStock - qtyInt
+                                    
+                                    // Update local stock
+                                    selectedIngredient!!.stock = newStock
+                                    
+                                    // Add to history
+                                    val now = Calendar.getInstance().time
+                                    val dateFormat = SimpleDateFormat("M/d/yyyy", Locale.getDefault())
+                                    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+                                    
+                                    recentAdjustments.add(0, AdjustmentHistoryItem(
+                                        ingredient = selectedIngredient!!.name,
+                                        reason = reason.ifEmpty { "adjustment" },
+                                        staff = "Admin User", // Mock user
+                                        date = dateFormat.format(now),
+                                        time = timeFormat.format(now),
+                                        change = if (adjustmentType == "Add") "+$qtyInt" else "-$qtyInt",
+                                        flow = "$oldStock -> $newStock",
+                                        branch = if(selectedBranch == "All") "B1" else selectedBranch
+                                    ))
+                                    
+                                    // Reset form
+                                    quantity = ""
+                                    reason = ""
+                                    selectedIngredient = null
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             enabled = isFormValid,
                             shape = RoundedCornerShape(12.dp),
@@ -355,10 +459,16 @@ fun InventoryAdjustmentScreen(
 
                         HorizontalDivider(color = Color(0xFFF1F5F9))
 
-                        recentAdjustments.forEachIndexed { index, item ->
-                            AdjustmentItemUI(item)
-                            if (index < recentAdjustments.size - 1) {
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
+                        if (filteredAdjustments.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("No adjustments found for this branch", color = Color.Gray, fontSize = 14.sp)
+                            }
+                        } else {
+                            filteredAdjustments.forEachIndexed { index, item ->
+                                AdjustmentItemUI(item)
+                                if (index < filteredAdjustments.size - 1) {
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                                }
                             }
                         }
                     }
@@ -388,7 +498,7 @@ fun AdjustmentItemUI(item: AdjustmentHistoryItem) {
         }
         Column(horizontalAlignment = Alignment.End) {
             Surface(
-                color = Color(0xFF1E293B), // Dark background for the badge
+                color = Color(0xFF1E293B),
                 shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
@@ -409,45 +519,12 @@ fun AdjustmentItemUI(item: AdjustmentHistoryItem) {
 // ── COMPONENT: CATEGORIZED DROPDOWN CONTENT ──────────────────────────────────
 
 @Composable
-fun CategorizedAdjustmentDropdown(onSelected: (IngredientStock) -> Unit) {
-    val categories = mapOf(
-        "Fruits" to listOf(
-            IngredientStock("Mango", 30, "pcs"),
-            IngredientStock("Dragon Fruit", 8, "pcs"),
-            IngredientStock("Guyabano", 12, "pcs"),
-            IngredientStock("Strawberry", 10, "pack"),
-            IngredientStock("Buko", 20, "pcs"),
-            IngredientStock("Avocado", 25, "pcs"),
-            IngredientStock("Melon", 5, "pcs"),
-            IngredientStock("Banana", 40, "pcs"),
-            IngredientStock("Apple", 18, "pcs")
-        ),
-        "Toppings & Mix-ins" to listOf(
-            IngredientStock("Oreo", 20, "pack"),
-            IngredientStock("Crashed Graham", 15, "pack"),
-            IngredientStock("Cheese", 12, "pack"),
-            IngredientStock("Lemon Square Cheesecake", 10, "pack"),
-            IngredientStock("Nata de Coco", 18, "pack"),
-            IngredientStock("Pearl", 14, "pack")
-        ),
-        "Syrups" to listOf(
-            IngredientStock("Syrup - Caramel", 8, "pack"),
-            IngredientStock("Syrup - Mango", 8, "pack"),
-            IngredientStock("Syrup - Chocolate", 8, "pack"),
-            IngredientStock("Syrup - Strawberry", 8, "pack")
-        ),
-        "Dairy & Sweeteners" to listOf(
-            IngredientStock("Evap", 24, "can"),
-            IngredientStock("Condense", 20, "can"),
-            IngredientStock("Sugar", 15, "pack")
-        ),
-        "Others" to listOf(
-            IngredientStock("Ice", 10, "sack")
-        )
-    )
-
+fun CategorizedAdjustmentDropdown(
+    ingredients: Map<String, List<IngredientStock>>, 
+    onSelected: (IngredientStock) -> Unit
+) {
     Column {
-        categories.forEach { (category, items) ->
+        ingredients.forEach { (category, items) ->
             Text(
                 text = category,
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),

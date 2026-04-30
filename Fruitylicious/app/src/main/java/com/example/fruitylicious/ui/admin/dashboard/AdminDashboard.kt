@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -119,6 +120,7 @@ fun AdminDashboardScreen(
     ) {
         // Header
         DashboardHeader(
+            navController   = navController,
             selectedBranch  = selectedBranch,
             onBranchSelect  = { selectedBranch = it },
             onMenuClick     = { scope.launch { drawerState.open() } }
@@ -149,6 +151,7 @@ fun AdminDashboardScreen(
 // ── Header ───────────────────────────────────────────────────────────────────
 @Composable
 private fun DashboardHeader(
+    navController: NavController,
     selectedBranch: String,
     onBranchSelect: (String) -> Unit,
     onMenuClick:    () -> Unit
@@ -159,53 +162,65 @@ private fun DashboardHeader(
             .background(DashGreenPrimary)
             .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
     ) {
-        // Hamburger
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .clickable { onMenuClick() },
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            repeat(3) {
-                Box(
-                    modifier = Modifier
-                        .width(22.dp)
-                        .height(2.5.dp)
-                        .background(Color.White, RoundedCornerShape(2.dp))
-                )
-            }
-        }
-
-        // Title
-        Text(
-            text       = "DASHBOARD",
-            color      = Color.White,
-            fontSize   = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier   = Modifier.align(Alignment.Center)
-        )
-
-        // Branch selector pills
         Row(
-            modifier            = Modifier.align(Alignment.CenterEnd),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("B1", "B2", "All").forEach { branch ->
-                val isActive = selectedBranch == branch
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (isActive) Color.White else Color.White.copy(alpha = 0.25f))
-                        .clickable { onBranchSelect(branch) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
+            // Hamburger
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Title
+            Text(
+                text       = "DASHBOARD",
+                color      = Color.White,
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier   = Modifier.weight(1f)
+            )
+
+            // Notification Icon
+            IconButton(onClick = { navController.navigate("admin_notification") }) {
+                Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.White)
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Branch Selector Toggle
+            Surface(
+                color = DashGreenDark,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text       = branch,
-                        color      = if (isActive) DashGreenPrimary else Color.White,
-                        fontSize   = 12.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                    )
+                    listOf("B1", "B2", "All").forEach { branch ->
+                        val isSelected = selectedBranch == branch
+                        Surface(
+                            color = if (isSelected) Color.White else Color.Transparent,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .clickable { onBranchSelect(branch) }
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            ) {
+                                Text(
+                                    text = branch,
+                                    color = if (isSelected) DashGreenPrimary else Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -350,10 +365,10 @@ private fun QuickActionsSection(navController: NavController) {
 
         // 2 × 2 grid - wala pa tong mga route
         val actions = listOf(
-            Triple(Icons.Outlined.Inventory2,  "Products",    ""),
-            Triple(Icons.Outlined.SetMeal,     "Ingredients", ""),
-            Triple(Icons.AutoMirrored.Outlined.MenuBook, "Recipes", ""),
-            Triple(Icons.Outlined.Search,      "Inventory",   "")
+            Triple(Icons.Outlined.Inventory2,  "Products",    "admin_manage_products"),
+            Triple(Icons.Outlined.SetMeal,     "Ingredients", "admin_manage_ingredients"),
+            Triple(Icons.AutoMirrored.Outlined.MenuBook, "Recipes", "admin_recipe_management"),
+            Triple(Icons.Outlined.Autorenew,   "Restock",     "admin_restock")
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

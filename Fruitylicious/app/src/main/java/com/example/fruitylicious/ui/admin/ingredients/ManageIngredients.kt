@@ -714,40 +714,46 @@ private fun MiHeader(
                 }
             }
             // Yellow highlighted title
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFFFD600))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = "MANAGE INGREDIENTS",
-                    color = MpGreenDark,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(
+                text = "MANAGE INGREDIENTS",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        // Branch selector
-        Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Branch Selector Toggle
+        Surface(
+            color = MpGreenDark,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.height(32.dp).align(Alignment.CenterEnd)
         ) {
-            listOf("B1", "B2", "All").forEach { b ->
-                val isActive = selectedBranch == b
-                Text(
-                    text = b,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (isActive) Color.White else Color.Transparent)
-                        .border(1.dp, Color.White, RoundedCornerShape(20.dp))
-                        .clickable { onBranchSelect(b) }
-                        .padding(horizontal = 12.dp, vertical = 5.dp),
-                    color = if (isActive) MpGreen else Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                )
+            Row(
+                modifier = Modifier.padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("B1", "B2", "All").forEach { branch ->
+                    val isSelected = selectedBranch == branch
+                    Surface(
+                        color = if (isSelected) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .clickable { onBranchSelect(branch) }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = branch,
+                                color = if (isSelected) MpGreen else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }

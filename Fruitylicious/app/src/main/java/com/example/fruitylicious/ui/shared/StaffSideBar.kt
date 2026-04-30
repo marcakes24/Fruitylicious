@@ -121,7 +121,7 @@ fun StaffSideBarContent(
             // ── Management section (staff-limited) ───────────────────────────
             StaffSidebarSectionHeader("Management")
             val managementItems = listOf(
-                StaffNavItem(Icons.Outlined.Autorenew,   "Restock",              ""),
+                StaffNavItem(Icons.Outlined.Autorenew,   "Restock",              "restock"),
                 StaffNavItem(Icons.Outlined.DeleteOutline,"Waste Management",    "waste_management")
             )
             managementItems.forEach { item ->

@@ -17,12 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.fruitylicious.data.local.entity.AppDatabase
 
-// ── Brand colors ──────────────────────────────────────────────────────────────
-private val RptGreen    = Color(0xFF2C8C44)
-private val RptCardBg   = Color.White
-private val RptRed      = Color(0xFFE53935)
-private val RptTextMain = Color(0xFF1A1A1A)
-private val RptTextSub  = Color(0xFF757575)
+// Colors are defined in ReportsDashboardScreen.kt
 private val RptLowStock = Color(0xFFE53935)
 private val RptOkStock  = Color(0xFF2C8C44)
 

@@ -27,13 +27,7 @@ import com.example.fruitylicious.data.local.entity.AppDatabase
 import java.util.*
 import kotlin.math.abs
 
-// ── Brand colors ──────────────────────────────────────────────────────────────
-private val RptGreen     = Color(0xFF2C8C44)
-private val RptGreenDark = Color(0xFF1B5E20)
-private val RptCardBg    = Color.White
-private val RptRed       = Color(0xFFE53935)
-private val RptTextMain  = Color(0xFF1A1A1A)
-private val RptTextSub   = Color(0xFF757575)
+// Colors are defined in ReportsDashboardScreen.kt
 
 @Composable
 fun SalesTabContent(branch: String, navController: NavController) {

@@ -826,47 +826,45 @@ private fun MpHeader(
             }
 
             // Highlighted Title
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFFFD600))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text       = "MANAGE PRODUCTS",
-                    color      = MpGreenDark,
-                    fontSize   = 16.sp, // slightly smaller so it fits well with the menu
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(
+                text       = "MANAGE PRODUCTS",
+                color      = Color.White,
+                fontSize   = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        // Branch pills
-        Row(
-            modifier              = Modifier.align(Alignment.CenterEnd),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Branch Selector Toggle
+        Surface(
+            color = MpGreenDark,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.height(32.dp).align(Alignment.CenterEnd)
         ) {
-            listOf("B1", "B2", "All").forEach { branch ->
-                val isActive = selectedBranch == branch
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (isActive) Color.White else Color.Transparent)
-                        .border(
-                            width = 1.dp,
-                            color = Color.White,
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                        .clickable { onBranchSelect(branch) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text       = branch,
-                        color      = if (isActive) MpGreen else Color.White,
-                        fontSize   = 12.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                    )
+            Row(
+                modifier = Modifier.padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("B1", "B2", "All").forEach { branch ->
+                    val isSelected = selectedBranch == branch
+                    Surface(
+                        color = if (isSelected) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .clickable { onBranchSelect(branch) }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = branch,
+                                color = if (isSelected) MpGreen else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

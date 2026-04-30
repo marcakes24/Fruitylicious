@@ -19,11 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.example.fruitylicious.data.local.entity.AppDatabase
 import java.util.*
 
-// ── Brand colors ──────────────────────────────────────────────────────────────
-private val RptCardBg   = Color.White
-private val RptRed      = Color(0xFFE53935)
-private val RptTextMain = Color(0xFF1A1A1A)
-private val RptTextSub  = Color(0xFF757575)
+// Colors are defined in ReportsDashboardScreen.kt
 
 @Composable
 fun WasteTabContent(branch: String) {

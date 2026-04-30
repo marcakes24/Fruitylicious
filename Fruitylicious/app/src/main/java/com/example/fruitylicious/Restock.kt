@@ -27,13 +27,19 @@ import java.util.*
 
 // ── DATA MODELS ──────────────────────────────────────────────────────────────
 
-data class RestockEntry(
+data class RestockEntryItem(
     val ingredient: String,
     val supplier: String?,
     val staff: String,
     val date: String,
     val time: String,
-    val quantity: String
+    val quantity: String,
+    val branch: String
+)
+
+data class RestockIngredient(
+    val name: String,
+    val stock: String
 )
 
 // ── MAIN SCREEN ─────────────────────────────────────────────────────────────
@@ -45,19 +51,34 @@ fun RestockScreen(
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
-    // UI State for managing pop-ups and filters
+    // UI State
     var showRestockEntry by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateText by remember { mutableStateOf("") }
+    var selectedBranch by remember { mutableStateOf("B1") }
 
-    // Sample data for the restock history list
-    val restockHistory = listOf(
-        RestockEntry("Avocado", "Sackma Diy", "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs"),
-        RestockEntry("Avocado", null, "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs"),
-        RestockEntry("Evap", null, "Staff User", "4/15/2026", "12:38 AM", "+ 12 can"),
-        RestockEntry("Pearl", null, "Admin User", "4/13/2026", "12:38 AM", "+ 10 pack")
-    )
+    // Functional State for History
+    val restockHistory = remember {
+        mutableStateListOf(
+            RestockEntryItem("Avocado", "Sackma Diy", "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs", "B1"),
+            RestockEntryItem("Avocado", null, "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs", "B2"),
+            RestockEntryItem("Evap", null, "Staff User", "4/15/2026", "12:38 AM", "+ 12 can", "B1"),
+            RestockEntryItem("Pearl", null, "Admin User", "4/13/2026", "12:38 AM", "+ 10 pack", "B1")
+        )
+    }
+
+    // Filtering logic
+    val filteredHistory = remember(searchQuery, selectedBranch, selectedDateText, restockHistory.size) {
+        restockHistory.filter { item ->
+            val matchesSearch = item.ingredient.contains(searchQuery, ignoreCase = true) ||
+                              (item.supplier?.contains(searchQuery, ignoreCase = true) ?: false) ||
+                              item.staff.contains(searchQuery, ignoreCase = true)
+            val matchesBranch = if (selectedBranch == "All") true else item.branch == selectedBranch
+            val matchesDate = if (selectedDateText.isEmpty()) true else item.date == selectedDateText
+            matchesSearch && matchesBranch && matchesDate
+        }.reversed()
+    }
 
     // Date Picker State
     val datePickerState = rememberDatePickerState()
@@ -68,7 +89,7 @@ fun RestockScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        val sdf = SimpleDateFormat("M/d/yyyy", Locale.getDefault())
                         selectedDateText = sdf.format(Date(millis))
                     }
                     showDatePicker = false
@@ -102,20 +123,52 @@ fun RestockScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Burger Menu Trigger (Connected to Sidebar)
                 IconButton(onClick = { scope.launch { drawerState.open() } }) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Page Title
                 Text(
                     text = "RESTOCK",
                     color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
+
+                // Branch Selector Toggle
+                Surface(
+                    color = Color(0xFF1B5E20),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("B1", "B2", "All").forEach { branch ->
+                            val isSelected = selectedBranch == branch
+                            Surface(
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clickable { selectedBranch = branch }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                ) {
+                                    Text(
+                                        text = branch,
+                                        color = if (isSelected) Color(0xFF2E7D32) else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -161,7 +214,6 @@ fun RestockScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Search Field (Functional)
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -175,7 +227,6 @@ fun RestockScreen(
                             )
                         )
 
-                        // Date Selector Field (Triggers Date Picker)
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = selectedDateText,
@@ -197,7 +248,6 @@ fun RestockScreen(
                                     focusedBorderColor = Color(0xFF2E7D32)
                                 )
                             )
-                            // Catch clicks for picker
                             Box(modifier = Modifier.matchParentSize().clickable { showDatePicker = true })
                         }
                     }
@@ -213,7 +263,6 @@ fun RestockScreen(
                     shadowElevation = 2.dp
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        // List Header
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -232,7 +281,7 @@ fun RestockScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "${restockHistory.size} entries",
+                                    text = "${filteredHistory.size} entries",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -243,11 +292,16 @@ fun RestockScreen(
 
                         HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
-                        // Restock History Items
-                        restockHistory.forEachIndexed { index, entry ->
-                            RestockHistoryItem(entry)
-                            if (index < restockHistory.size - 1) {
-                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        if (filteredHistory.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("No restock records found", color = Color.Gray)
+                            }
+                        } else {
+                            filteredHistory.forEachIndexed { index, entry ->
+                                RestockRecordRow(entry)
+                                if (index < filteredHistory.size - 1) {
+                                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                                }
                             }
                         }
                     }
@@ -256,18 +310,20 @@ fun RestockScreen(
         }
     }
 
-    // ── SECTION 5: POP-UPS (DIALOGS) ──────────────────────────────────────────
-
-    // Restock Entry Popup
     if (showRestockEntry) {
-        RestockEntryDialog(onDismiss = { showRestockEntry = false })
+        RestockEntryDialog(
+            onDismiss = { showRestockEntry = false },
+            onAdd = { entry ->
+                restockHistory.add(entry)
+                showRestockEntry = false
+            },
+            currentBranch = if (selectedBranch == "All") "B1" else selectedBranch
+        )
     }
 }
 
-// ── COMPONENT: RESTOCK HISTORY ITEM ──────────────────────────────────────────
-
 @Composable
-fun RestockHistoryItem(entry: RestockEntry) {
+fun RestockRecordRow(entry: RestockEntryItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -282,7 +338,7 @@ fun RestockHistoryItem(entry: RestockEntry) {
                 fontSize = 15.sp,
                 color = Color(0xFF333333)
             )
-            if (entry.supplier != null) {
+            if (!entry.supplier.isNullOrBlank()) {
                 Text(
                     text = "Supplier: ${entry.supplier}",
                     fontSize = 12.sp,
@@ -290,7 +346,7 @@ fun RestockHistoryItem(entry: RestockEntry) {
                 )
             }
             Text(
-                text = entry.staff,
+                text = "${entry.staff} (${entry.branch})",
                 fontSize = 12.sp,
                 color = Color.Gray
             )
@@ -319,50 +375,37 @@ fun RestockHistoryItem(entry: RestockEntry) {
     }
 }
 
-// ── COMPONENT: RESTOCK ENTRY POPUP ───────────────────────────────────────────
-
 @Composable
-fun RestockEntryDialog(onDismiss: () -> Unit) {
-    var selectedIngredient by remember { mutableStateOf("") }
+fun RestockEntryDialog(
+    onDismiss: () -> Unit,
+    onAdd: (RestockEntryItem) -> Unit,
+    currentBranch: String
+) {
+    var selectedIngredient by remember { mutableStateOf<RestockIngredient?>(null) }
     var quantity by remember { mutableStateOf("") }
     var supplier by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
-    // Validation logic for "Add Stock" button
-    val isFormValid = selectedIngredient.isNotEmpty() && quantity.isNotEmpty()
+    val isFormValid = selectedIngredient != null && quantity.isNotEmpty()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = Color.White,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
         ) {
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState())
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())
             ) {
-                // Header with X close button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "Restock Entry",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
-                        )
-                        Text(
-                            text = "Add stock for an ingredient",
-                            fontSize = 13.sp,
-                            color = Color(0xFF64748B)
-                        )
+                        Text(text = "Restock Entry", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                        Text(text = "Add stock for an ingredient", fontSize = 13.sp, color = Color(0xFF64748B))
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
@@ -371,34 +414,27 @@ fun RestockEntryDialog(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Ingredient Input (Typeable Dropdown)
                 Text("Ingredient", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
                 Spacer(modifier = Modifier.height(8.dp))
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
-                        value = selectedIngredient,
+                        value = selectedIngredient?.name ?: "",
                         onValueChange = {},
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Choose an ingredient...", color = Color.LightGray) },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
                         shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color(0xFFCBD5E1)
-                        )
+                        colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xFFCBD5E1))
                     )
-                    // Clicking open the dropdown
                     Box(modifier = Modifier.matchParentSize().clickable { dropdownExpanded = true })
                     
                     DropdownMenu(
                         expanded = dropdownExpanded,
                         onDismissRequest = { dropdownExpanded = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .background(Color.White)
-                            .heightIn(max = 400.dp)
+                        modifier = Modifier.fillMaxWidth(0.85f).background(Color.White).heightIn(max = 400.dp)
                     ) {
-                        IngredientDropdownContent { ingredient ->
+                        RestockIngredientDropdownList { ingredient ->
                             selectedIngredient = ingredient
                             dropdownExpanded = false
                         }
@@ -407,7 +443,6 @@ fun RestockEntryDialog(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Quantity Input (Typeable)
                 Text("Quantity to Add", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -416,21 +451,14 @@ fun RestockEntryDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Enter quantity", color = Color.LightGray) },
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFCBD5E1)
-                    )
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xFFCBD5E1))
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color(0xFFE2E8F0))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Supplier Input (Typeable)
-                Row {
-                    Text("Supplier", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("(optional)", fontSize = 13.sp, color = Color.Gray)
-                }
+                Text("Supplier (optional)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = supplier,
@@ -438,42 +466,41 @@ fun RestockEntryDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("e.g. Farm Fresh, Dairy Best", color = Color.LightGray) },
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFCBD5E1)
-                    )
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xFFCBD5E1))
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Note Input (Typeable)
-                Row {
-                    Text("Note", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("(optional)", fontSize = 13.sp, color = Color.Gray)
-                }
+                Text("Note (optional)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                     placeholder = { Text("Any additional notes...", color = Color.LightGray) },
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFCBD5E1)
-                    )
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color(0xFFCBD5E1))
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Add Stock Button (Enabled only if Ingredient and Quantity are filled)
                 Button(
-                    onClick = { if (isFormValid) onDismiss() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .shadow(2.dp, RoundedCornerShape(12.dp)),
+                    onClick = { 
+                        if (isFormValid) {
+                            val now = Calendar.getInstance().time
+                            val unit = selectedIngredient?.stock?.split(" ")?.last() ?: "pcs"
+                            onAdd(RestockEntryItem(
+                                ingredient = selectedIngredient!!.name,
+                                supplier = supplier.takeIf { it.isNotBlank() },
+                                staff = "Admin User", // Mock
+                                date = SimpleDateFormat("M/d/yyyy", Locale.getDefault()).format(now),
+                                time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(now),
+                                quantity = "+ $quantity $unit",
+                                branch = currentBranch
+                            ))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
                     enabled = isFormValid,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -481,39 +508,59 @@ fun RestockEntryDialog(onDismiss: () -> Unit) {
                         disabledContainerColor = Color(0xFFCBD5E1)
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Inventory, 
-                        contentDescription = null, 
-                        tint = if (isFormValid) Color.White else Color(0xFF94A3B8)
-                    )
+                    Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = if (isFormValid) Color.White else Color(0xFF94A3B8))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Add Stock", 
-                        color = if (isFormValid) Color.White else Color(0xFF94A3B8), 
-                        fontSize = 16.sp, 
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(text = "Add Stock", color = if (isFormValid) Color.White else Color(0xFF94A3B8), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
 
-// ── COMPONENT: CATEGORIZED INGREDIENT LIST ───────────────────────────────────
-
 @Composable
-fun IngredientDropdownContent(onSelected: (String) -> Unit) {
+fun RestockIngredientDropdownList(onSelected: (RestockIngredient) -> Unit) {
     val categories = mapOf(
-        "Fruits" to listOf("Mango", "Dragon Fruit", "Guyabano", "Strawberry", "Buko", "Avocado", "Melon", "Banana", "Apple"),
-        "Toppings & Mix-ins" to listOf("Oreo", "Crashed Graham", "Cheese", "Lemon Square Cheesecake", "Nata de Coco", "Pearl"),
-        "Syrups" to listOf("Syrup - Caramel", "Syrup - Mango", "Syrup - Chocolate", "Syrup - Strawberry"),
-        "Dairy & Sweeteners" to listOf("Evap", "Condense", "Sugar"),
-        "Others" to listOf("Ice")
+        "Fruits" to listOf(
+            RestockIngredient("Mango", "30 pcs"),
+            RestockIngredient("Dragon Fruit", "8 pcs"),
+            RestockIngredient("Guyabano", "12 pcs"),
+            RestockIngredient("Strawberry", "10 pack"),
+            RestockIngredient("Buko", "20 pcs"),
+            RestockIngredient("Avocado", "25 pcs"),
+            RestockIngredient("Melon", "5 pcs"),
+            RestockIngredient("Banana", "40 pcs"),
+            RestockIngredient("Apple", "18 pcs")
+        ),
+        "Toppings & Mix-ins" to listOf(
+            RestockIngredient("Oreo", "20 pack"),
+            RestockIngredient("Crashed Graham", "15 pack"),
+            RestockIngredient("Cheese", "12 pack"),
+            RestockIngredient("Lemon Square Cheesecake", "10 pack"),
+            RestockIngredient("Nata de Coco", "18 pack"),
+            RestockIngredient("Pearl", "14 pack")
+        ),
+        "Syrups" to listOf(
+            RestockIngredient("Syrup - Caramel", "8 pack"),
+            RestockIngredient("Syrup - Mango", "8 pack"),
+            RestockIngredient("Syrup - Chocolate", "8 pack"),
+            RestockIngredient("Syrup - Strawberry", "6 pack")
+        ),
+        "Dairy & Sweeteners" to listOf(
+            RestockIngredient("Evap", "24 can"),
+            RestockIngredient("Condense", "20 can"),
+            RestockIngredient("Sugar", "15 pack")
+        ),
+        "Others" to listOf(
+            RestockIngredient("Ice", "10 sack"),
+            RestockIngredient("Medium Cups", "10 packs"),
+            RestockIngredient("Large Cups", "10 packs"),
+            RestockIngredient("Lids", "10 packs"),
+            RestockIngredient("Straws", "15 packs")
+        )
     )
 
     Column {
         categories.forEach { (category, items) ->
-            // Category Header
             Text(
                 text = category,
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
@@ -521,10 +568,14 @@ fun IngredientDropdownContent(onSelected: (String) -> Unit) {
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF2E7D32)
             )
-            // Ingredient Items
             items.forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(item, fontSize = 14.sp, color = Color(0xFF334155)) },
+                    text = { 
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(item.name, fontSize = 14.sp, color = Color(0xFF334155))
+                            Text("(${item.stock})", fontSize = 12.sp, color = Color.Gray)
+                        }
+                    },
                     onClick = { onSelected(item) },
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
                 )
