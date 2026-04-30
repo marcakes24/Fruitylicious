@@ -37,6 +37,7 @@ import com.example.fruitylicious.QueueScreen
 import com.example.fruitylicious.UserManagementScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen
+import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 import com.example.fruitylicious.ui.shared.AttendanceState
 import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.TimeLogUiState
@@ -91,7 +92,8 @@ fun AppNavigation() {
             "admin_recipe_management",
             "admin_inventory_monitoring",
             "admin_reports",
-            "admin_sales_summary"
+            "admin_sales_summary",
+            "admin_audit_logs"
         )
 
         adminRoutes.forEach { route ->
@@ -147,6 +149,7 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
             "admin_reports" -> ReportsScreen(navController, drawerState, scope)
             "admin_sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
+            "admin_audit_logs" -> AuditLogScreen(drawerState)
         }
     }
 }
