@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,19 +35,14 @@ private val RptRed       = Color(0xFFE53935)
 private val RptTextMain  = Color(0xFF1A1A1A)
 private val RptTextSub   = Color(0xFF757575)
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TAB 1 — SALES
-// ══════════════════════════════════════════════════════════════════════════════
 @Composable
 fun SalesTabContent(branch: String, navController: NavController) {
     val context        = LocalContext.current
     val db             = remember { AppDatabase.getDatabase(context) }
     val transactionDao = db.transactionDao()
 
-    // Period toggle: daily / weekly / monthly
     var period by remember { mutableStateOf("daily") }
 
-    // Live state
     var totalSales     by remember { mutableDoubleStateOf(0.0) }
     var previousSales  by remember { mutableDoubleStateOf(0.0) }
     var cashTotal      by remember { mutableDoubleStateOf(0.0) }
@@ -118,237 +117,228 @@ fun SalesTabContent(branch: String, navController: NavController) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // ── Period toggle + hero card ─────────────────────────────────────────
+        // ── Period Toggle & Hero Card ─────────────────────────────────────────
         SalesRptCard {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFFF0F0F0))
-                    .padding(3.dp)
+                    .background(Color(0xFFF5F5F5))
+                    .padding(4.dp)
             ) {
                 listOf("daily", "weekly", "monthly").forEach { p ->
+                    val isSel = (period == p)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(18.dp))
-                            .background(if (period == p) Color.White else Color.Transparent)
+                            .background(if (isSel) Color.White else Color.Transparent)
                             .clickable { period = p }
-                            .padding(vertical = 7.dp),
+                            .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text       = p,
                             fontSize   = 13.sp,
-                            fontWeight = if (period == p) FontWeight.Bold else FontWeight.Normal,
-                            color      = if (period == p) RptTextMain else RptTextSub
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                            color      = if (isSel) RptTextMain else RptTextSub
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text     = "${period.replaceFirstChar { it.uppercase() }}'s Sales",
-                fontSize = 13.sp,
-                color    = RptTextSub
+                text     = "Today's Sales",
+                fontSize = 14.sp,
+                color    = RptTextSub,
+                fontWeight = FontWeight.Medium
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier          = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text       = "₱${String.format(Locale.US, "%,.2f", totalSales)}",
-                    fontSize   = 28.sp,
+                    fontSize   = 32.sp,
                     fontWeight = FontWeight.Bold,
                     color      = RptTextMain,
                     modifier   = Modifier.weight(1f)
                 )
-                Box(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isUp) Color(0xFFE8F5E9) else Color(0xFFFFEBEE))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
+                    Icon(
+                        imageVector = if (isUp) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                        contentDescription = null,
+                        tint = if (isUp) RptGreen else RptRed,
+                        modifier = Modifier.size(14.dp)
+                    )
                     Text(
-                        text       = "${if (isUp) "▲" else "▼"} ${String.format(Locale.US, "%.1f",
-                            abs(pctChange)
-                        )}%",
+                        text       = "${String.format(Locale.US, "%.1f", abs(pctChange))}%",
                         color      = if (isUp) RptGreen else RptRed,
-                        fontSize   = 12.sp,
+                        fontSize   = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
             Text(
-                text     = "vs previous (₱${String.format(Locale.US, "%,.2f", previousSales)})",
+                text     = "vs yesterday (₱${String.format(Locale.US, "%,.2f", previousSales)})",
                 fontSize = 12.sp,
                 color    = RptTextSub
             )
         }
 
-        // ── Sales breakdown table ─────────────────────────────────────────────
-        if (salesBreakdown.isNotEmpty()) {
-            SalesRptCard {
-                Text(
-                    "Sales Breakdown ($period)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp,
-                    color      = RptTextMain
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("Product", modifier = Modifier.weight(1f),      fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold)
-                    Text("Qty",    modifier = Modifier.width(40.dp),     fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                    Text("Total",  modifier = Modifier.width(80.dp),     fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+        // ── Sales Breakdown ───────────────────────────────────────────────────
+        SalesRptCard {
+            Text(
+                "Sales Breakdown (${period})",
+                fontWeight = FontWeight.Bold,
+                fontSize   = 15.sp,
+                color      = RptTextMain
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("Product", modifier = Modifier.weight(1f), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold)
+                Text("Qty",     modifier = Modifier.width(40.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Total",   modifier = Modifier.width(90.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFEEEEEE))
+            
+            if (salesBreakdown.isEmpty()) {
+                Text("No sales data found.", fontSize = 13.sp, color = RptTextSub, modifier = Modifier.padding(vertical = 8.dp))
+            } else {
                 salesBreakdown.forEach { (name, qty, total) ->
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Text(
-                            name,
-                            modifier  = Modifier.weight(1f),
-                            fontSize  = 13.sp,
-                            color     = RptTextMain,
-                            fontWeight = FontWeight.Medium,
-                            maxLines  = 1,
-                            overflow  = TextOverflow.Ellipsis
-                        )
-                        Text("$qty",
-                            modifier  = Modifier.width(40.dp),
-                            fontSize  = 13.sp,
-                            color     = RptTextMain,
-                            textAlign = TextAlign.Center)
-                        Text(
-                            "₱${String.format(Locale.US, "%,.2f", total)}",
-                            modifier   = Modifier.width(80.dp),
-                            fontSize   = 13.sp,
-                            color      = RptGreen,
-                            fontWeight = FontWeight.Bold,
-                            textAlign  = TextAlign.End
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = RptTextMain, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("12:04 PM • Staff 1", fontSize = 11.sp, color = RptTextSub) // Mock metadata
+                        }
+                        Text("$qty", modifier = Modifier.width(40.dp), fontSize = 14.sp, color = RptTextMain, textAlign = TextAlign.Center)
+                        Column(modifier = Modifier.width(90.dp), horizontalAlignment = Alignment.End) {
+                            Text("₱${String.format(Locale.US, "%,.2f", total)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = RptGreen)
+                            Text("Cash", fontSize = 11.sp, color = RptTextSub)
+                        }
                     }
                 }
             }
         }
 
-        // ── Payment summary ───────────────────────────────────────────────────
-        if (cashTotal + gcashTotal > 0) {
-            SalesRptCard {
-                Text(
-                    "Payment Summary ($period)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp,
-                    color      = RptTextMain
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                val total    = cashTotal + gcashTotal
-                val cashFrac = if (total > 0) (cashTotal / total).toFloat() else 0f
+        // ── Payment Summary ───────────────────────────────────────────────────
+        SalesRptCard {
+            Text(
+                "Payment Summary (${period})",
+                fontWeight = FontWeight.Bold,
+                fontSize   = 15.sp,
+                color      = RptTextMain
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            val total = cashTotal + gcashTotal
+            val cashFrac = if (total > 0) (cashTotal / total).toFloat() else 0.5f
 
-                // Stacked bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF2196F3))
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(Color(0xFF2196F3))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(cashFrac)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(RptGreen)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(RptGreen))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Column {
-                            Text("Cash",  fontSize = 11.sp, color = RptTextSub)
-                            Text("₱${String.format(Locale.US, "%,.2f", cashTotal)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
-                        }
+                        .fillMaxWidth(cashFrac)
+                        .fillMaxHeight()
+                        .background(RptGreen)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(RptGreen))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text("Cash", fontSize = 12.sp, color = RptTextSub)
+                        Text("₱${String.format(Locale.US, "%,.2f", cashTotal)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFF2196F3)))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Column {
-                            Text("GCash", fontSize = 11.sp, color = RptTextSub)
-                            Text("₱${String.format(Locale.US, "%,.2f", gcashTotal)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
-                        }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFF2196F3)))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("GCash", fontSize = 12.sp, color = RptTextSub)
+                        Text("₱${String.format(Locale.US, "%,.2f", gcashTotal)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
                     }
                 }
             }
         }
 
-        // ── Top-selling items ─────────────────────────────────────────────────
-        if (topItems.isNotEmpty()) {
-            SalesRptCard {
-                Text(
-                    "Top Selling Items",
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 14.sp,
-                    color      = RptTextMain
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+        // ── Top Selling Items ─────────────────────────────────────────────────
+        SalesRptCard {
+            Text(
+                "Top Selling Items",
+                fontWeight = FontWeight.Bold,
+                fontSize   = 15.sp,
+                color      = RptTextMain
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            if (topItems.isEmpty()) {
+                Text("No data.", fontSize = 13.sp, color = RptTextSub)
+            } else {
                 topItems.forEachIndexed { idx, item ->
                     Row(
-                        modifier              = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${idx + 1}.", fontSize = 13.sp, color = RptTextSub, modifier = Modifier.width(24.dp))
-                            Text(item.first, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = RptTextMain)
+                            Text("${idx + 1}.", fontSize = 14.sp, color = RptTextSub, modifier = Modifier.width(28.dp))
+                            Text(item.first, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = RptTextMain)
                         }
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(RptTextMain)
-                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            Text("${item.second} sold", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("${item.second} sold", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // ── Full Sales Summary button ─────────────────────────────────────────
+        // ── Full Sales Summary Button ─────────────────────────────────────────
         Button(
             onClick  = { navController.navigate("admin_sales_summary") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
             colors = ButtonDefaults.buttonColors(containerColor = RptGreenDark),
             shape  = RoundedCornerShape(12.dp)
         ) {
-            Text(
-                "Go to Full Sales Summary  →",
-                color      = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize   = 14.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Go to Full Sales Summary", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
-// ── Shared card wrapper ───────────────────────────────────────────────────────
 @Composable
 private fun SalesRptCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier        = Modifier.fillMaxWidth(),
         color           = RptCardBg,
         shape           = RoundedCornerShape(12.dp),
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }

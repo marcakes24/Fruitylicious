@@ -25,9 +25,6 @@ private val RptRed      = Color(0xFFE53935)
 private val RptTextMain = Color(0xFF1A1A1A)
 private val RptTextSub  = Color(0xFF757575)
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TAB 2 — WASTE
-// ══════════════════════════════════════════════════════════════════════════════
 @Composable
 fun WasteTabContent(branch: String) {
     val context  = LocalContext.current
@@ -82,13 +79,16 @@ fun WasteTabContent(branch: String) {
                 modifier        = Modifier.weight(1f),
                 color           = RptCardBg,
                 shape           = RoundedCornerShape(12.dp),
-                shadowElevation = 2.dp
+                shadowElevation = 1.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Waste (This Week)", fontSize = 11.sp, color = RptTextSub)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("$totalWaste", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = RptRed)
-                    Text("pcs", fontSize = 11.sp, color = RptTextSub)
+                    Text("Total Waste (This Week)", fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("$totalWaste", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = RptRed)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("pcs", fontSize = 14.sp, color = RptTextSub, modifier = Modifier.padding(bottom = 4.dp))
+                    }
                 }
             }
             // Most wasted card
@@ -96,11 +96,11 @@ fun WasteTabContent(branch: String) {
                 modifier        = Modifier.weight(1f),
                 color           = RptCardBg,
                 shape           = RoundedCornerShape(12.dp),
-                shadowElevation = 2.dp
+                shadowElevation = 1.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Most Wasted", fontSize = 11.sp, color = RptTextSub)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Most Wasted", fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         mostWasted,
                         fontSize   = 20.sp,
@@ -109,101 +109,99 @@ fun WasteTabContent(branch: String) {
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis
                     )
-                    Text("$mostWastedQty pcs", fontSize = 11.sp, color = RptTextSub)
+                    Text("$mostWastedQty pcs", fontSize = 14.sp, color = RptTextSub)
                 }
             }
         }
 
-        // ── Primary reasons bar chart ─────────────────────────────────────────
+        // ── Primary Reasons Bar Chart ─────────────────────────────────────────
         WasteRptCard {
-            Text("Primary Reasons", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = RptTextMain)
-            Spacer(modifier = Modifier.height(12.dp))
+            Text("Primary Reasons", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = RptTextMain)
+            Spacer(modifier = Modifier.height(16.dp))
             if (reasonData.isEmpty()) {
-                Text("No waste records this week", fontSize = 13.sp, color = RptTextSub)
+                Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 reasonData.forEach { data ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier          = Modifier.padding(vertical = 5.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
                         Text(
                             data.first,
-                            modifier  = Modifier.width(120.dp),
-                            fontSize  = 12.sp,
+                            fontSize  = 13.sp,
                             color     = RptTextSub,
-                            maxLines  = 1,
-                            overflow  = TextOverflow.Ellipsis
+                            fontWeight = FontWeight.Medium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(14.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(Color(0xFFFFCDD2))
-                        ) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(data.second.toFloat() / maxReason)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(7.dp))
-                                    .background(RptRed)
-                            )
+                                    .weight(1f)
+                                    .height(12.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFFEBEE))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(data.second.toFloat() / maxReason)
+                                        .fillMaxHeight()
+                                        .background(RptRed)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Optional: show value
+                            // Text("${data.second}", fontSize = 12.sp, color = RptTextMain, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // ── Waste by items list ───────────────────────────────────────────────
+        // ── Waste by Items List ───────────────────────────────────────────────
         WasteRptCard {
             Text(
                 "Waste by Items (This Week)",
                 fontWeight = FontWeight.Bold,
-                fontSize   = 14.sp,
+                fontSize   = 15.sp,
                 color      = RptTextMain
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             if (wasteByItem.isEmpty()) {
-                Text("No waste recorded this week", fontSize = 13.sp, color = RptTextSub)
+                Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 wasteByItem.forEach { item ->
                     Row(
-                        modifier              = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        modifier              = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment     = Alignment.CenterVertically
                     ) {
                         Text(
                             item.first,
-                            fontSize   = 14.sp,
+                            fontSize   = 15.sp,
                             color      = RptTextMain,
                             fontWeight = FontWeight.Medium
                         )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(RptTextMain)
-                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("${item.second} wasted", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("${item.second} wasted", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
-// ── Shared card wrapper ───────────────────────────────────────────────────────
 @Composable
 private fun WasteRptCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier        = Modifier.fillMaxWidth(),
         color           = RptCardBg,
         shape           = RoundedCornerShape(12.dp),
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }

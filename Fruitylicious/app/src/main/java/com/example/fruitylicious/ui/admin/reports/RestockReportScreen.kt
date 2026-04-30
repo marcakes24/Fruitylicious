@@ -26,16 +26,12 @@ private val RptCardBg    = Color.White
 private val RptTextMain  = Color(0xFF1A1A1A)
 private val RptTextSub   = Color(0xFF757575)
 
-// ── Data class for UI ─────────────────────────────────────────────────────────
 private data class RestockFrequencyItem(
     val name: String,
     val frequency: String,
     val avgUnits: Int
 )
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TAB 3 — RESTOCK
-// ══════════════════════════════════════════════════════════════════════════════
 @Composable
 fun RestockTabContent(branch: String) {
     val context    = LocalContext.current
@@ -56,7 +52,15 @@ fun RestockTabContent(branch: String) {
 
         totalToday   = restockDao.getTotalRestockedToday(branchId, todayStart, System.currentTimeMillis()) ?: 0
         restockItems = restockDao.getRestockFrequency(branchId)
-            .map { RestockFrequencyItem(it.ingredientName, it.frequencyLabel, it.avgUnits) }
+            .map { 
+                val label = when {
+                    it.count >= 10 -> "Every day"
+                    it.count >= 5  -> "Every 2 days"
+                    it.count >= 3  -> "Every 3 days"
+                    else           -> "Weekly"
+                }
+                RestockFrequencyItem(it.ingredientName, label, it.avgUnits) 
+            }
     }
 
     Column(
@@ -66,69 +70,69 @@ fun RestockTabContent(branch: String) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // ── Total Added Today hero card ────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(RptGreenDark)
-                .padding(24.dp)
+        // ── Total Added Today Hero Card ──────────────────────────────────────
+        Surface(
+            modifier        = Modifier.fillMaxWidth(),
+            color           = RptGreenDark,
+            shape           = RoundedCornerShape(12.dp),
+            shadowElevation = 2.dp
         ) {
-            Column {
+            Column(modifier = Modifier.padding(24.dp)) {
                 Text(
                     "Total Added Today",
                     color    = Color.White.copy(alpha = 0.8f),
-                    fontSize = 13.sp
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text       = "$totalToday",
                         color      = Color.White,
-                        fontSize   = 40.sp,
+                        fontSize   = 42.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         "units",
                         color    = Color.White.copy(alpha = 0.8f),
-                        fontSize = 16.sp,
+                        fontSize = 18.sp,
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
             }
         }
 
-        // ── Restock frequency table ───────────────────────────────────────────
+        // ── Restock Frequency Table ──────────────────────────────────────────
         RestockRptCard {
             Text(
                 "Restock Frequency",
                 fontWeight = FontWeight.Bold,
-                fontSize   = 14.sp,
+                fontSize   = 15.sp,
                 color      = RptTextMain
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Header row
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-                Text("Product",   modifier = Modifier.weight(1f),   fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold)
-                Text("Times",     modifier = Modifier.width(70.dp), fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                Text("Avg Units", modifier = Modifier.width(70.dp), fontSize = 11.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                Text("Product",   modifier = Modifier.weight(1f),   fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold)
+                Text("Times",     modifier = Modifier.width(90.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Avg Units", modifier = Modifier.width(80.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
             }
-            HorizontalDivider(modifier = Modifier.padding(bottom = 6.dp))
+            HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp), color = Color(0xFFEEEEEE))
 
             if (restockItems.isEmpty()) {
-                Text("No restock data available", fontSize = 13.sp, color = RptTextSub)
+                Text("No restock data found.", fontSize = 13.sp, color = RptTextSub, modifier = Modifier.padding(vertical = 8.dp))
             } else {
                 restockItems.forEach { item ->
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                        modifier          = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             item.name,
                             modifier   = Modifier.weight(1f),
-                            fontSize   = 14.sp,
+                            fontSize   = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color      = RptTextMain,
                             maxLines   = 1,
@@ -136,26 +140,25 @@ fun RestockTabContent(branch: String) {
                         )
                         Box(
                             modifier = Modifier
-                                .width(70.dp)
-                                .padding(horizontal = 4.dp)
+                                .width(90.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFF0F0F0)),
+                                .background(Color(0xFFF5F5F5))
+                                .padding(vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text      = item.frequency,
-                                fontSize  = 10.sp,
+                                fontSize  = 11.sp,
                                 color     = RptTextSub,
-                                textAlign = TextAlign.Center,
-                                modifier  = Modifier.padding(horizontal = 4.dp, vertical = 3.dp)
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Text(
                             text       = "${item.avgUnits}",
-                            modifier   = Modifier.width(70.dp),
-                            fontSize   = 14.sp,
+                            modifier   = Modifier.width(80.dp),
+                            fontSize   = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color      = RptTextMain,
+                            color      = RptGreenDark,
                             textAlign  = TextAlign.End
                         )
                     }
@@ -163,18 +166,17 @@ fun RestockTabContent(branch: String) {
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
-// ── Shared card wrapper ───────────────────────────────────────────────────────
 @Composable
 private fun RestockRptCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier        = Modifier.fillMaxWidth(),
         color           = RptCardBg,
         shape           = RoundedCornerShape(12.dp),
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }

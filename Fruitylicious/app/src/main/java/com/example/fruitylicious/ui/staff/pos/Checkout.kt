@@ -1,6 +1,7 @@
 package com.example.fruitylicious.ui.staff.pos
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,8 +12,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,23 +24,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
+import com.example.fruitylicious.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
-// ── COLORS ────────────────────────────────────────────────────────────────────
-
-private val GreenHeader = Color(0xFF2E7D32)
+// ── Colors ────────────────────────────────────────────────────────────────────
+private val GreenHeader = Color(0xFF2C8C44)
 private val BackgroundYellow = Color(0xFFFFEAA0)
-private val OrangeAccent = Color(0xFFFF5722)
 private val CardWhite = Color.White
+private val RptGreen = Color(0xFF2C8C44)
+private val RptGreenLight = Color(0xFFE8F5E9)
 
-// ── MAIN SCREEN ─────────────────────────────────────────────────────────────
+enum class CheckoutStep { FORM, GCASH_QR, SUCCESS }
 
 @Composable
 fun CheckoutScreen(
@@ -44,463 +54,411 @@ fun CheckoutScreen(
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
-    // UI State
+    var currentStep by remember { mutableStateOf(CheckoutStep.FORM) }
+    var customerName by remember { mutableStateOf("") }
     var amountReceived by remember { mutableStateOf("") }
-    var selectedPaymentMethod by remember { mutableStateOf("None") } // "Cash" or "GCash"
-    var showGCashPopup by remember { mutableStateOf(false) }
-    var showReceiptPopup by remember { mutableStateOf(false) }
-
-    // Constants
-    val totalAmount = 85.0
+    var selectedPaymentMethod by remember { mutableStateOf("Cash") }
     
-    // Derived State for Real-time Change Calculation
+    // In a real app, these would come from a shared ViewModel or navigation arguments.
+    val totalAmount = 60.0
     val receivedValue = amountReceived.toDoubleOrNull() ?: 0.0
     val change = if (receivedValue >= totalAmount) receivedValue - totalAmount else 0.0
+    val isAmountValid = receivedValue >= totalAmount
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundYellow)
-            .verticalScroll(rememberScrollState())
-    ) {
-        
-        // ── SECTION 1: TOP GREEN HEADER ──────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GreenHeader)
-                .padding(top = 48.dp, bottom = 16.dp, start = 20.dp, end = 20.dp)
-        ) {
-            // Burger Menu connected to Sidebar
-            Column(
+    Box(modifier = Modifier.fillMaxSize().background(BackgroundYellow)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ── Header ────────────────────────────────────────────────────────
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .clickable { scope.launch { drawerState.open() } }
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+                    .fillMaxWidth()
+                    .background(GreenHeader)
+                    .padding(top = 48.dp, bottom = 14.dp, start = 16.dp, end = 16.dp)
             ) {
-                repeat(3) {
-                    Box(
-                        modifier = Modifier
-                            .width(22.dp)
-                            .height(2.dp)
-                            .background(Color.White, RoundedCornerShape(1.dp))
-                    )
+                IconButton(
+                    onClick = { scope.launch { drawerState.open() } },
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(3) {
+                            Box(modifier = Modifier.width(20.dp).height(2.dp).background(Color.White))
+                        }
+                    }
                 }
+
+                Text(
+                    text = "CHECK OUT",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
 
-            Text(
-                text = "CHECK OUT",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .padding(20.dp)
-                .fillMaxWidth()
-        ) {
-            
-            // ── SECTION 2: ORDER SUMMARY CARD ────────────────────────────────
-            Text(
-                text = "Order Summary",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1B1B1B)
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = CardWhite,
-                shadowElevation = 4.dp
-            ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    SummaryRow("Flavor", "Avocado")
-                    SummaryRow("Size", "Medium")
-                    SummaryRow("Add ons", "Pearl")
-                    SummaryRow("Quantity", "1 pc")
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Total Amount",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.Black
+            // ── Main Content Area ─────────────────────────────────────────────
+            AnimatedContent(
+                targetState = currentStep,
+                transitionSpec = {
+                    fadeIn() togetherWith fadeOut()
+                },
+                label = "CheckoutStepTransition"
+            ) { step ->
+                when (step) {
+                    CheckoutStep.FORM -> {
+                        CheckoutForm(
+                            customerName = customerName,
+                            onCustomerNameChange = { customerName = it },
+                            amountReceived = amountReceived,
+                            onAmountChange = { amountReceived = it },
+                            selectedPaymentMethod = selectedPaymentMethod,
+                            onPaymentMethodSelect = { selectedPaymentMethod = it },
+                            totalAmount = totalAmount,
+                            change = change,
+                            isAmountValid = isAmountValid,
+                            onConfirm = {
+                                if (selectedPaymentMethod == "Gcash") {
+                                    currentStep = CheckoutStep.GCASH_QR
+                                } else {
+                                    currentStep = CheckoutStep.SUCCESS
+                                }
+                            },
+                            onBack = { navController.popBackStack() }
                         )
-                        Text(
-                            text = "₱ 85",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = OrangeAccent
+                    }
+                    CheckoutStep.GCASH_QR -> {
+                        GCashQRView(
+                            onConfirmPayment = { currentStep = CheckoutStep.SUCCESS },
+                            onBack = { currentStep = CheckoutStep.FORM }
+                        )
+                    }
+                    CheckoutStep.SUCCESS -> {
+                        PaymentSuccessView(
+                            customerName = customerName,
+                            totalAmount = totalAmount,
+                            receivedAmount = receivedValue,
+                            change = change,
+                            paymentMethod = selectedPaymentMethod,
+                            onNewOrder = {
+                                navController.navigate("pos") {
+                                    popUpTo("pos") { inclusive = true }
+                                }
+                            }
                         )
                     }
                 }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(24.dp))
+@Composable
+fun CheckoutForm(
+    customerName: String,
+    onCustomerNameChange: (String) -> Unit,
+    amountReceived: String,
+    onAmountChange: (String) -> Unit,
+    selectedPaymentMethod: String,
+    onPaymentMethodSelect: (String) -> Unit,
+    totalAmount: Double,
+    change: Double,
+    isAmountValid: Boolean,
+    onConfirm: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        }
 
-            // ── SECTION 3: AMOUNT RECEIVED INPUT (TYPEABLE) ──────────────────
-            Text(
-                text = "Amount Received",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1B1B1B)
-            )
-
+        // ── Order Summary Card ──────────────────────────────────────────
+        CheckoutCard {
+            Text("Order Summary", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("1x Guyabano", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Medium", fontSize = 12.sp, color = Color.Gray)
+                }
+                Text("₱60.00", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(GreenHeader, RoundedCornerShape(8.dp))
+                    .padding(16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total Amount", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("₱${String.format(Locale.US, "%,.2f", totalAmount)}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+        }
 
+        // ── Customer Name Card ──────────────────────────────────────────
+        CheckoutCard {
+            Text("Customer Name", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = customerName,
+                onValueChange = onCustomerNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Enter customer name", color = Color.LightGray) },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GreenHeader,
+                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent
+                ),
+                singleLine = true
+            )
+        }
+
+        // ── Payment Method Card ─────────────────────────────────────────
+        CheckoutCard {
+            Text("Payment Method", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PaymentMethodButton(
+                    modifier = Modifier.weight(1f),
+                    label = "Cash",
+                    icon = Icons.Outlined.Payments,
+                    isSelected = selectedPaymentMethod == "Cash",
+                    onClick = { onPaymentMethodSelect("Cash") }
+                )
+                PaymentMethodButton(
+                    modifier = Modifier.weight(1f),
+                    label = "Gcash",
+                    icon = Icons.Outlined.CreditCard,
+                    isSelected = selectedPaymentMethod == "Gcash",
+                    onClick = { onPaymentMethodSelect("Gcash") }
+                )
+            }
+        }
+
+        // ── Amount Received & Change ────────────────────────────────────
+        CheckoutCard {
+            Text("Amount Received (P)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = amountReceived,
-                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) amountReceived = it },
+                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) onAmountChange(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("₱ 0.00", color = Color.LightGray) },
-                prefix = { Text("₱ ", color = Color.Gray) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(16.dp),
+                placeholder = { Text("0.00", color = Color.LightGray) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = CardWhite,
-                    focusedContainerColor = CardWhite,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = GreenHeader
+                    focusedBorderColor = GreenHeader,
+                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent
                 ),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ── SECTION 4: REAL-TIME CHANGE DISPLAY ──────────────────────────
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = OrangeAccent,
-                shadowElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Change",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "₱${"%,.2f".format(change)}",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ── SECTION 5: PAYMENT METHOD SELECTION ─────────────────────────
-            Text(
-                text = "PAYMENT METHOD",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1B1B1B)
-            )
-
             Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Cash Payment Card (Turns Green when selected)
-                PaymentMethodCard(
-                    title = "Cash",
-                    icon = "₱",
-                    isSelected = selectedPaymentMethod == "Cash",
-                    modifier = Modifier.weight(1f),
-                    onClick = { selectedPaymentMethod = "Cash" }
-                )
-                // GCash Payment Card (Shows GCash Popup)
-                PaymentMethodCard(
-                    title = "Gcash",
-                    icon = "G",
-                    isSelected = selectedPaymentMethod == "GCash",
-                    modifier = Modifier.weight(1f),
-                    onClick = { 
-                        selectedPaymentMethod = "GCash"
-                        showGCashPopup = true
-                    }
-                )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("100", "200", "500", "1000").forEach { valStr ->
+                    AmountPresetButton(label = "₱ $valStr", modifier = Modifier.weight(1f), onClick = { onAmountChange(valStr) })
+                }
+                AmountPresetButton(label = "Exact", modifier = Modifier.weight(1f), isExact = true, onClick = { onAmountChange(totalAmount.toString()) })
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── SECTION 6: CHECK OUT ACTION BUTTON ───────────────────────────
-            Button(
-                onClick = { if (selectedPaymentMethod != "None") showReceiptPopup = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .shadow(4.dp, RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GreenHeader)
-            ) {
-                Text(
-                    text = "Check Out",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Change", fontSize = 14.sp, color = Color.Gray)
+                Text("₱${String.format(Locale.US, "%,.2f", change)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = RptGreen)
             }
             
-            Spacer(modifier = Modifier.height(40.dp))
-        }
-    }
-
-    // ── SECTION 7: POP-UPS (GCASH & RECEIPT) ───────────────────────────────────
-    
-    // GCash QR Code Popup with X to close
-    if (showGCashPopup) {
-        GCashPopup(onDismiss = { showGCashPopup = false })
-    }
-
-    // Official Receipt Popup showing transaction details
-    if (showReceiptPopup) {
-        ReceiptPopup(
-            receivedAmount = receivedValue,
-            change = change,
-            paymentMethod = selectedPaymentMethod,
-            onDone = {
-                showReceiptPopup = false
-                navController.navigate("pos") // Redirect back to POS Screen
+            if (!isAmountValid && amountReceived.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Amount received must be greater than or equal to total.", color = Color.Red, fontSize = 11.sp)
             }
-        )
-    }
-}
+        }
 
-// ── COMPONENT: SUMMARY ROW ───────────────────────────────────────────────────
-
-@Composable
-fun SummaryRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(text = label, color = Color.Gray, fontSize = 14.sp)
-        Text(text = value, color = Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-// ── COMPONENT: PAYMENT METHOD CARD ───────────────────────────────────────────
-
-@Composable
-fun PaymentMethodCard(
-    title: String,
-    icon: String,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(if (isSelected) GreenHeader else CardWhite)
-    val contentColor by animateColorAsState(if (isSelected) Color.White else Color.Black)
-
-    Surface(
-        modifier = modifier
-            .height(100.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        color = backgroundColor,
-        shadowElevation = 4.dp
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        // ── Confirm Button ──────────────────────────────────────────────
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            enabled = isAmountValid,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GreenHeader,
+                disabledContainerColor = Color.LightGray.copy(alpha = 0.5f)
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, contentColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = icon, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = contentColor)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = contentColor)
+            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Confirm Payment", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
+        
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
-// ── COMPONENT: GCASH POP-UP ──────────────────────────────────────────────────
-
 @Composable
-fun GCashPopup(onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+fun GCashQRView(onConfirmPayment: () -> Unit, onBack: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White,
-            modifier = Modifier.width(320.dp)
-        ) {
-            Box(modifier = Modifier.padding(20.dp)) {
-                // Top-right X button to close
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .clickable { onDismiss() }
-                        .size(24.dp),
-                    tint = Color.Gray
-                )
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "G",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF007AFF)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Gcash",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF007AFF)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // QR Code Area
-                    Box(
-                        modifier = Modifier
-                            .size(200.dp)
-                            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("QR CODE", color = Color.LightGray)
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "M*** N****",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "09*********60",
-                        fontSize = 16.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── COMPONENT: RECEIPT POP-UP ────────────────────────────────────────────────
-
-@Composable
-fun ReceiptPopup(
-    receivedAmount: Double,
-    change: Double,
-    paymentMethod: String,
-    onDone: () -> Unit
-) {
-    Dialog(onDismissRequest = onDone) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.width(300.dp).shadow(8.dp, RoundedCornerShape(20.dp)),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Green success checkmark
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(Color(0xFF007AFF)), contentAlignment = Alignment.Center) {
+                        Text("G", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Gcash", color = Color(0xFF007AFF), fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(GreenHeader),
+                        .size(180.dp)
+                        .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(8.dp))
+                        .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Success",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
+                    // Try to load logo as placeholder for QR
+                    Image(
+                        painter = painterResource(id = R.drawable.qrcode),
+                        contentDescription = "GCash QR Code",
+                        modifier = Modifier.fillMaxSize(0.8f),
+                        contentScale = ContentScale.Fit
                     )
                 }
-
+                
                 Spacer(modifier = Modifier.height(16.dp))
+                Text("M*** N****", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("09*********", color = Color.Gray, fontSize = 14.sp)
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Button(
+            onClick = onConfirmPayment,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GreenHeader),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Confirm Payment Received", fontWeight = FontWeight.Bold)
+        }
+        
+        TextButton(onClick = onBack) {
+            Text("Go back", color = Color.Gray)
+        }
+    }
+}
 
-                Text(
-                    text = "Your Receipt",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF3E2723)
-                )
+@Composable
+fun PaymentSuccessView(
+    customerName: String,
+    totalAmount: Double,
+    receivedAmount: Double,
+    change: Double,
+    paymentMethod: String,
+    onNewOrder: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Success Banner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(RptGreenLight)
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = RptGreen, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Payment Successful", color = RptGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Receipt Card
+        Surface(
+            modifier = Modifier.fillMaxWidth().weight(1f).shadow(4.dp, RoundedCornerShape(2.dp)),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Logo
+                Text("FRUITYLICIOUS", fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = RptGreen)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Fruits and Shakes Station", fontSize = 12.sp, color = Color.Gray)
+                Text("Dilliman, Quezon City", fontSize = 11.sp, color = Color.Gray)
+                Text(SimpleDateFormat("M/dd/yyyy • h:mm a", Locale.US).format(Date()), fontSize = 11.sp, color = Color.Gray)
+                Text("Tel: 091-237577", fontSize = 11.sp, color = Color.Gray)
 
                 Spacer(modifier = Modifier.height(24.dp))
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = Color(0xFFEEEEEE))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ReceiptRow("Order ID", "AV 1001")
-                    ReceiptRow("Date & Time", "February 14, 2026")
-                    ReceiptRow("Flavor", "Avocado")
-                    ReceiptRow("Size", "Medium")
-                    ReceiptRow("Add ons", "Pearl")
-                    ReceiptRow("Quantity", "1 pc")
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = Color(0xFFF5F5F5))
-                    Spacer(modifier = Modifier.height(16.dp))
+                Text("Customer", fontSize = 11.sp, color = Color.Gray)
+                Text(customerName.ifEmpty { "Walk-in" }, fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
-                    ReceiptRow("Total Amount", "₱ 85")
-                    ReceiptRow("Payment Received", "₱ ${"%.0f".format(receivedAmount)}")
-                    ReceiptRow("Change", "₱ ${"%.0f".format(change)}")
-                    ReceiptRow("Payment Method", paymentMethod)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("1x Guyabano", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Medium", fontSize = 11.sp, color = Color.Gray)
+                    }
+                    Text("₱${String.format(Locale.US, "%,.2f", totalAmount)}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider(color = Color(0xFFEEEEEE))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Done button redirects back to POS
-                Button(
-                    onClick = onDone,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenHeader)
-                ) {
-                    Text("Done", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                }
+                ReceiptRow("Total", "₱${String.format(Locale.US, "%,.2f", totalAmount)}")
+                ReceiptRow("Payment", paymentMethod)
+                ReceiptRow("Cash Received", "₱${String.format(Locale.US, "%,.2f", receivedAmount)}")
+                ReceiptRow("Change", "₱${String.format(Locale.US, "%,.2f", change)}")
+
+                Spacer(modifier = Modifier.height(40.dp))
+                Text("Served by: Admin User", fontSize = 11.sp, color = Color.Gray)
+                Text("Thank you for choosing Fruitylicious!", fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center)
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onNewOrder,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GreenHeader),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("New Order", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
@@ -508,12 +466,79 @@ fun ReceiptPopup(
 @Composable
 fun ReceiptRow(label: String, value: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = Color.Gray, fontSize = 13.sp)
-        Text(text = value, color = Color(0xFF334155), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = 13.sp, color = Color.Gray)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun CheckoutCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = CardWhite,
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp), content = content)
+    }
+}
+
+@Composable
+fun PaymentMethodButton(
+    modifier: Modifier = Modifier,
+    label: String,
+    icon: ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .height(64.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) RptGreenLight else Color.White,
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) GreenHeader else Color(0xFFEEEEEE)
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = if (isSelected) GreenHeader else Color.Gray, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(label, color = if (isSelected) GreenHeader else Color.Gray, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+fun AmountPresetButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    isExact: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .height(38.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = if (isExact) RptGreenLight else Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isExact) GreenHeader else Color(0xFFEEEEEE))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isExact) GreenHeader else Color.DarkGray
+            )
+        }
     }
 }

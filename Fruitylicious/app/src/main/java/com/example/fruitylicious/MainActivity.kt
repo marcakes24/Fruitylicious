@@ -35,6 +35,8 @@ import com.example.fruitylicious.ui.staff.waste.WasteManagementScreen
 // Corrected Imports
 import com.example.fruitylicious.QueueScreen
 import com.example.fruitylicious.UserManagementScreen
+import com.example.fruitylicious.ui.admin.reports.ReportsScreen
+import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen
 import com.example.fruitylicious.ui.shared.AttendanceState
 import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.TimeLogUiState
@@ -66,7 +68,8 @@ fun AppNavigation() {
             "waste_management",
             "queue_screen",
             "time_log",
-            "inventory_monitoring"
+            "inventory_monitoring",
+            "sales_summary"
         )
 
         staffRoutes.forEach { route ->
@@ -86,7 +89,9 @@ fun AppNavigation() {
             "admin_users",
             "admin_time_log",
             "admin_recipe_management",
-            "admin_inventory_monitoring"
+            "admin_inventory_monitoring",
+            "admin_reports",
+            "admin_sales_summary"
         )
 
         adminRoutes.forEach { route ->
@@ -113,6 +118,7 @@ fun MainScaffold(navController: NavController, startScreen: String) {
             "queue_screen" -> QueueScreen(navController, drawerState, scope)
             "time_log" -> TimeLogRoute(drawerState, scope)
             "inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
+            "sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
         }
     }
 }
@@ -139,6 +145,8 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
             "admin_time_log" -> TimeLogRoute(drawerState, scope)
             "admin_recipe_management" -> RecipeManagementScreen(navController, drawerState, scope)
             "admin_inventory_monitoring" -> InventoryMonitoringScreen(navController, drawerState, scope)
+            "admin_reports" -> ReportsScreen(navController, drawerState, scope)
+            "admin_sales_summary" -> SalesSummaryScreen(navController, drawerState, scope)
         }
     }
 }
