@@ -3,9 +3,11 @@ package com.example.fruitylicious.ui.shared
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,15 +66,15 @@ data class TimeLogUiState(
     @DrawableRes val profileRes: Int? = R.drawable.eula
 )
 
-private val HeaderGreen = Color(0xFF279640)
-private val ScreenBackground = Color(0xFFE8D996)
-private val CardBackground = Color(0xFFF6F6F6)
-private val TimeTextColor = Color(0xFF14213D)
-private val SubtleText = Color(0xFF6A7280)
-private val LightGrayBox = Color(0xFFEEEEEE)
+private val HeaderGreen = Color(0xFF2C8C44)
+private val ScreenBackground = Color(0xFFFFEAA0)
+private val CardBackground = Color.White
+private val TimeTextColor = Color(0xFF1A1A1A)
+private val SubtleText = Color(0xFF757575)
+private val LightGrayBox = Color(0xFFF5F5F5)
 private val OnlineGreen = Color(0xFF22C55E)
-private val StatusGreenBox = Color(0xFFDDEFE2)
-private val DarkButton = Color(0xFF1E2A3D)
+private val StatusGreenBox = Color(0xFFE8F5E9)
+private val DarkButton = Color(0xFF333333)
 
 @Composable
 fun TimeLogScreen(
@@ -96,31 +99,38 @@ fun TimeLogScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(88.dp)
                     .background(HeaderGreen)
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
             ) {
-                IconButton(onClick = onMenuClick) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        tint = Color.White
-                    )
-                }
-
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Hamburger
+                    Column(
+                        modifier = Modifier
+                            .clickable { onMenuClick() }
+                            .padding(end = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        repeat(3) {
+                            Box(
+                                modifier = Modifier
+                                    .width(22.dp)
+                                    .height(2.5.dp)
+                                    .background(Color.White, RoundedCornerShape(2.dp))
+                            )
+                        }
+                    }
+
                     Text(
                         text = "TIME LOG",
                         color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -136,9 +146,9 @@ fun TimeLogScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = CardBackground),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -307,10 +317,11 @@ private fun ClockActionButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp),
-        shape = RoundedCornerShape(2.dp),
+            .height(52.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,

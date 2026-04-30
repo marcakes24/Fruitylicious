@@ -614,16 +614,19 @@ fun DeleteIngredientDialog(
                     Button(
                         onClick = onConfirm,
                         modifier = Modifier
-                            .weight(1.3f)
+                            .weight(1.4f)
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = DialogBtnDelete),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         Text(
                             "Delete Ingredient",
                             color = MpTextMain,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }

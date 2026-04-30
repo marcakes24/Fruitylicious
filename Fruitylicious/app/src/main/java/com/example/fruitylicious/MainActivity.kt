@@ -147,9 +147,9 @@ fun AdminScaffold(navController: NavController, startScreen: String) {
     ) {
         when (startScreen) {
             "admin_home" -> AdminDashboardScreen(navController, drawerState, scope)
-            "admin_pos" -> POSScreen(navController, drawerState, scope)
+            "admin_pos" -> POSScreen(navController, drawerState, scope, isAdmin = true)
             "admin_transacHistory" -> TransactionHistoryScreen(navController, drawerState, scope)
-            "admin_checkout" -> CheckoutScreen(navController, drawerState, scope)
+            "admin_checkout" -> CheckoutScreen(navController, drawerState, scope, isAdmin = true)
             "admin_waste_management" -> WasteManagementScreen(navController, drawerState, scope)
             "admin_queue" -> QueueScreen(navController, drawerState, scope)
             "admin_manage_products" -> ManageProductsScreen(drawerState, scope)

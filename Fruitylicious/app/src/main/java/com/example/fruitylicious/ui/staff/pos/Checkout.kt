@@ -52,7 +52,8 @@ enum class CheckoutStep { FORM, GCASH_QR, SUCCESS }
 fun CheckoutScreen(
     navController: NavController,
     drawerState: DrawerState,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    isAdmin: Boolean = false
 ) {
     var currentStep by remember { mutableStateOf(CheckoutStep.FORM) }
     var customerName by remember { mutableStateOf("") }
@@ -138,8 +139,14 @@ fun CheckoutScreen(
                             change = change,
                             paymentMethod = selectedPaymentMethod,
                             onNewOrder = {
-                                navController.navigate("pos") {
-                                    popUpTo("pos") { inclusive = true }
+                                if (isAdmin) {
+                                    navController.navigate("admin_pos") {
+                                        popUpTo("admin_pos") { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate("pos") {
+                                        popUpTo("pos") { inclusive = true }
+                                    }
                                 }
                             }
                         )

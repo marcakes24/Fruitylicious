@@ -331,7 +331,7 @@ private fun GreetingCard(
                 // Start POS button
                 Button(
                     onClick = {
-                        navController.navigate("pos") {
+                        navController.navigate("admin_pos") {
                             popUpTo("admin_home") { saveState = true }
                             launchSingleTop = true
                             restoreState    = true

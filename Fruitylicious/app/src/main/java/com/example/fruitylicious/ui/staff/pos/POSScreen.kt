@@ -98,7 +98,8 @@ val optionalAddOnChoices = listOf(
 fun POSScreen(
     navController: NavController,
     drawerState: DrawerState,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    isAdmin: Boolean = false
 ) {
     var selectedProduct  by remember { mutableStateOf<POSProduct?>(null) }
     var cartExpanded     by remember { mutableStateOf(false) }
@@ -295,7 +296,11 @@ fun POSScreen(
                         },
                         onClear = { cartItems = emptyList() },
                         onCheckout = { 
-                            navController.navigate("checkout")
+                            if (isAdmin) {
+                                navController.navigate("admin_checkout")
+                            } else {
+                                navController.navigate("checkout")
+                            }
                         }
                     )
                 }
