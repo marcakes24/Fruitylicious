@@ -1,0 +1,1436 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "3e8611f7b7f393b57d4e89d652e85328",
+    "entities": [
+      {
+        "tableName": "branches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`branchId` INTEGER NOT NULL, `branchName` TEXT NOT NULL, `address` TEXT NOT NULL, `contactNumber` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`branchId`))",
+        "fields": [
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchName",
+            "columnName": "branchName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactNumber",
+            "columnName": "contactNumber",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "branchId"
+          ]
+        }
+      },
+      {
+        "tableName": "users",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`userId` INTEGER NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, `username` TEXT NOT NULL, `password` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`userId`))",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "password",
+            "columnName": "password",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "userId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_users_username",
+            "unique": true,
+            "columnNames": [
+              "username"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_users_username` ON `${TABLE_NAME}` (`username`)"
+          },
+          {
+            "name": "index_users_role",
+            "unique": false,
+            "columnNames": [
+              "role"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_users_role` ON `${TABLE_NAME}` (`role`)"
+          }
+        ]
+      },
+      {
+        "tableName": "products",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`productId` INTEGER NOT NULL, `image` TEXT, `productName` TEXT NOT NULL, `isAddon` INTEGER NOT NULL, `price` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`productId`))",
+        "fields": [
+          {
+            "fieldPath": "productId",
+            "columnName": "productId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "image",
+            "columnName": "image",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "productName",
+            "columnName": "productName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAddon",
+            "columnName": "isAddon",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "price",
+            "columnName": "price",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "productId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_products_productName",
+            "unique": false,
+            "columnNames": [
+              "productName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_products_productName` ON `${TABLE_NAME}` (`productName`)"
+          },
+          {
+            "name": "index_products_isAddon",
+            "unique": false,
+            "columnNames": [
+              "isAddon"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_products_isAddon` ON `${TABLE_NAME}` (`isAddon`)"
+          }
+        ]
+      },
+      {
+        "tableName": "ingredients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredientId` INTEGER NOT NULL, `image` TEXT, `ingredientName` TEXT NOT NULL, `unitType` TEXT NOT NULL, `estimatedWeightPerUnit` REAL NOT NULL, `isPackaging` INTEGER NOT NULL, `lowStockThreshold` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`ingredientId`))",
+        "fields": [
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "image",
+            "columnName": "image",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ingredientName",
+            "columnName": "ingredientName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitType",
+            "columnName": "unitType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estimatedWeightPerUnit",
+            "columnName": "estimatedWeightPerUnit",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPackaging",
+            "columnName": "isPackaging",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lowStockThreshold",
+            "columnName": "lowStockThreshold",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ingredientId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ingredients_ingredientName",
+            "unique": false,
+            "columnNames": [
+              "ingredientName"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_ingredientName` ON `${TABLE_NAME}` (`ingredientName`)"
+          },
+          {
+            "name": "index_ingredients_isPackaging",
+            "unique": false,
+            "columnNames": [
+              "isPackaging"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_isPackaging` ON `${TABLE_NAME}` (`isPackaging`)"
+          }
+        ]
+      },
+      {
+        "tableName": "product_recipes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` INTEGER NOT NULL, `productId` INTEGER NOT NULL, `ingredientId` INTEGER NOT NULL, `quantityRequired` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`recipeId`), FOREIGN KEY(`productId`) REFERENCES `products`(`productId`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`ingredientId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "recipeId",
+            "columnName": "recipeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "productId",
+            "columnName": "productId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantityRequired",
+            "columnName": "quantityRequired",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "recipeId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_product_recipes_productId",
+            "unique": false,
+            "columnNames": [
+              "productId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_product_recipes_productId` ON `${TABLE_NAME}` (`productId`)"
+          },
+          {
+            "name": "index_product_recipes_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_product_recipes_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "products",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "productId"
+            ],
+            "referencedColumns": [
+              "productId"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "ingredientId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "inventory",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredientId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `currentStock` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`ingredientId`, `branchId`), FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`ingredientId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentStock",
+            "columnName": "currentStock",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ingredientId",
+            "branchId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_inventory_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          },
+          {
+            "name": "index_inventory_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "ingredientId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "restock_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`restockId` TEXT NOT NULL, `ingredientId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `userId` INTEGER NOT NULL, `quantityAdded` REAL NOT NULL, `supplier` TEXT NOT NULL, `dateTime` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`restockId`), FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`ingredientId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "restockId",
+            "columnName": "restockId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantityAdded",
+            "columnName": "quantityAdded",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supplier",
+            "columnName": "supplier",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTime",
+            "columnName": "dateTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "restockId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_restock_logs_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_restock_logs_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          },
+          {
+            "name": "index_restock_logs_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_restock_logs_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_restock_logs_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_restock_logs_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_restock_logs_dateTime",
+            "unique": false,
+            "columnNames": [
+              "dateTime"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_restock_logs_dateTime` ON `${TABLE_NAME}` (`dateTime`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "ingredientId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          },
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "inventory_adjustments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`adjustmentId` TEXT NOT NULL, `ingredientId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `userId` INTEGER NOT NULL, `adjustmentAmount` REAL NOT NULL, `reason` TEXT NOT NULL, `dateTime` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`adjustmentId`), FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`ingredientId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "adjustmentId",
+            "columnName": "adjustmentId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "adjustmentAmount",
+            "columnName": "adjustmentAmount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTime",
+            "columnName": "dateTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "adjustmentId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_inventory_adjustments_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_adjustments_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          },
+          {
+            "name": "index_inventory_adjustments_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_adjustments_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_inventory_adjustments_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_adjustments_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_inventory_adjustments_dateTime",
+            "unique": false,
+            "columnNames": [
+              "dateTime"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_inventory_adjustments_dateTime` ON `${TABLE_NAME}` (`dateTime`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "ingredientId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          },
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "waste_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`wasteId` TEXT NOT NULL, `ingredientId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `userId` INTEGER NOT NULL, `quantity` REAL NOT NULL, `image` TEXT, `reason` TEXT NOT NULL, `dateTime` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`wasteId`), FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`ingredientId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "wasteId",
+            "columnName": "wasteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantity",
+            "columnName": "quantity",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "image",
+            "columnName": "image",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTime",
+            "columnName": "dateTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "wasteId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_waste_logs_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_waste_logs_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          },
+          {
+            "name": "index_waste_logs_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_waste_logs_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_waste_logs_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_waste_logs_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_waste_logs_dateTime",
+            "unique": false,
+            "columnNames": [
+              "dateTime"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_waste_logs_dateTime` ON `${TABLE_NAME}` (`dateTime`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "ingredientId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          },
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "transactions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`transactionId` TEXT NOT NULL, `userId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `totalAmount` REAL NOT NULL, `paymentType` TEXT NOT NULL, `dateTime` INTEGER NOT NULL, `status` TEXT NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`transactionId`), FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalAmount",
+            "columnName": "totalAmount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paymentType",
+            "columnName": "paymentType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTime",
+            "columnName": "dateTime",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "transactionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_transactions_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transactions_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_transactions_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transactions_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_transactions_dateTime",
+            "unique": false,
+            "columnNames": [
+              "dateTime"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transactions_dateTime` ON `${TABLE_NAME}` (`dateTime`)"
+          },
+          {
+            "name": "index_transactions_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transactions_status` ON `${TABLE_NAME}` (`status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "transaction_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`transactionItemId` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `productId` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, `subtotal` REAL NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`transactionItemId`), FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`transactionId`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`productId`) REFERENCES `products`(`productId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "transactionItemId",
+            "columnName": "transactionItemId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "productId",
+            "columnName": "productId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantity",
+            "columnName": "quantity",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtotal",
+            "columnName": "subtotal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "transactionItemId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_transaction_items_transactionId",
+            "unique": false,
+            "columnNames": [
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaction_items_transactionId` ON `${TABLE_NAME}` (`transactionId`)"
+          },
+          {
+            "name": "index_transaction_items_productId",
+            "unique": false,
+            "columnNames": [
+              "productId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaction_items_productId` ON `${TABLE_NAME}` (`productId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "transactions",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "transactionId"
+            ],
+            "referencedColumns": [
+              "transactionId"
+            ]
+          },
+          {
+            "table": "products",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "productId"
+            ],
+            "referencedColumns": [
+              "productId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "audit_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`logId` TEXT NOT NULL, `userId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `action` TEXT NOT NULL, `tableAffected` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`logId`), FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "logId",
+            "columnName": "logId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tableAffected",
+            "columnName": "tableAffected",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "logId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_audit_logs_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_logs_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_audit_logs_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_logs_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_audit_logs_action",
+            "unique": false,
+            "columnNames": [
+              "action"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_logs_action` ON `${TABLE_NAME}` (`action`)"
+          },
+          {
+            "name": "index_audit_logs_tableAffected",
+            "unique": false,
+            "columnNames": [
+              "tableAffected"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_logs_tableAffected` ON `${TABLE_NAME}` (`tableAffected`)"
+          },
+          {
+            "name": "index_audit_logs_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_audit_logs_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "staff_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`logId` TEXT NOT NULL, `userId` INTEGER NOT NULL, `branchId` INTEGER NOT NULL, `image` TEXT, `clockIn` INTEGER NOT NULL, `clockOut` INTEGER, `lastModified` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `syncedAt` INTEGER, PRIMARY KEY(`logId`), FOREIGN KEY(`userId`) REFERENCES `users`(`userId`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`branchId`) REFERENCES `branches`(`branchId`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "logId",
+            "columnName": "logId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "branchId",
+            "columnName": "branchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "image",
+            "columnName": "image",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "clockIn",
+            "columnName": "clockIn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clockOut",
+            "columnName": "clockOut",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastModified",
+            "columnName": "lastModified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSynced",
+            "columnName": "isSynced",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAt",
+            "columnName": "syncedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "logId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_staff_logs_userId",
+            "unique": false,
+            "columnNames": [
+              "userId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staff_logs_userId` ON `${TABLE_NAME}` (`userId`)"
+          },
+          {
+            "name": "index_staff_logs_branchId",
+            "unique": false,
+            "columnNames": [
+              "branchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staff_logs_branchId` ON `${TABLE_NAME}` (`branchId`)"
+          },
+          {
+            "name": "index_staff_logs_clockIn",
+            "unique": false,
+            "columnNames": [
+              "clockIn"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staff_logs_clockIn` ON `${TABLE_NAME}` (`clockIn`)"
+          },
+          {
+            "name": "index_staff_logs_clockOut",
+            "unique": false,
+            "columnNames": [
+              "clockOut"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_staff_logs_clockOut` ON `${TABLE_NAME}` (`clockOut`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "users",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "userId"
+            ],
+            "referencedColumns": [
+              "userId"
+            ]
+          },
+          {
+            "table": "branches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "branchId"
+            ],
+            "referencedColumns": [
+              "branchId"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e8611f7b7f393b57d4e89d652e85328')"
+    ]
+  }
+}
