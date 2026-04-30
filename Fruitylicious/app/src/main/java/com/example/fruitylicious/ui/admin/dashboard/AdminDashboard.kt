@@ -261,19 +261,46 @@ private fun GreetingCard(
                     )
                 }
 
-                // "Viewing: Branch X" badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFFE8F5E9))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text       = "Viewing: $branchName",
-                        color      = DashGreenPrimary,
-                        fontSize   = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    // "Viewing: Branch X" badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFFE8F5E9))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text       = "Viewing: $branchName",
+                            color      = DashGreenPrimary,
+                            fontSize   = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Online Status Indicator
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFFE8F5E9))
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(RoundedCornerShape(50.dp))
+                                .background(DashGreenPrimary)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Online",
+                            color = DashGreenPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
