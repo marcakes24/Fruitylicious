@@ -63,4 +63,7 @@ interface InventoryAdjustmentDao {
 
     @Query("DELETE FROM inventory_adjustments WHERE adjustmentId = :adjustmentId")
     suspend fun deleteAdjustment(adjustmentId: String)
+
+    @Query("SELECT * FROM inventory_adjustments ORDER BY dateTime DESC")
+    fun observeAllAdjustments(): Flow<List<InventoryAdjustmentEntity>>
 }

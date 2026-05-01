@@ -7,8 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
 import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
-import com.example.fruitylicious.ui.admin.inventory.AdminAdjustmentScreen
-import com.example.fruitylicious.ui.admin.inventory.AdminInventoryScreen
+import com.example.fruitylicious.ui.admin.inventory.InventoryMonitoringScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
 import com.example.fruitylicious.ui.admin.reports.InventoryReportScreen
@@ -18,13 +17,14 @@ import com.example.fruitylicious.ui.admin.reports.SalesReportScreen
 import com.example.fruitylicious.ui.admin.reports.TransactionReportScreen
 import com.example.fruitylicious.ui.admin.reports.WasteReportScreen
 import com.example.fruitylicious.ui.admin.restock.AdminRestockEntryScreen
-import com.example.fruitylicious.ui.admin.restock.AdminRestockHistoryScreen
+import com.example.fruitylicious.ui.admin.restock.RestockScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogsScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserFormScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.UserListScreen
 import com.example.fruitylicious.ui.admin.system.AuditLogsScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteEntryScreen
 import com.example.fruitylicious.ui.admin.waste.AdminWasteHistoryScreen
+import com.example.fruitylicious.ui.admin.inventory.InventoryAdjustmentScreen
 import com.example.fruitylicious.ui.auth.LoginScreen
 import com.example.fruitylicious.ui.staff.adjustment.AdjustmentScreen
 import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
@@ -60,7 +60,6 @@ const val ADMIN_DASHBOARD = "admin_dashboard"
 const val ADMIN_PRODUCTS = "admin_products"
 const val ADMIN_INGREDIENTS = "admin_ingredients"
 const val ADMIN_RECIPES = "admin_recipes"
-const val ADMIN_RECIPE_FORM = "admin_recipe_form"
 const val ADMIN_INVENTORY = "admin_inventory"
 const val ADMIN_ADJUSTMENT = "admin_adjustment"
 const val ADMIN_WASTE_ENTRY = "admin_waste_entry"
@@ -213,15 +212,14 @@ fun FruityliciousNavGraph(
         }
 
         composable(ADMIN_INVENTORY) {
-            AdminInventoryScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onBack = { navController.popBackStack() }
+            InventoryMonitoringScreen(
+                navController = navController
             )
         }
 
         composable(ADMIN_ADJUSTMENT) {
-            AdminAdjustmentScreen(
-                onBack = { navController.popBackStack() }
+            InventoryAdjustmentScreen(
+                navController = navController
             )
         }
 
@@ -245,9 +243,8 @@ fun FruityliciousNavGraph(
         }
 
         composable(ADMIN_RESTOCK_HISTORY) {
-            AdminRestockHistoryScreen(
-                onNavigate = { route -> navController.navigate(route) },
-                onBack = { navController.popBackStack() }
+            RestockScreen(
+                navController = navController
             )
         }
 

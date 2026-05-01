@@ -110,4 +110,9 @@ interface InventoryDao {
 
     @Query("DELETE FROM inventory WHERE ingredientId = :ingredientId AND branchId = :branchId")
     suspend fun deleteInventoryItem(ingredientId: Int, branchId: Int)
+
+    @Query("SELECT * FROM inventory ORDER BY branchId ASC, ingredientId ASC")
+    fun observeAllInventory(): Flow<List<InventoryEntity>>
+
+
 }

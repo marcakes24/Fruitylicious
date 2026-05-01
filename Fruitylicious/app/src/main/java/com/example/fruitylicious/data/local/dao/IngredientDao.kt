@@ -41,4 +41,7 @@ interface IngredientDao {
 
     @Query("DELETE FROM ingredients WHERE ingredientId = :ingredientId")
     suspend fun deleteIngredient(ingredientId: Int)
+
+    @Query("SELECT * FROM ingredients ORDER BY ingredientName ASC")
+    fun observeIngredients(): Flow<List<IngredientEntity>>
 }

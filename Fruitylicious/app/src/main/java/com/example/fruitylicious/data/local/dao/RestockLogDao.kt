@@ -55,4 +55,7 @@ interface RestockLogDao {
 
     @Query("DELETE FROM restock_logs WHERE restockId = :restockId")
     suspend fun deleteRestockLog(restockId: String)
+
+    @Query("SELECT * FROM restock_logs ORDER BY dateTime DESC")
+    fun observeAllRestockLogs(): Flow<List<RestockLogEntity>>
 }
