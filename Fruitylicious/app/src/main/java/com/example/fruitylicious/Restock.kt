@@ -35,7 +35,8 @@ data class RestockEntryItem(
     val date: String,
     val time: String,
     val quantity: String,
-    val branch: String
+    val branch: String,
+    val note: String? = null
 )
 
 data class RestockIngredient(
@@ -58,13 +59,14 @@ fun RestockScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateText by remember { mutableStateOf("") }
     var selectedBranch by remember { mutableStateOf("B1") }
+    var selectedEntryForNote by remember { mutableStateOf<RestockEntryItem?>(null) }
 
     // Functional State for History
     val restockHistory = remember {
         mutableStateListOf(
-            RestockEntryItem("Avocado", "Sackma Diy", "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs", "B1"),
+            RestockEntryItem("Avocado", "Sackma Diy", "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs", "B1", "Received in good condition."),
             RestockEntryItem("Avocado", null, "Staff User", "4/14/2026", "12:38 AM", "+ 20 pcs", "B2"),
-            RestockEntryItem("Evap", null, "Staff User", "4/15/2026", "12:38 AM", "+ 12 can", "B1"),
+            RestockEntryItem("Evap", null, "Staff User", "4/15/2026", "12:38 AM", "+ 12 can", "B1", "New batch expiration 2027."),
             RestockEntryItem("Pearl", null, "Admin User", "4/13/2026", "12:38 AM", "+ 10 pack", "B1")
         )
     }
@@ -291,7 +293,7 @@ fun RestockScreen(
                             }
                         } else {
                             filteredHistory.forEachIndexed { index, entry ->
-                                RestockRecordRow(entry)
+                                RestockRecordRow(entry, onClick = { selectedEntryForNote = it })
                                 if (index < filteredHistory.size - 1) {
                                     HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
                                 }
@@ -313,13 +315,21 @@ fun RestockScreen(
             currentBranch = if (selectedBranch == "All") "B1" else selectedBranch
         )
     }
+
+    selectedEntryForNote?.let { entry ->
+        RestockNoteDialog(
+            entry = entry,
+            onDismiss = { selectedEntryForNote = null }
+        )
+    }
 }
 
 @Composable
-fun RestockRecordRow(entry: RestockEntryItem) {
+fun RestockRecordRow(entry: RestockEntryItem, onClick: (RestockEntryItem) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick(entry) }
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -364,6 +374,75 @@ fun RestockRecordRow(entry: RestockEntryItem) {
                 fontSize = 11.sp,
                 color = Color.Gray
             )
+        }
+    }
+}
+
+@Composable
+fun RestockNoteDialog(
+    entry: RestockEntryItem,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = "Restock Note", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                        Text(text = "Additional details for this entry", fontSize = 13.sp, color = Color(0xFF64748B))
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text("Ingredient", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(entry.ingredient, fontSize = 15.sp, color = Color(0xFF1E293B), fontWeight = FontWeight.Medium)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Additional Notes", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (entry.note.isNullOrBlank()) "no notes" else entry.note,
+                            fontSize = 14.sp,
+                            color = if (entry.note.isNullOrBlank()) Color.LightGray else Color(0xFF334155)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(52.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                ) {
+                    Text(text = "Close", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -489,7 +568,8 @@ fun RestockEntryDialog(
                                 date = SimpleDateFormat("M/d/yyyy", Locale.getDefault()).format(now),
                                 time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(now),
                                 quantity = "+ $quantity $unit",
-                                branch = currentBranch
+                                branch = currentBranch,
+                                note = note.takeIf { it.isNotBlank() }
                             ))
                         }
                     },
