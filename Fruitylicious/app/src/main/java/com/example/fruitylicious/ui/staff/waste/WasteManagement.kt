@@ -40,7 +40,8 @@ data class WasteHistoryItem(
     val time: String,
     val quantity: String,
     val branch: String,
-    val imageRes: Int? = null
+    val imageRes: Int? = null,
+    val reason: String? = null
 )
 
 // ── MAIN SCREEN ─────────────────────────────────────────────────────────────
@@ -58,12 +59,13 @@ fun WasteManagementScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateText by remember { mutableStateOf("") }
     var selectedBranch by remember { mutableStateOf("All") }
+    var selectedEntryForReason by remember { mutableStateOf<WasteHistoryItem?>(null) }
 
     // State list for waste history to make it functional
     val wasteHistory = remember { 
         mutableStateListOf(
-            WasteHistoryItem("Avocado", "Staff User", "04/14/2026", "12:38 AM", "- 20 pcs", "B1", R.drawable.avocado),
-            WasteHistoryItem("Evap", "Staff User", "04/15/2026", "12:38 AM", "- 12 can", "B2", R.drawable.evap),
+            WasteHistoryItem("Avocado", "Staff User", "04/14/2026", "12:38 AM", "- 20 pcs", "B1", R.drawable.avocado, "Overripe and bruised."),
+            WasteHistoryItem("Evap", "Staff User", "04/15/2026", "12:38 AM", "- 12 can", "B2", R.drawable.evap, "Expired batch."),
             WasteHistoryItem("Pearl", "Admin User", "04/13/2026", "12:38 AM", "- 10 pack", "B1", R.drawable.pearl),
             WasteHistoryItem("Pearl", "Admin User", "04/13/2026", "12:38 AM", "- 10 pack", "B2", R.drawable.pearl)
         )
@@ -302,7 +304,7 @@ fun WasteManagementScreen(
                             }
                         } else {
                             filteredHistory.forEachIndexed { index, entry ->
-                                WasteRecordRow(entry)
+                                WasteRecordRow(entry, onClick = { selectedEntryForReason = it })
                                 if (index < filteredHistory.size - 1) {
                                     HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
                                 }
@@ -327,15 +329,23 @@ fun WasteManagementScreen(
             currentBranch = if (selectedBranch == "All") "B1" else selectedBranch
         )
     }
+
+    selectedEntryForReason?.let { entry ->
+        WasteReasonDialog(
+            entry = entry,
+            onDismiss = { selectedEntryForReason = null }
+        )
+    }
 }
 
 // ── COMPONENT: WASTE HISTORY ITEM ROW ───────────────────────────────────────
 
 @Composable
-fun WasteRecordRow(entry: WasteHistoryItem) {
+fun WasteRecordRow(entry: WasteHistoryItem, onClick: (WasteHistoryItem) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick(entry) }
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -401,6 +411,77 @@ fun WasteRecordRow(entry: WasteHistoryItem) {
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8)
                 )
+            }
+        }
+    }
+}
+
+// ── COMPONENT: WASTE REASON DIALOG (POPUP) ───────────────────────────────────
+
+@Composable
+fun WasteReasonDialog(
+    entry: WasteHistoryItem,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = "Waste Reason", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                        Text(text = "Additional details for this waste entry", fontSize = 13.sp, color = Color(0xFF64748B))
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text("Ingredient", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(entry.ingredient, fontSize = 15.sp, color = Color(0xFF1E293B), fontWeight = FontWeight.Medium)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Reason", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (entry.reason.isNullOrBlank()) "no notes" else entry.reason,
+                            fontSize = 14.sp,
+                            color = if (entry.reason.isNullOrBlank()) Color.LightGray else Color(0xFF334155)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(52.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                ) {
+                    Text(text = "Close", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -593,7 +674,8 @@ fun WasteEntryDialog(
                                     "Evap" -> R.drawable.evap
                                     "Pearl" -> R.drawable.pearl
                                     else -> null
-                                }
+                                },
+                                reason = reason.takeIf { it.isNotBlank() }
                             )
                             onAddEntry(newItem)
                         } 
