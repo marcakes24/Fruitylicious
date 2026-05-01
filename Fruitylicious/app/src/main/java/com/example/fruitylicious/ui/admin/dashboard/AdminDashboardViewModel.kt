@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.admin.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.repository.InventoryRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
 import com.example.fruitylicious.domain.usecase.auth.LogoutUseCase
 import com.example.fruitylicious.util.BranchConfig
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -24,8 +26,11 @@ import javax.inject.Inject
 data class AdminDashboardUiState(
     val userName: String = "",
     val selectedBranch: String = "B1",
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val dateText: String = "",
     val isOnline: Boolean = false,
+    val hasNotifications: Boolean = false,
     val weeklySalesData: List<Float> = List(7) { 0f },
     val weeklyTotalSales: Double = 0.0,
     val weeklyTransactionCount: Int = 0,
@@ -38,6 +43,7 @@ class AdminDashboardViewModel @Inject constructor(
     private val branchConfig: BranchConfig,
     private val networkMonitor: NetworkMonitor,
     private val transactionRepository: TransactionRepository,
+    private val inventoryRepository: InventoryRepository,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
@@ -47,6 +53,8 @@ class AdminDashboardViewModel @Inject constructor(
         AdminDashboardUiState(
             userName = sessionManager.getUserName().ifBlank { "Admin User" },
             selectedBranch = "B${branchConfig.branchId}",
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}",
             dateText = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US).format(Date())
         )
     )
@@ -56,6 +64,7 @@ class AdminDashboardViewModel @Inject constructor(
     init {
         observeNetwork()
         observeWeeklySales(_uiState.value.selectedBranch)
+        observeNotifications()
     }
 
     fun onBranchSelected(branch: String) {
@@ -75,6 +84,19 @@ class AdminDashboardViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(isOnline = isOnline)
                 }
+            }
+        }
+    }
+
+    private fun observeNotifications() {
+        viewModelScope.launch {
+            combine(
+                inventoryRepository.observeLowStockItems(1),
+                inventoryRepository.observeLowStockItems(2)
+            ) { b1, b2 ->
+                b1.isNotEmpty() || b2.isNotEmpty()
+            }.collectLatest { hasNotifs ->
+                _uiState.update { it.copy(hasNotifications = hasNotifs) }
             }
         }
     }

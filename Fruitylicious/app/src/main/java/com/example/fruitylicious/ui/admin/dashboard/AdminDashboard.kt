@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.ADMIN_INGREDIENTS
+import com.example.fruitylicious.ADMIN_NOTIFICATIONS
 import com.example.fruitylicious.ADMIN_PRODUCTS
 import com.example.fruitylicious.ADMIN_RECIPES
 import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
@@ -87,7 +88,11 @@ fun AdminDashboardScreen(
         ) {
             DashboardHeader(
                 selectedBranch = uiState.selectedBranch,
+                hasNotifications = uiState.hasNotifications,
                 onBranchSelect = viewModel::onBranchSelected,
+                onNotificationsClick = {
+                    navController.navigate(ADMIN_NOTIFICATIONS)
+                },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
@@ -139,14 +144,16 @@ fun AdminDashboardScreen(
 @Composable
 private fun DashboardHeader(
     selectedBranch: String,
+    hasNotifications: Boolean,
     onBranchSelect: (String) -> Unit,
+    onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(DashGreenPrimary)
-            .padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
+            .padding(start = 8.dp, end = 16.dp, top = 48.dp, bottom = 14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -160,31 +167,46 @@ private fun DashboardHeader(
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
             Text(
                 text = "DASHBOARD",
                 color = Color.White,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
 
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Notifications",
-                    tint = Color.White
-                )
+            IconButton(
+                onClick = onNotificationsClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (hasNotifications) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.Red)
+                            )
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFFF5F5F5))
-                    .padding(4.dp)
+                    .padding(3.dp)
             ) {
                 listOf("B1", "B2", "All").forEach { branch ->
                     val isSelected = selectedBranch == branch
@@ -194,13 +216,13 @@ private fun DashboardHeader(
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (isSelected) DashGreenPrimary else Color.Transparent)
                             .clickable { onBranchSelect(branch) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = branch,
                             color = if (isSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -236,15 +258,16 @@ private fun GreetingCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Hello, ${adminName.ifBlank { "Admin User" }}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        maxLines = 1
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -266,7 +289,7 @@ private fun GreetingCard(
                         Text(
                             text = "Viewing: $branchName",
                             color = DashGreenPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -292,7 +315,7 @@ private fun GreetingCard(
                         Text(
                             text = if (isOnline) "Online" else "Offline",
                             color = if (isOnline) DashGreenPrimary else Color.Gray,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -301,14 +324,16 @@ private fun GreetingCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(DashGreenDark)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Ready to serve?",
                         color = Color.White,
@@ -319,15 +344,14 @@ private fun GreetingCard(
                     Text(
                         text = "Open POS to start taking orders.",
                         color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 13.sp
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
                     )
                 }
 
                 Button(
                     onClick = onStartPos,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .height(44.dp),
+                    modifier = Modifier.height(40.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp)
@@ -336,15 +360,15 @@ private fun GreetingCard(
                         imageVector = Icons.Outlined.ShoppingCart,
                         contentDescription = null,
                         tint = DashGreenPrimary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
 
                     Spacer(modifier = Modifier.width(6.dp))
 
                     Text(
-                        text = "Start POS",
+                        text = "POS",
                         color = DashGreenPrimary,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

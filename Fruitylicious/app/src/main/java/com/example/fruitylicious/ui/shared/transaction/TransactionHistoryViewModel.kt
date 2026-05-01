@@ -52,6 +52,8 @@ data class TransactionHistoryRow(
 
 data class TransactionHistoryUiState(
     val transactions: List<TransactionHistoryRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -70,7 +72,12 @@ class TransactionHistoryViewModel @Inject constructor(
     private val branchConfig: BranchConfig
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(TransactionHistoryUiState())
+    private val _uiState = MutableStateFlow(
+        TransactionHistoryUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
     private var transactions: List<TransactionEntity> = emptyList()

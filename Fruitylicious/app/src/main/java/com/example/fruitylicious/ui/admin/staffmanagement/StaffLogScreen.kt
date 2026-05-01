@@ -72,7 +72,9 @@ fun StaffLogScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var selectedBranch by remember { mutableStateOf("All") }
+    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
+        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+    }
     var searchQuery by remember { mutableStateOf("") }
 
     val filteredLogs = uiState.logs.filter { log ->
@@ -113,6 +115,7 @@ fun StaffLogScreen(
         ) {
             Header(
                 selectedBranch = selectedBranch,
+                isAdmin = uiState.isAdmin,
                 onBranchSelect = { selectedBranch = it },
                 onMenuClick = {
                     scope.launch {
@@ -161,6 +164,7 @@ fun StaffLogScreen(
 @Composable
 private fun Header(
     selectedBranch: String,
+    isAdmin: Boolean,
     onBranchSelect: (String) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -191,31 +195,33 @@ private fun Header(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            if (isAdmin) {
+                Spacer(modifier = Modifier.weight(1f))
 
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF5F5F5))
-                    .padding(4.dp)
-            ) {
-                listOf("B1", "B2", "All").forEach { branch ->
-                    val isSelected = selectedBranch == branch
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFF5F5F5))
+                        .padding(4.dp)
+                ) {
+                    listOf("B1", "B2", "All").forEach { branch ->
+                        val isSelected = selectedBranch == branch
 
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) SlGreen else Color.Transparent)
-                            .clickable { onBranchSelect(branch) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = branch,
-                            color = if (isSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) SlGreen else Color.Transparent)
+                                .clickable { onBranchSelect(branch) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = branch,
+                                color = if (isSelected) Color.White else Color(0xFF666E7A),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

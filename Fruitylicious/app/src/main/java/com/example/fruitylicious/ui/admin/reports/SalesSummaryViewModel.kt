@@ -3,6 +3,8 @@ package com.example.fruitylicious.ui.admin.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.TransactionDao
+import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +16,8 @@ import javax.inject.Inject
 
 data class SalesSummaryUiState(
     val selectedBranch: String = "All",
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val todaySales: Double = 0.0,
     val yesterdaySales: Double = 0.0,
     val weekData: List<Double> = List(7) { 0.0 },
@@ -28,14 +32,21 @@ data class SalesSummaryUiState(
 
 @HiltViewModel
 class SalesSummaryViewModel @Inject constructor(
-    private val transactionDao: TransactionDao
+    private val transactionDao: TransactionDao,
+    private val sessionManager: SessionManager,
+    private val branchConfig: BranchConfig
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SalesSummaryUiState())
+    private val _uiState = MutableStateFlow(
+        SalesSummaryUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<SalesSummaryUiState> = _uiState.asStateFlow()
 
     init {
-        loadSummary("All")
+        loadSummary(if (_uiState.value.isAdmin) "All" else _uiState.value.userBranchId)
     }
 
     fun onBranchSelected(branch: String) {

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fruitylicious.STAFF_INVENTORY
+import com.example.fruitylicious.STAFF_NOTIFICATIONS
 import com.example.fruitylicious.STAFF_POS
 import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
 import com.example.fruitylicious.STAFF_SALES_SUMMARY
@@ -93,6 +94,10 @@ fun StaffDashboardScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             StaffDashboardHeader(
+                hasNotifications = uiState.hasNotifications,
+                onNotificationsClick = {
+                    navController.navigate(STAFF_NOTIFICATIONS)
+                },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
@@ -145,6 +150,8 @@ fun StaffDashboardScreen(
 
 @Composable
 private fun StaffDashboardHeader(
+    hasNotifications: Boolean,
+    onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -175,12 +182,29 @@ private fun StaffDashboardHeader(
                 modifier = Modifier.weight(1f)
             )
 
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Notifications",
-                    tint = Color.White
-                )
+            IconButton(
+                onClick = onNotificationsClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (hasNotifications) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.Red)
+                            )
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
@@ -205,15 +229,16 @@ private fun StaffGreetingCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Hello, $staffName",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = StaffTextPrimary
+                        color = StaffTextPrimary,
+                        maxLines = 1
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -235,7 +260,7 @@ private fun StaffGreetingCard(
                         Text(
                             text = branchName,
                             color = StaffGreenPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -261,7 +286,7 @@ private fun StaffGreetingCard(
                         Text(
                             text = if (isOnline) "Online" else "Offline",
                             color = if (isOnline) StaffGreenPrimary else Color.Gray,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -270,14 +295,16 @@ private fun StaffGreetingCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(StaffGreenDark)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Ready to serve?",
                         color = Color.White,
@@ -288,15 +315,14 @@ private fun StaffGreetingCard(
                     Text(
                         text = "Open POS to start taking orders.",
                         color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 13.sp
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
                     )
                 }
 
                 Button(
                     onClick = onStartPos,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .height(44.dp),
+                    modifier = Modifier.height(40.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp)
@@ -305,15 +331,15 @@ private fun StaffGreetingCard(
                         imageVector = Icons.Outlined.ShoppingCart,
                         contentDescription = null,
                         tint = StaffGreenPrimary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
 
                     Spacer(modifier = Modifier.width(6.dp))
 
                     Text(
-                        text = "Start POS",
+                        text = "POS",
                         color = StaffGreenPrimary,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

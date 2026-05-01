@@ -97,7 +97,6 @@ fun ManageIngredientsScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var selectedBranch by remember { mutableStateOf("B1") }
     var searchQuery by remember { mutableStateOf("") }
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -133,8 +132,6 @@ fun ManageIngredientsScreen(
                     .background(MiPageBg)
             ) {
                 MiHeader(
-                    selectedBranch = selectedBranch,
-                    onBranchSelect = { selectedBranch = it },
                     onMenuClick = {
                         scope.launch {
                             drawerState.open()
@@ -833,8 +830,6 @@ private fun RowButtons(
 
 @Composable
 private fun MiHeader(
-    selectedBranch: String,
-    onBranchSelect: (String) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -869,34 +864,6 @@ private fun MiHeader(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFFF5F5F5))
-                .padding(4.dp)
-        ) {
-            listOf("B1", "B2", "All").forEach { branch ->
-                val isSelected = selectedBranch == branch
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) MiGreen else Color.Transparent)
-                        .clickable { onBranchSelect(branch) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = branch,
-                        color = if (isSelected) Color.White else Color(0xFF666E7A),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
     }
 }

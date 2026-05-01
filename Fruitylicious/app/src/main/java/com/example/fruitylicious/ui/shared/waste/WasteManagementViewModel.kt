@@ -45,6 +45,8 @@ data class WasteHistoryRow(
 data class WasteManagementUiState(
     val ingredients: List<WasteIngredientRow> = emptyList(),
     val history: List<WasteHistoryRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -61,7 +63,12 @@ class WasteManagementViewModel @Inject constructor(
     private val branchConfig: BranchConfig
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(WasteManagementUiState())
+    private val _uiState = MutableStateFlow(
+        WasteManagementUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<WasteManagementUiState> = _uiState.asStateFlow()
 
     private var inventory: List<InventoryEntity> = emptyList()

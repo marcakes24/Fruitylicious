@@ -6,6 +6,7 @@ import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,8 @@ data class StaffLogRow(
 
 data class StaffLogUiState(
     val logs: List<StaffLogRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null
 )
@@ -34,10 +37,16 @@ data class StaffLogUiState(
 @HiltViewModel
 class StaffLogViewModel @Inject constructor(
     private val staffLogDao: StaffLogDao,
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(StaffLogUiState())
+    private val _uiState = MutableStateFlow(
+        StaffLogUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<StaffLogUiState> = _uiState.asStateFlow()
 
     private var staffLogs: List<StaffLogEntity> = emptyList()

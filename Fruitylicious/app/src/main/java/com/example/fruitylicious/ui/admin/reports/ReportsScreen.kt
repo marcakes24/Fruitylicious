@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import kotlinx.coroutines.launch
@@ -61,14 +62,17 @@ enum class ReportTab(val label: String) {
 @Composable
 fun ReportsScreen(
     navController: NavController,
-    adminName: String = "Admin User",
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    viewModel: ReportsViewModel = hiltViewModel()
 ) {
+    val uiState = viewModel.uiState
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableStateOf(ReportTab.SALES) }
-    var selectedBranch by remember { mutableStateOf("All") }
+    var selectedBranch by remember { 
+        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -81,7 +85,7 @@ fun ReportsScreen(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    adminName = uiState.adminName,
                     onLogout = onLogout
                 )
             }
@@ -94,6 +98,7 @@ fun ReportsScreen(
         ) {
             ReportsHeader(
                 selectedBranch = selectedBranch,
+                isAdmin = uiState.isAdmin,
                 onBranchSelected = { selectedBranch = it },
                 onMenuClick = {
                     scope.launch {
@@ -142,6 +147,7 @@ fun ReportsScreen(
 @Composable
 private fun ReportsHeader(
     selectedBranch: String,
+    isAdmin: Boolean,
     onBranchSelected: (String) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -171,29 +177,31 @@ private fun ReportsHeader(
             modifier = Modifier.weight(1f)
         )
 
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.White)
-                .padding(2.dp)
-        ) {
-            listOf("B1", "B2", "All").forEach { branch ->
-                val isSelected = selectedBranch == branch
+        if (isAdmin) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White)
+                    .padding(2.dp)
+            ) {
+                listOf("B1", "B2", "All").forEach { branch ->
+                    val isSelected = selectedBranch == branch
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (isSelected) RptGreen else Color.Transparent)
-                        .clickable { onBranchSelected(branch) }
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = branch,
-                        color = if (isSelected) Color.White else RptTextSub,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (isSelected) RptGreen else Color.Transparent)
+                            .clickable { onBranchSelected(branch) }
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = branch,
+                            color = if (isSelected) Color.White else RptTextSub,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

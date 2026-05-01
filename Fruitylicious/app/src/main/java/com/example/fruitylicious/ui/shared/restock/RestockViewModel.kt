@@ -45,6 +45,8 @@ data class RestockHistoryRow(
 data class RestockUiState(
     val ingredients: List<RestockIngredientRow> = emptyList(),
     val history: List<RestockHistoryRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -61,7 +63,12 @@ class RestockViewModel @Inject constructor(
     private val branchConfig: BranchConfig
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(RestockUiState())
+    private val _uiState = MutableStateFlow(
+        RestockUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<RestockUiState> = _uiState.asStateFlow()
 
     private var ingredients: List<IngredientEntity> = emptyList()

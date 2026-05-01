@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.staff.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.repository.InventoryRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
 import com.example.fruitylicious.domain.usecase.auth.LogoutUseCase
 import com.example.fruitylicious.util.BranchConfig
@@ -26,6 +27,7 @@ data class StaffDashboardUiState(
     val userName: String = "",
     val branchId: Int = 0,
     val isOnline: Boolean = false,
+    val hasNotifications: Boolean = false,
     val dateText: String = "",
     val weeklySalesData: List<Float> = List(7) { 0f },
     val weeklyTotalSales: Double = 0.0,
@@ -39,6 +41,7 @@ class StaffDashboardViewModel @Inject constructor(
     private val branchConfig: BranchConfig,
     private val networkMonitor: NetworkMonitor,
     private val transactionRepository: TransactionRepository,
+    private val inventoryRepository: InventoryRepository,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
@@ -59,6 +62,7 @@ class StaffDashboardViewModel @Inject constructor(
     init {
         observeNetwork()
         observeWeeklySales()
+        observeNotifications()
     }
 
     private fun observeNetwork() {
@@ -67,6 +71,14 @@ class StaffDashboardViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(isOnline = isOnline)
                 }
+            }
+        }
+    }
+
+    private fun observeNotifications() {
+        viewModelScope.launch {
+            inventoryRepository.observeLowStockItems(branchId).collectLatest { items ->
+                _uiState.update { it.copy(hasNotifications = items.isNotEmpty()) }
             }
         }
     }

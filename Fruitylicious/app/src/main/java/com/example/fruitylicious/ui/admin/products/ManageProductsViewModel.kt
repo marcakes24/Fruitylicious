@@ -6,6 +6,7 @@ import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.data.repository.ProductVariantRepository
 import com.example.fruitylicious.domain.usecase.admin.ManageProductUseCase
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,8 @@ data class ManageProductsUiState(
     val addons: List<ProductEntity> = emptyList(),
     val variants: List<ProductVariantEntity> = emptyList(),
     val productRows: List<ProductVariantRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -34,10 +37,16 @@ data class ManageProductsUiState(
 @HiltViewModel
 class ManageProductsViewModel @Inject constructor(
     private val manageProductUseCase: ManageProductUseCase,
-    private val productVariantRepository: ProductVariantRepository
+    private val productVariantRepository: ProductVariantRepository,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ManageProductsUiState())
+    private val _uiState = MutableStateFlow(
+        ManageProductsUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<ManageProductsUiState> = _uiState.asStateFlow()
 
     init {

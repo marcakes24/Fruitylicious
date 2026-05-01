@@ -6,6 +6,7 @@ import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,8 @@ data class InventoryMonitoringRow(
 
 data class InventoryMonitoringUiState(
     val rows: List<InventoryMonitoringRow> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null
 )
@@ -51,10 +54,16 @@ data class InventoryMonitoringUiState(
 @HiltViewModel
 class InventoryMonitoringViewModel @Inject constructor(
     private val inventoryDao: InventoryDao,
-    private val ingredientDao: IngredientDao
+    private val ingredientDao: IngredientDao,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(InventoryMonitoringUiState())
+    private val _uiState = MutableStateFlow(
+        InventoryMonitoringUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<InventoryMonitoringUiState> = _uiState.asStateFlow()
 
     private var inventoryItems = emptyList<InventoryEntity>()

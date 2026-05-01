@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.domain.usecase.admin.ManageIngredientUseCase
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ import kotlin.math.absoluteValue
 
 data class ManageIngredientsUiState(
     val ingredients: List<IngredientEntity> = emptyList(),
+    val isAdmin: Boolean = false,
+    val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -23,10 +26,16 @@ data class ManageIngredientsUiState(
 
 @HiltViewModel
 class ManageIngredientsViewModel @Inject constructor(
-    private val manageIngredientUseCase: ManageIngredientUseCase
+    private val manageIngredientUseCase: ManageIngredientUseCase,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ManageIngredientsUiState())
+    private val _uiState = MutableStateFlow(
+        ManageIngredientsUiState(
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            userBranchId = "B${sessionManager.getBranchId()}"
+        )
+    )
     val uiState: StateFlow<ManageIngredientsUiState> = _uiState.asStateFlow()
 
     init {

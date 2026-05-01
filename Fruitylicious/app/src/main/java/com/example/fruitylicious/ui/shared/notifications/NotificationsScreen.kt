@@ -76,7 +76,9 @@ fun NotificationsScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var selectedBranch by remember { mutableStateOf("All") }
+    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
+        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+    }
 
     val filteredNotifications = uiState.notifications.filter { item ->
         when (selectedBranch) {
@@ -112,6 +114,7 @@ fun NotificationsScreen(
         ) {
             Header(
                 selectedBranch = selectedBranch,
+                isAdmin = uiState.isAdmin,
                 onBranchSelected = { selectedBranch = it },
                 onMenuClick = {
                     scope.launch {
@@ -163,6 +166,7 @@ fun NotificationsScreen(
 @Composable
 private fun Header(
     selectedBranch: String,
+    isAdmin: Boolean,
     onBranchSelected: (String) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -192,29 +196,31 @@ private fun Header(
                 modifier = Modifier.weight(1f)
             )
 
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF5F5F5))
-                    .padding(4.dp)
-            ) {
-                listOf("B1", "B2", "All").forEach { branch ->
-                    val isSelected = selectedBranch == branch
+            if (isAdmin) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFF5F5F5))
+                        .padding(4.dp)
+                ) {
+                    listOf("B1", "B2", "All").forEach { branch ->
+                        val isSelected = selectedBranch == branch
 
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) NotifGreen else Color.Transparent)
-                            .clickable { onBranchSelected(branch) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = branch,
-                            color = if (isSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) NotifGreen else Color.Transparent)
+                                .clickable { onBranchSelected(branch) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = branch,
+                                color = if (isSelected) Color.White else Color(0xFF666E7A),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
