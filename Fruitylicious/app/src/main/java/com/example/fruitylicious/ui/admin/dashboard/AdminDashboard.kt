@@ -61,6 +61,7 @@ private val ChartBar = Color(0xFFE53935)
 private val TextPrimary = Color(0xFF1A1A1A)
 private val TextSecondary = Color(0xFF757575)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(
     navController: NavController,

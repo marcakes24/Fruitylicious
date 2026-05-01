@@ -3,6 +3,7 @@ package com.example.fruitylicious.ui.admin.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.repository.InventoryRepository
+import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
 import com.example.fruitylicious.domain.usecase.auth.LogoutUseCase
 import com.example.fruitylicious.util.BranchConfig
@@ -34,7 +35,10 @@ data class AdminDashboardUiState(
     val weeklySalesData: List<Float> = List(7) { 0f },
     val weeklyTotalSales: Double = 0.0,
     val weeklyTransactionCount: Int = 0,
-    val error: String? = null
+    val error: String? = null,
+    val isSyncing: Boolean = false,
+    val syncMessage: String? = null,
+    val syncError: String? = null
 )
 
 @HiltViewModel
@@ -44,7 +48,8 @@ class AdminDashboardViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val transactionRepository: TransactionRepository,
     private val inventoryRepository: InventoryRepository,
-    private val logoutUseCase: LogoutUseCase
+    private val logoutUseCase: LogoutUseCase,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private var salesJob: Job? = null
@@ -183,6 +188,60 @@ class AdminDashboardViewModel @Inject constructor(
             Calendar.SATURDAY -> 5
             Calendar.SUNDAY -> 6
             else -> 0
+        }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            if (!networkMonitor.isOnline()) {
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = null,
+                        syncError = "Cannot sync. Device is offline."
+                    )
+                }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    isSyncing = true,
+                    syncMessage = null,
+                    syncError = null
+                )
+            }
+
+            val lastPulledAt = sessionManager.getLastPulledAt()
+            val result = syncRepository.sync(lastPulledAt)
+            val completedAt = System.currentTimeMillis()
+
+            sessionManager.saveSyncStatus(
+                syncedAt = completedAt,
+                success = result.success,
+                message = result.message
+            )
+
+            if (result.success) {
+                sessionManager.saveLastPulledAt(completedAt)
+            }
+
+            _uiState.update {
+                it.copy(
+                    isSyncing = false,
+                    syncMessage = if (result.success) result.message else null,
+                    syncError = if (result.success) null else result.message
+                )
+            }
+        }
+    }
+
+    fun clearSyncMessage() {
+        _uiState.update {
+            it.copy(
+                syncMessage = null,
+                syncError = null
+            )
         }
     }
 }

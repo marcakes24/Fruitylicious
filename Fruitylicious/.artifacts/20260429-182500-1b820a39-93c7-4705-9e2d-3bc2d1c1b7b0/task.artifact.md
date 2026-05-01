@@ -1,0 +1,34 @@
+# Tasks
+
+- [x] Research and Planning
+	- [x] Identify screens with branch picker
+	- [x] Analyze user roles and session management
+	- [x] Create implementation plan
+- [x] Update ViewModels to provide user role and branch info
+	- [x] Update AdminDashboardViewModel
+	- [x] Update SalesSummaryViewModel (Admin)
+	- [x] Update StaffLogViewModel (Admin)
+	- [x] Update AuditLogViewModel
+	- [x] Update ManageIngredientsViewModel
+	- [x] Update ManageProductsViewModel
+	- [x] Update InventoryMonitoringViewModel
+	- [x] Update NotificationsViewModel
+	- [x] Update RestockViewModel
+	- [x] Update TransactionHistoryViewModel
+	- [x] Update WasteManagementViewModel
+- [x] Update Screens to hide branch picker for staff
+	- [x] Update AdminDashboard
+	- [x] Update ReportsScreen
+	- [x] Update SalesSummaryScreen (Admin)
+	- [x] Update StaffLogScreen (Admin)
+	- [x] Update AuditLogScreen
+	- [x] Update ManageIngredientScreen
+	- [x] Update ManageProductsScreen
+	- [x] Update InventoryMonitoringScreen
+	- [x] Update NotificationsScreen
+	- [x] Update RestockScreen
+	- [x] Update TransactionHistoryScreen
+	- [x] Update WasteManagementScreen
+- [ ] Final Verification
+	- [ ] Verify as Admin
+	- [ ] Verify as Staff
