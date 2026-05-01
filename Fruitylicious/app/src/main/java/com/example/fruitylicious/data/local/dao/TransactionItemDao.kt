@@ -70,4 +70,7 @@ interface TransactionItemDao {
 
     @Query("DELETE FROM transaction_items WHERE transactionId = :transactionId")
     suspend fun deleteItemsForTransaction(transactionId: String)
+
+    @Query("SELECT * FROM transaction_items ORDER BY transactionId ASC")
+    fun observeAllTransactionItems(): Flow<List<TransactionItemEntity>>
 }

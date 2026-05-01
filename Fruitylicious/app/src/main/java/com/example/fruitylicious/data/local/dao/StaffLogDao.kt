@@ -79,4 +79,21 @@ interface StaffLogDao {
 
     @Query("DELETE FROM staff_logs WHERE logId = :logId")
     suspend fun deleteStaffLog(logId: String)
+
+    @Query("SELECT * FROM staff_logs ORDER BY clockIn DESC")
+    fun observeAllStaffLogs(): Flow<List<StaffLogEntity>>
+
+    @Query("SELECT * FROM staff_logs WHERE userId = :userId ORDER BY clockIn DESC")
+    fun observeLogsByUser(userId: Int): Flow<List<StaffLogEntity>>
+
+    @Query(
+        """
+    SELECT * FROM staff_logs
+    WHERE userId = :userId
+    AND clockOut IS NULL
+    ORDER BY clockIn DESC
+    LIMIT 1
+    """
+    )
+    suspend fun getActiveLogForUser(userId: Int): StaffLogEntity?
 }

@@ -58,4 +58,35 @@ interface RestockLogDao {
 
     @Query("SELECT * FROM restock_logs ORDER BY dateTime DESC")
     fun observeAllRestockLogs(): Flow<List<RestockLogEntity>>
+
+    @Query(
+        """
+    SELECT COALESCE(SUM(quantityAdded), 0)
+    FROM restock_logs
+    WHERE dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR branchId = :branchId)
+    """
+    )
+    suspend fun getTotalRestockedUnits(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): Double
+
+    @Query(
+        """
+    SELECT 
+        i.ingredientName AS ingredientName,
+        COUNT(*) AS restockCount,
+        COALESCE(AVG(r.quantityAdded), 0) AS avgUnits
+    FROM restock_logs r
+    INNER JOIN ingredients i ON r.ingredientId = i.ingredientId
+    WHERE (:branchId IS NULL OR r.branchId = :branchId)
+    GROUP BY r.ingredientId
+    ORDER BY restockCount DESC, ingredientName ASC
+    """
+    )
+    suspend fun getRestockFrequencyReport(
+        branchId: Int?
+    ): List<RestockFrequencyRow>
 }

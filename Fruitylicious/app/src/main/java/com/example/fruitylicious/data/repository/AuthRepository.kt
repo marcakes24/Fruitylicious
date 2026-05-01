@@ -26,74 +26,101 @@ class AuthRepository @Inject constructor(
     private val branchConfig: BranchConfig
 ) {
 
-    suspend fun login(username: String, password: String): LoginResult = withContext(Dispatchers.IO) {
+    suspend fun login(
+        username: String,
+        password: String
+    ): LoginResult = withContext(Dispatchers.IO) {
         val trimmedUsername = username.trim()
 
         if (trimmedUsername.isBlank() || password.isBlank()) {
             return@withContext LoginResult.Error("Username and password are required.")
         }
 
-        try {
+        val localLoginResult = loginOfflineIfValid(
+            username = trimmedUsername,
+            password = password
+        )
+
+        if (localLoginResult != null) {
+            return@withContext localLoginResult
+        }
+
+        return@withContext loginOnline(
+            username = trimmedUsername,
+            password = password
+        )
+    }
+
+    private suspend fun loginOfflineIfValid(
+        username: String,
+        password: String
+    ): LoginResult? {
+        val user = userDao.getUserByUsername(username)
+
+        if (user == null || user.password != password) {
+            return null
+        }
+
+        sessionManager.saveSession(
+            token = "",
+            userId = user.userId,
+            userName = user.name,
+            username = user.username,
+            role = user.role,
+            branchId = branchConfig.branchId,
+            loginTime = System.currentTimeMillis()
+        )
+
+        return LoginResult.OfflineSuccess(user)
+    }
+
+    private suspend fun loginOnline(
+        username: String,
+        password: String
+    ): LoginResult {
+        return try {
             val response = authApi.login(
                 LoginRequestDto(
-                    username = trimmedUsername,
+                    username = username,
                     password = password,
                     branchId = branchConfig.branchId
                 )
             )
 
-            if (response.isSuccessful) {
-                val body = response.body()
-                    ?: return@withContext LoginResult.Error("Empty login response from server.")
-
-                sessionManager.saveSession(
-                    token = body.token,
-                    userId = body.userId,
-                    userName = body.name,
-                    username = body.username,
-                    role = body.role,
-                    branchId = branchConfig.branchId,
-                    loginTime = System.currentTimeMillis()
-                )
-
-                val now = System.currentTimeMillis()
-                userDao.upsertUser(
-                    UserEntity(
-                        userId = body.userId,
-                        name = body.name,
-                        role = body.role,
-                        username = body.username,
-                        password = password,
-                        lastModified = now,
-                        isSynced = true,
-                        syncedAt = now
-                    )
-                )
-
-                LoginResult.Success(body)
-            } else {
-                loginOffline(trimmedUsername, password)
+            if (!response.isSuccessful) {
+                return LoginResult.Error("Invalid username or password.")
             }
-        } catch (exception: Exception) {
-            loginOffline(trimmedUsername, password)
-        }
-    }
 
-    private suspend fun loginOffline(username: String, password: String): LoginResult {
-        val user = userDao.getUserByUsername(username)
+            val body = response.body()
+                ?: return LoginResult.Error("Empty login response from server.")
 
-        return if (user != null && user.password == password) {
             sessionManager.saveSession(
-                token = "",
-                userId = user.userId,
-                userName = user.name,
-                username = user.username,
-                role = user.role,
+                token = body.token,
+                userId = body.userId,
+                userName = body.name,
+                username = body.username,
+                role = body.role,
                 branchId = branchConfig.branchId,
                 loginTime = System.currentTimeMillis()
             )
-            LoginResult.OfflineSuccess(user)
-        } else {
+
+            val now = System.currentTimeMillis()
+
+            userDao.upsertUser(
+                UserEntity(
+                    userId = body.userId,
+                    name = body.name,
+                    role = body.role,
+                    username = body.username,
+                    password = password,
+                    lastModified = now,
+                    isSynced = true,
+                    syncedAt = now
+                )
+            )
+
+            LoginResult.Success(body)
+        } catch (exception: Exception) {
             LoginResult.Error("Invalid username or password.")
         }
     }

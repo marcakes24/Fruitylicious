@@ -39,6 +39,10 @@ interface UserDao {
     @Query("UPDATE users SET isSynced = 1, syncedAt = :syncedAt WHERE userId = :userId")
     suspend fun markSynced(userId: Int, syncedAt: Long)
 
+    @Query("SELECT * FROM users ORDER BY role ASC, name ASC")
+    fun observeUsers(): Flow<List<UserEntity>>
+
     @Query("DELETE FROM users WHERE userId = :userId")
     suspend fun deleteUser(userId: Int)
+
 }

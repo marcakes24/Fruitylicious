@@ -76,18 +76,6 @@ interface TransactionDao {
     @Upsert
     suspend fun upsertTransactions(transactions: List<TransactionEntity>)
 
-    @Query(
-        """
-        UPDATE transactions
-        SET status = 'void',
-            lastModified = :lastModified,
-            isSynced = 0,
-            syncedAt = NULL
-        WHERE transactionId = :transactionId
-        """
-    )
-    suspend fun voidTransaction(transactionId: String, lastModified: Long)
-
     @Query("UPDATE transactions SET isSynced = 1, syncedAt = :syncedAt WHERE transactionId = :transactionId")
     suspend fun markSynced(transactionId: String, syncedAt: Long)
 
@@ -114,4 +102,198 @@ interface TransactionDao {
         from: Long,
         to: Long
     ): Flow<List<TransactionEntity>>
+
+    @Query(
+        """
+    SELECT COALESCE(SUM(totalAmount), 0)
+    FROM transactions
+    WHERE status = 'completed'
+    AND dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR branchId = :branchId)
+    """
+    )
+
+    suspend fun getSalesTotal(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): Double
+
+    @Query(
+        """
+    SELECT COALESCE(SUM(totalAmount), 0)
+    FROM transactions
+    WHERE status = 'completed'
+    AND paymentType = :paymentType
+    AND dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR branchId = :branchId)
+    """
+    )
+    suspend fun getPaymentTotal(
+        branchId: Int?,
+        paymentType: String,
+        from: Long,
+        to: Long
+    ): Double
+
+    @Query(
+        """
+    SELECT 
+        p.productName AS productName,
+        SUM(ti.quantity) AS qty,
+        SUM(ti.subtotal) AS totalAmount
+    FROM transaction_items ti
+    INNER JOIN transactions t ON ti.transactionId = t.transactionId
+    INNER JOIN products p ON ti.productId = p.productId
+    WHERE t.status = 'completed'
+    AND t.dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR t.branchId = :branchId)
+    GROUP BY p.productName
+    ORDER BY totalAmount DESC
+    """
+    )
+    suspend fun getSalesBreakdown(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<SalesBreakdownRow>
+
+    @Query(
+        """
+    SELECT 
+        p.productName AS productName,
+        SUM(ti.quantity) AS totalQty
+    FROM transaction_items ti
+    INNER JOIN transactions t ON ti.transactionId = t.transactionId
+    INNER JOIN products p ON ti.productId = p.productId
+    WHERE t.status = 'completed'
+    AND t.dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR t.branchId = :branchId)
+    GROUP BY p.productName
+    ORDER BY totalQty DESC
+    LIMIT 5
+    """
+    )
+    suspend fun getTopSellingItems(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<TopSellingItemRow>
+
+    @Query(
+        """
+    SELECT COUNT(*)
+    FROM transactions
+    WHERE status = 'completed'
+    AND dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR branchId = :branchId)
+    """
+    )
+    suspend fun getTransactionCount(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): Int
+
+    @Query("SELECT * FROM transactions ORDER BY dateTime DESC")
+    fun observeAllTransactions(): Flow<List<TransactionEntity>>
+
+    @Query(
+        """
+    UPDATE transactions
+    SET status = 'void',
+        lastModified = :lastModified,
+        isSynced = 0,
+        syncedAt = NULL
+    WHERE transactionId = :transactionId
+    """
+    )
+    suspend fun voidTransaction(
+        transactionId: String,
+        lastModified: Long
+    )
+
+    @Query(
+        """
+    SELECT * FROM transactions
+    WHERE status IN ('pending', 'preparing', 'ready', 'completed')
+    ORDER BY dateTime DESC
+    """
+    )
+    fun observeQueueTransactions(): Flow<List<TransactionEntity>>
+
+    @Query(
+        """
+    UPDATE transactions
+    SET status = :status,
+        lastModified = :lastModified,
+        isSynced = 0,
+        syncedAt = NULL
+    WHERE transactionId = :transactionId
+    """
+    )
+    suspend fun updateTransactionStatus(
+        transactionId: String,
+        status: String,
+        lastModified: Long
+    )
+
+    @Query(
+        """
+    SELECT COALESCE(SUM(totalAmount), 0)
+    FROM transactions
+    WHERE status != 'void'
+    AND branchId = :branchId
+    AND dateTime BETWEEN :from AND :to
+    """
+    )
+    suspend fun getTodaySalesForBranch(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): Double
+
+    @Query(
+        """
+    SELECT COUNT(*)
+    FROM transactions
+    WHERE status != 'void'
+    AND branchId = :branchId
+    AND dateTime BETWEEN :from AND :to
+    """
+    )
+    suspend fun getTodayTransactionCountForBranch(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): Int
+
+    @Query(
+        """
+    SELECT COALESCE(SUM(totalAmount), 0)
+    FROM transactions
+    WHERE status != 'void'
+    AND branchId = :branchId
+    AND paymentType = :paymentType
+    AND dateTime BETWEEN :from AND :to
+    """
+    )
+    suspend fun getTodayPaymentTotalForBranch(
+        branchId: Int,
+        paymentType: String,
+        from: Long,
+        to: Long
+    ): Double
+
+    @Query(
+        """
+    SELECT COUNT(*)
+    FROM transactions
+    WHERE branchId = :branchId
+    AND status IN ('pending', 'preparing', 'ready')
+    """
+    )
+    suspend fun getActiveQueueCountForBranch(
+        branchId: Int
+    ): Int
 }

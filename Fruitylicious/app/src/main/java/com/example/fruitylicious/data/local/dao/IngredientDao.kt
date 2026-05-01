@@ -44,4 +44,6 @@ interface IngredientDao {
 
     @Query("SELECT * FROM ingredients ORDER BY ingredientName ASC")
     fun observeIngredients(): Flow<List<IngredientEntity>>
+
+
 }

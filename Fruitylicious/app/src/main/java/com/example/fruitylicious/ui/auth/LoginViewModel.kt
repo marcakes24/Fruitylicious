@@ -8,12 +8,12 @@ import com.example.fruitylicious.domain.usecase.auth.LoginUseCase
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class LoginUiState(
     val username: String = "",
@@ -39,6 +39,7 @@ class LoginViewModel @Inject constructor(
             branchName = branchConfig.branchName
         )
     )
+
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     fun onUsernameChanged(value: String) {
@@ -66,8 +67,17 @@ class LoginViewModel @Inject constructor(
         val username = currentState.username.trim()
         val password = currentState.password
 
-        val usernameError = if (username.isBlank()) "Username is required." else null
-        val passwordError = if (password.isBlank()) "Password is required." else null
+        val usernameError = if (username.isBlank()) {
+            "Username is required."
+        } else {
+            null
+        }
+
+        val passwordError = if (password.isBlank()) {
+            "Password is required."
+        } else {
+            null
+        }
 
         if (usernameError != null || passwordError != null) {
             _uiState.update {
@@ -92,23 +102,27 @@ class LoginViewModel @Inject constructor(
 
             when (val result = loginUseCase(username, password)) {
                 is LoginResult.Success -> {
-                    runImmediateSync()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            loggedInRole = result.response.role
+                            loggedInRole = result.response.role,
+                            error = null
                         )
                     }
+
+                    launchSyncInBackground()
                 }
 
                 is LoginResult.OfflineSuccess -> {
-                    runImmediateSync()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            loggedInRole = result.user.role
+                            loggedInRole = result.user.role,
+                            error = null
                         )
                     }
+
+                    launchSyncInBackground()
                 }
 
                 is LoginResult.Error -> {
@@ -123,9 +137,29 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    private fun launchSyncInBackground() {
+        viewModelScope.launch {
+            runCatching {
+                runImmediateSync()
+            }.onFailure { error ->
+                val now = System.currentTimeMillis()
+
+                sessionManager.saveSyncStatus(
+                    syncedAt = now,
+                    success = false,
+                    message = error.message ?: "Background sync failed."
+                )
+
+                println("FRUITY_SYNC_LOGIN_BACKGROUND_ERROR: ${error.message}")
+            }
+        }
+    }
+
     private suspend fun runImmediateSync() {
         val lastPulledAt = sessionManager.getLastPulledAt()
+
         val syncResult = syncRepository.sync(lastPulledAt)
+
         val now = System.currentTimeMillis()
 
         sessionManager.saveSyncStatus(
@@ -138,7 +172,13 @@ class LoginViewModel @Inject constructor(
             sessionManager.saveLastPulledAt(now)
         }
 
-        println("FRUITY_SYNC_LOGIN: success=${syncResult.success}, pushed=${syncResult.pushedCount}, pulled=${syncResult.pulledCount}, message=${syncResult.message}")
+        println(
+            "FRUITY_SYNC_LOGIN_BACKGROUND: " +
+                    "success=${syncResult.success}, " +
+                    "pushed=${syncResult.pushedCount}, " +
+                    "pulled=${syncResult.pulledCount}, " +
+                    "message=${syncResult.message}"
+        )
     }
 
     fun consumeLoginNavigation() {

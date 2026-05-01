@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
@@ -39,7 +38,6 @@ import com.example.fruitylicious.STAFF_INVENTORY
 import com.example.fruitylicious.STAFF_POS
 import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
 import com.example.fruitylicious.STAFF_SALES_SUMMARY
-import com.example.fruitylicious.STAFF_TRANSACTION_HISTORY
 import com.example.fruitylicious.STAFF_WASTE_HISTORY
 import java.util.Locale
 import kotlin.math.ceil

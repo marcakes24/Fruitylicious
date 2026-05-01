@@ -44,4 +44,8 @@ interface ProductDao {
 
     @Query("DELETE FROM products WHERE productId = :productId")
     suspend fun deleteProduct(productId: Int)
+
+    @Query("SELECT * FROM products ORDER BY productName ASC")
+    fun observeProducts(): Flow<List<ProductEntity>>
+
 }

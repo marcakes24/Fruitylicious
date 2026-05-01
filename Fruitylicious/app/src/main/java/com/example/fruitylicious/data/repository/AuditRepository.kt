@@ -16,22 +16,6 @@ class AuditLogRepository @Inject constructor(
         return auditLogDao.observeAuditLogsByBranch(branchId)
     }
 
-    fun observeAuditLogsByUser(userId: Int): Flow<List<AuditLogEntity>> {
-        return auditLogDao.observeAuditLogsByUser(userId)
-    }
-
-    fun observeAuditLogsByAction(action: String): Flow<List<AuditLogEntity>> {
-        return auditLogDao.observeAuditLogsByAction(action.trim())
-    }
-
-    fun observeAuditLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<AuditLogEntity>> {
-        return auditLogDao.observeAuditLogsByDateRange(branchId, from, to)
-    }
-
-    suspend fun getAuditLogs(branchId: Int): List<AuditLogEntity> {
-        return auditLogDao.getAuditLogsByBranch(branchId)
-    }
-
     suspend fun log(
         userId: Int,
         branchId: Int,

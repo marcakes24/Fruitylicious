@@ -57,4 +57,7 @@ interface TransactionItemAddonDao {
 
     @Query("DELETE FROM transaction_item_addons WHERE transactionItemId = :transactionItemId")
     suspend fun deleteAddonsForTransactionItem(transactionItemId: String)
+
+    @Query("SELECT * FROM transaction_item_addons ORDER BY transactionItemId ASC")
+    fun observeAllTransactionItemAddons(): Flow<List<TransactionItemAddonEntity>>
 }

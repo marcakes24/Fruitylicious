@@ -104,162 +104,169 @@ class TransactionRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Payment type is required."))
         }
 
-        val now = System.currentTimeMillis()
-        val transactionId = UUID.randomUUID().toString()
-        val totalAmount = cartItems.sumOf { it.subtotal }
+        return try {
+            val now = System.currentTimeMillis()
+            val transactionId = UUID.randomUUID().toString()
+            val totalAmount = cartItems.sumOf { it.subtotal }
 
-        val requiredByIngredient = mutableMapOf<Int, Double>()
+            val requiredByIngredient = mutableMapOf<Int, Double>()
 
-        for (cartItem in cartItems) {
-            if (cartItem.quantity <= 0) {
-                return Result.failure(
-                    IllegalArgumentException("Item quantity must be greater than zero.")
-                )
-            }
-
-            val baseRecipes = productRecipeDao.getRecipesForVariant(cartItem.variantId)
-
-            for (recipe in baseRecipes) {
-                val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
-                    ?: return Result.failure(
-                        IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+            for (cartItem in cartItems) {
+                if (cartItem.quantity <= 0) {
+                    return Result.failure(
+                        IllegalArgumentException("Item quantity must be greater than zero.")
                     )
+                }
 
-                val deductionPerItem = computeInventoryDeduction(
-                    recipeQuantity = recipe.quantityRequired,
-                    unitType = ingredient.unitType,
-                    estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
-                    ingredientName = ingredient.ingredientName
-                )
+                val baseRecipes = productRecipeDao.getRecipesForVariant(cartItem.variantId)
 
-                val totalRequired = deductionPerItem * cartItem.quantity
-
-                requiredByIngredient[recipe.ingredientId] =
-                    (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
-            }
-
-            for (addon in cartItem.addons) {
-                val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
-
-                for (recipe in addonRecipes) {
+                for (recipe in baseRecipes) {
                     val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
                         ?: return Result.failure(
                             IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
                         )
 
-                    val deductionPerAddon = computeInventoryDeduction(
+                    val deductionPerItem = computeInventoryDeduction(
                         recipeQuantity = recipe.quantityRequired,
                         unitType = ingredient.unitType,
                         estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
                         ingredientName = ingredient.ingredientName
                     )
 
-                    val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
+                    val totalRequired = deductionPerItem * cartItem.quantity
 
                     requiredByIngredient[recipe.ingredientId] =
                         (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
                 }
-            }
-        }
 
-        for ((ingredientId, requiredQuantity) in requiredByIngredient) {
-            val inventory = inventoryDao.getInventoryItem(
-                ingredientId = ingredientId,
-                branchId = branchId
-            )
+                for (addon in cartItem.addons) {
+                    val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
 
-            if (inventory == null) {
-                return Result.failure(
-                    IllegalStateException("Inventory item not found for ingredient $ingredientId.")
-                )
-            }
+                    for (recipe in addonRecipes) {
+                        val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
+                            ?: return Result.failure(
+                                IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+                            )
 
-            if (inventory.currentStock < requiredQuantity) {
-                return Result.failure(
-                    IllegalStateException("Insufficient stock for ingredient $ingredientId.")
-                )
-            }
-        }
+                        val deductionPerAddon = computeInventoryDeduction(
+                            recipeQuantity = recipe.quantityRequired,
+                            unitType = ingredient.unitType,
+                            estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
+                            ingredientName = ingredient.ingredientName
+                        )
 
-        database.withTransaction {
-            transactionDao.upsertTransaction(
-                TransactionEntity(
-                    transactionId = transactionId,
-                    userId = userId,
-                    branchId = branchId,
-                    totalAmount = totalAmount,
-                    paymentType = paymentType.trim(),
-                    status = "completed",
-                    dateTime = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
-            )
+                        val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
 
-            for (cartItem in cartItems) {
-                val transactionItemId = UUID.randomUUID().toString()
-
-                transactionItemDao.upsertTransactionItem(
-                    TransactionItemEntity(
-                        transactionItemId = transactionItemId,
-                        transactionId = transactionId,
-                        productId = cartItem.productId,
-                        variantId = cartItem.variantId,
-                        sizeName = cartItem.sizeName,
-                        quantity = cartItem.quantity,
-                        subtotal = cartItem.subtotal,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
-                    )
-                )
-
-                val addonEntities = cartItem.addons.map { addon ->
-                    val totalAddonQuantity = addon.quantity * cartItem.quantity
-
-                    TransactionItemAddonEntity(
-                        transactionItemAddonId = UUID.randomUUID().toString(),
-                        transactionItemId = transactionItemId,
-                        addonProductId = addon.addonProductId,
-                        quantity = totalAddonQuantity,
-                        subtotal = addon.unitPrice * totalAddonQuantity,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
-                    )
-                }
-
-                if (addonEntities.isNotEmpty()) {
-                    transactionItemAddonDao.upsertAddons(addonEntities)
+                        requiredByIngredient[recipe.ingredientId] =
+                            (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
+                    }
                 }
             }
 
             for ((ingredientId, requiredQuantity) in requiredByIngredient) {
-                inventoryDao.deductStock(
+                val inventory = inventoryDao.getInventoryItem(
                     ingredientId = ingredientId,
-                    branchId = branchId,
-                    amount = requiredQuantity,
-                    lastModified = now
+                    branchId = branchId
+                )
+
+                if (inventory == null) {
+                    return Result.failure(
+                        IllegalStateException("Inventory item not found for ingredient $ingredientId.")
+                    )
+                }
+
+                if (inventory.currentStock < requiredQuantity) {
+                    return Result.failure(
+                        IllegalStateException("Insufficient stock for ingredient $ingredientId.")
+                    )
+                }
+            }
+
+            database.withTransaction {
+                transactionDao.upsertTransaction(
+                    TransactionEntity(
+                        transactionId = transactionId,
+                        userId = userId,
+                        branchId = branchId,
+                        totalAmount = totalAmount,
+                        paymentType = paymentType.trim(),
+
+                        // Important for Queue:
+                        status = "pending",
+
+                        dateTime = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                )
+
+                for (cartItem in cartItems) {
+                    val transactionItemId = UUID.randomUUID().toString()
+
+                    transactionItemDao.upsertTransactionItem(
+                        TransactionItemEntity(
+                            transactionItemId = transactionItemId,
+                            transactionId = transactionId,
+                            productId = cartItem.productId,
+                            variantId = cartItem.variantId,
+                            sizeName = cartItem.sizeName,
+                            quantity = cartItem.quantity,
+                            subtotal = cartItem.subtotal,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
+                    )
+
+                    val addonEntities = cartItem.addons.map { addon ->
+                        val totalAddonQuantity = addon.quantity * cartItem.quantity
+
+                        TransactionItemAddonEntity(
+                            transactionItemAddonId = UUID.randomUUID().toString(),
+                            transactionItemId = transactionItemId,
+                            addonProductId = addon.addonProductId,
+                            quantity = totalAddonQuantity,
+                            subtotal = addon.unitPrice * totalAddonQuantity,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
+                    }
+
+                    if (addonEntities.isNotEmpty()) {
+                        transactionItemAddonDao.upsertAddons(addonEntities)
+                    }
+                }
+
+                for ((ingredientId, requiredQuantity) in requiredByIngredient) {
+                    inventoryDao.deductStock(
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        amount = requiredQuantity,
+                        lastModified = now
+                    )
+                }
+
+                auditLogDao.upsertAuditLog(
+                    AuditLogEntity(
+                        logId = UUID.randomUUID().toString(),
+                        userId = userId,
+                        branchId = branchId,
+                        action = "Created transaction $transactionId with total amount $totalAmount.",
+                        tableAffected = "transactions",
+                        timestamp = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
                 )
             }
 
-            auditLogDao.upsertAuditLog(
-                AuditLogEntity(
-                    logId = UUID.randomUUID().toString(),
-                    userId = userId,
-                    branchId = branchId,
-                    action = "Created transaction $transactionId with total amount $totalAmount.",
-                    tableAffected = "transactions",
-                    timestamp = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
-            )
+            Result.success(transactionId)
+        } catch (exception: Exception) {
+            Result.failure(exception)
         }
-
-        return Result.success(transactionId)
     }
 
     suspend fun voidTransaction(

@@ -24,10 +24,6 @@ class WasteRepository @Inject constructor(
         return wasteLogDao.observeWasteLogsByBranch(branchId)
     }
 
-    fun observeWasteLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<WasteLogEntity>> {
-        return wasteLogDao.observeWasteLogsByDateRange(branchId, from, to)
-    }
-
     suspend fun getWasteLogs(branchId: Int): List<WasteLogEntity> {
         return wasteLogDao.getWasteLogsByBranch(branchId)
     }
