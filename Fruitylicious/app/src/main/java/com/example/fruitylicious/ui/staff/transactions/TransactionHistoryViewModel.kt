@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 data class TransactionHistoryUiState(
     val transactions: List<TransactionEntity> = emptyList(),
+    val isAdmin: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null
 )
@@ -32,7 +33,9 @@ class TransactionHistoryViewModel @Inject constructor(
 
     private val branchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
-    private val _uiState = MutableStateFlow(TransactionHistoryUiState())
+    private val _uiState = MutableStateFlow(TransactionHistoryUiState(
+        isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true
+    ))
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
     init {
@@ -53,6 +56,11 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     fun voidTransaction(transactionId: String) {
+        if (!_uiState.value.isAdmin) {
+            _uiState.update { it.copy(error = "Only admins can void transactions.") }
+            return
+        }
+
         viewModelScope.launch {
             val result = voidTransactionUseCase(
                 transactionId = transactionId,

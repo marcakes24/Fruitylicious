@@ -474,11 +474,19 @@ private fun IngredientEditDialog(
                 }
 
                 FieldBlock("Estimated Weight") {
-                    DialogTextField(
-                        value = weight,
-                        onValueChange = { weight = it },
-                        placeholder = "0.00"
-                    )
+                    Column {
+                        DialogTextField(
+                            value = weight,
+                            onValueChange = { weight = it },
+                            placeholder = "0.00"
+                        )
+                        Text(
+                            text = "For 'pcs' or 'can', enter weight/volume in g/ml per unit.",
+                            fontSize = 11.sp,
+                            color = MiTextSub,
+                            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                        )
+                    }
                 }
 
                 FieldBlock("Low Stock Threshold") {

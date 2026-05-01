@@ -201,6 +201,20 @@ class ManageProductsViewModel @Inject constructor(
         }
     }
 
+    fun deleteFullProduct(productId: Int) {
+        viewModelScope.launch {
+            val result = manageProductUseCase.deleteProduct(productId)
+
+            _uiState.update {
+                if (result.isSuccess) {
+                    it.copy(successMessage = "Whole product deleted.", error = null)
+                } else {
+                    it.copy(error = result.exceptionOrNull()?.message ?: "Failed to delete product.")
+                }
+            }
+        }
+    }
+
     fun deleteAddon(productId: Int) {
         viewModelScope.launch {
             val result = manageProductUseCase.deleteProduct(productId)

@@ -15,12 +15,6 @@ interface WasteLogDao {
     @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
     fun observeWasteLogsByBranch(branchId: Int): Flow<List<WasteLogEntity>>
 
-    @Query("SELECT * FROM waste_logs WHERE wasteId = :wasteId")
-    suspend fun getWasteLogById(wasteId: String): WasteLogEntity?
-
-    @Query("SELECT * FROM waste_logs ORDER BY dateTime DESC")
-    suspend fun getAllWasteLogs(): List<WasteLogEntity>
-
     @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
     suspend fun getWasteLogsByBranch(branchId: Int): List<WasteLogEntity>
 

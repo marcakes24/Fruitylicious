@@ -30,6 +30,10 @@ class StaffLogRepository @Inject constructor(
         return staffLogDao.observeStaffLogsByDateRange(branchId, from, to)
     }
 
+    suspend fun getActiveLogForUser(userId: Int): StaffLogEntity? {
+        return staffLogDao.getActiveLogForUser(userId)
+    }
+
     suspend fun getStaffLogs(branchId: Int): List<StaffLogEntity> {
         return staffLogDao.getStaffLogsByBranch(branchId)
     }

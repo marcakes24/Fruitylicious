@@ -27,9 +27,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -476,6 +482,7 @@ private fun StaffSalesChartSection(
                 val maxSales = (weeklySales.maxOrNull() ?: 0f).coerceAtLeast(100f)
                 val roundedMax = (ceil(maxSales / 100.0) * 100).toInt()
                 val highlightIdx = weeklySales.indexOf(weeklySales.maxOrNull() ?: 0f)
+                val textMeasurer = rememberTextMeasurer()
 
                 val yLabels = listOf(
                     "₱$roundedMax",
@@ -485,6 +492,9 @@ private fun StaffSalesChartSection(
                     "₱0"
                 )
 
+                val topPadding = 32.dp
+                val bottomPadding = 24.dp
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -492,9 +502,9 @@ private fun StaffSalesChartSection(
                 ) {
                     Column(
                         modifier = Modifier
-                            .width(40.dp)
+                            .width(44.dp)
                             .fillMaxHeight()
-                            .padding(bottom = 20.dp),
+                            .padding(top = topPadding, bottom = bottomPadding),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         yLabels.forEach { label ->
@@ -515,13 +525,15 @@ private fun StaffSalesChartSection(
                             .weight(1f)
                             .fillMaxHeight()
                     ) {
-                        val chartHeight = size.height - 24.dp.toPx()
+                        val tPaddingPx = topPadding.toPx()
+                        val bPaddingPx = bottomPadding.toPx()
+                        val chartHeight = size.height - tPaddingPx - bPaddingPx
                         val barCount = weeklySales.size
                         val gap = size.width / barCount
                         val barWidth = gap * 0.55f
 
                         for (i in 0..4) {
-                            val y = chartHeight * (1f - i / 4f)
+                            val y = tPaddingPx + chartHeight * (1f - i / 4f)
                             drawLine(
                                 color = Color(0xFFE0E0E0),
                                 start = Offset(0f, y),
@@ -533,7 +545,7 @@ private fun StaffSalesChartSection(
                         weeklySales.forEachIndexed { index, value ->
                             val barHeight = (value / roundedMax) * chartHeight
                             val left = index * gap + (gap - barWidth) / 2f
-                            val top = chartHeight - barHeight
+                            val top = tPaddingPx + chartHeight - barHeight
 
                             drawRoundRect(
                                 color = StaffChartBar,
@@ -544,9 +556,10 @@ private fun StaffSalesChartSection(
 
                             if (index == highlightIdx && value > 0f) {
                                 staffDrawTooltip(
+                                    textMeasurer = textMeasurer,
                                     label = value.toInt().toString(),
                                     centerX = left + barWidth / 2f,
-                                    topY = top - 26.dp.toPx()
+                                    topY = top - 28.dp.toPx()
                                 )
                             }
                         }
@@ -609,6 +622,7 @@ private fun StaffSalesChartSection(
 }
 
 private fun DrawScope.staffDrawTooltip(
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
     label: String,
     centerX: Float,
     topY: Float
@@ -617,21 +631,51 @@ private fun DrawScope.staffDrawTooltip(
     val bubbleHeight = 22.dp.toPx()
     val left = centerX - bubbleWidth / 2f
 
-    drawRoundRect(
-        color = Color(0xFF1A1A1A),
-        topLeft = Offset(left, topY),
-        size = Size(bubbleWidth, bubbleHeight),
-        cornerRadius = CornerRadius(4.dp.toPx())
-    )
-
-    val triangleTop = topY + bubbleHeight
-
-    val path = Path().apply {
-        moveTo(centerX - 4.dp.toPx(), triangleTop)
-        lineTo(centerX + 4.dp.toPx(), triangleTop)
-        lineTo(centerX, triangleTop + 5.dp.toPx())
+    val tooltipPath = Path().apply {
+        addRoundRect(
+            androidx.compose.ui.geometry.RoundRect(
+                left = left,
+                top = topY,
+                right = left + bubbleWidth,
+                bottom = topY + bubbleHeight,
+                cornerRadius = CornerRadius(4.dp.toPx())
+            )
+        )
+        moveTo(centerX - 4.dp.toPx(), topY + bubbleHeight)
+        lineTo(centerX + 4.dp.toPx(), topY + bubbleHeight)
+        lineTo(centerX, topY + bubbleHeight + 5.dp.toPx())
         close()
     }
 
-    drawPath(path, color = Color(0xFF1A1A1A))
+    drawIntoCanvas { canvas ->
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            isAntiAlias = true
+            setShadowLayer(
+                12f,
+                0f,
+                4f,
+                android.graphics.Color.argb(70, 0, 0, 0)
+            )
+        }
+        canvas.nativeCanvas.drawPath(tooltipPath.asAndroidPath(), paint)
+    }
+
+    val textLayoutResult = textMeasurer.measure(
+        text = label,
+        style = TextStyle(
+            color = Color(0xFF1A1A1A),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    )
+
+    drawText(
+        textLayoutResult = textLayoutResult,
+        topLeft = Offset(
+            centerX - textLayoutResult.size.width / 2f,
+            topY + (bubbleHeight - textLayoutResult.size.height) / 2f
+        )
+    )
 }

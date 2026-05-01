@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -35,6 +38,7 @@ import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.BorderStroke
 
 private val RmGreen = Color(0xFF2E7D32)
 private val RmPageBg = Color(0xFFFFEAA0)
@@ -52,6 +56,8 @@ fun RecipeManagementScreen(
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    var selectedTab by remember { mutableStateOf("Products") }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -82,13 +88,45 @@ fun RecipeManagementScreen(
             )
 
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Products Available",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RmTextMain,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (selectedTab == "Products") "Products Available" else "Addons Available",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RmTextMain
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.5f))
+                            .padding(4.dp)
+                    ) {
+                        listOf("Products", "Addons").forEach { tab ->
+                            val isActive = selectedTab == tab
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isActive) RmGreen else Color.Transparent)
+                                    .clickable { selectedTab = tab }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = tab,
+                                    color = if (isActive) Color.White else RmTextMain,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Surface(
                     modifier = Modifier
@@ -98,12 +136,14 @@ fun RecipeManagementScreen(
                     color = Color.White,
                     shadowElevation = 2.dp
                 ) {
-                    if (uiState.products.isEmpty()) {
+                    val displayList = if (selectedTab == "Products") uiState.products else uiState.addons
+
+                    if (displayList.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No products found", color = RmTextSub)
+                            Text("No ${selectedTab.lowercase()} found", color = RmTextSub)
                         }
                     } else {
                         LazyVerticalGrid(
@@ -113,10 +153,11 @@ fun RecipeManagementScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(uiState.products, key = { it.productId }) { product ->
+                            items(displayList, key = { it.productId }) { product ->
                                 ProductGridItem(
                                     product = product,
                                     variants = uiState.variantsByProductId[product.productId].orEmpty(),
+                                    hasRecipe = product.productId in uiState.productIdsWithRecipes,
                                     onClick = { viewModel.selectProduct(product) }
                                 )
                             }
@@ -185,6 +226,7 @@ private fun Header(
 private fun ProductGridItem(
     product: ProductEntity,
     variants: List<ProductVariantEntity>,
+    hasRecipe: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
@@ -193,34 +235,60 @@ private fun ProductGridItem(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFFFFFDE7),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE))
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(8.dp)
-        ) {
-            IconCircle(
-                icon = Icons.Outlined.RestaurantMenu,
-                contentDescription = "Product"
-            )
+        Box {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+                IconCircle(
+                    icon = Icons.Outlined.RestaurantMenu,
+                    contentDescription = "Product"
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = product.productName,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = RmTextMain,
-                textAlign = TextAlign.Center
-            )
+                Text(
+                    text = product.productName,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = RmTextMain,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    lineHeight = 16.sp,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-            Text(
-                text = "${variants.size} size(s)",
-                fontSize = 10.sp,
-                color = RmTextSub,
-                textAlign = TextAlign.Center
-            )
+                Text(
+                    text = "${variants.size} size(s)",
+                    fontSize = 10.sp,
+                    color = RmTextSub,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            if (!hasRecipe) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "No Recipe",
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -281,21 +349,15 @@ private fun RecipeDetailDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "Select Size",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (variants.isEmpty()) {
+                if (variants.isNotEmpty()) {
                     Text(
-                        text = "No sizes available. Add product sizes first.",
-                        color = Color.Red,
-                        fontSize = 13.sp
+                        text = "Select Size",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
                     )
-                } else {
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         variants.forEach { variant ->
                             SizeCard(
@@ -305,9 +367,9 @@ private fun RecipeDetailDialog(
                             )
                         }
                     }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -330,6 +392,39 @@ private fun RecipeDetailDialog(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                if (recipeLines.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ingredient",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RmTextSub,
+                            modifier = Modifier.weight(1.8f)
+                        )
+                        Text(
+                            text = "Qty",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RmTextSub,
+                            modifier = Modifier.width(75.dp)
+                        )
+                        Text(
+                            text = "Unit",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RmTextSub,
+                            modifier = Modifier.width(45.dp)
+                        )
+                        Spacer(modifier = Modifier.size(28.dp)) // Offset for delete button
+                    }
+                }
 
                 recipeLines.forEachIndexed { index, line ->
                     RecipeIngredientRow(
@@ -366,7 +461,7 @@ private fun RecipeDetailDialog(
                         .height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RmGreen),
                     shape = RoundedCornerShape(8.dp),
-                    enabled = selectedVariant != null
+                    enabled = variants.isEmpty() || selectedVariant != null
                 ) {
                     Text(
                         text = "Save Recipe",
@@ -438,19 +533,22 @@ private fun RecipeIngredientRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(modifier = Modifier.weight(1.5f)) {
+            Box(modifier = Modifier.weight(1.8f)) {
                 OutlinedButton(
                     onClick = { ingredientExpanded = true },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(44.dp),
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
                 ) {
                     Text(
-                        text = selectedIngredient?.ingredientName ?: "Ingredient",
-                        fontSize = 12.sp,
-                        maxLines = 1
+                        text = selectedIngredient?.ingredientName ?: "Select",
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -461,7 +559,7 @@ private fun RecipeIngredientRow(
                 ) {
                     ingredients.forEach { ingredient ->
                         DropdownMenuItem(
-                            text = { Text(ingredient.ingredientName) },
+                            text = { Text(ingredient.ingredientName, fontSize = 13.sp) },
                             onClick = {
                                 onIngredientSelected(ingredient)
                                 ingredientExpanded = false
@@ -475,26 +573,26 @@ private fun RecipeIngredientRow(
                 value = line.quantity,
                 onValueChange = onQuantityChanged,
                 modifier = Modifier
-                    .width(70.dp)
-                    .height(48.dp),
+                    .width(75.dp)
+                    .height(44.dp),
                 shape = RoundedCornerShape(8.dp),
-                singleLine = true
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = RmGreen,
+                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                )
             )
 
-            Box(
-                modifier = Modifier
-                    .width(58.dp)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF5F5F5)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = line.unit.ifBlank { "unit" },
-                    fontSize = 12.sp,
-                    color = RmTextSub
-                )
-            }
+            Text(
+                text = line.unit.ifBlank { "-" },
+                fontSize = 11.sp,
+                color = RmTextSub,
+                modifier = Modifier.width(45.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
             IconButton(
                 onClick = onRemove,
@@ -503,15 +601,18 @@ private fun RecipeIngredientRow(
                 Icon(
                     imageVector = Icons.Default.RemoveCircleOutline,
                     contentDescription = "Remove",
-                    tint = Color.Red
+                    tint = Color(0xFFE57373)
                 )
             }
         }
 
-        if (selectedIngredient?.unitType.equals("pcs", ignoreCase = true)) {
+        val unit = selectedIngredient?.unitType ?: ""
+        val isPcsOrCan = unit.equals("pcs", ignoreCase = true) || unit.equals("can", ignoreCase = true)
+
+        if (isPcsOrCan) {
             Text(
-                text = "Enter grams. Inventory deducts pcs using estimated weight per unit.",
-                fontSize = 10.sp,
+                text = "Enter grams. Inventory deducts $unit using estimated weight per unit.",
+                fontSize = 9.sp,
                 color = RmTextSub,
                 modifier = Modifier.padding(start = 4.dp, top = 2.dp)
             )

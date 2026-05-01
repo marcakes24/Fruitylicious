@@ -169,15 +169,18 @@ class TransactionRepository @Inject constructor(
                     branchId = branchId
                 )
 
+                val ingredient = ingredientDao.getIngredientById(ingredientId)
+                val ingredientName = ingredient?.ingredientName ?: "Ingredient $ingredientId"
+
                 if (inventory == null) {
                     return Result.failure(
-                        IllegalStateException("Inventory item not found for ingredient $ingredientId.")
+                        IllegalStateException("Inventory item not found for $ingredientName.")
                     )
                 }
 
                 if (inventory.currentStock < requiredQuantity) {
                     return Result.failure(
-                        IllegalStateException("Insufficient stock for ingredient $ingredientId.")
+                        IllegalStateException("Insufficient stock for $ingredientName.")
                     )
                 }
             }
@@ -362,10 +365,13 @@ class TransactionRepository @Inject constructor(
         estimatedWeightPerUnit: Double,
         ingredientName: String
     ): Double {
-        return if (unitType.equals("pcs", ignoreCase = true)) {
+        val isPcsOrCan = unitType.equals("pcs", ignoreCase = true) || 
+                         unitType.equals("can", ignoreCase = true)
+
+        return if (isPcsOrCan) {
             if (estimatedWeightPerUnit <= 0.0) {
                 throw IllegalStateException(
-                    "$ingredientName uses pcs but estimated weight per unit is not set."
+                    "$ingredientName uses $unitType but estimated weight per unit is not set."
                 )
             }
 

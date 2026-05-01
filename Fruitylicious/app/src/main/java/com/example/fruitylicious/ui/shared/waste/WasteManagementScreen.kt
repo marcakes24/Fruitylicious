@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
@@ -205,20 +206,28 @@ fun WasteManagementScreen(
                 item {
                     Button(
                         onClick = {
-                            showWasteEntry = true
-                            viewModel.clearMessages()
+                            if (uiState.isClockedIn) {
+                                showWasteEntry = true
+                                viewModel.clearMessages()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .shadow(2.dp, RoundedCornerShape(12.dp)),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = WsGreen)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
+                        )
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                        Icon(
+                            imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Waste Entry",
+                            text = if (uiState.isClockedIn) "Waste Entry" else "Clock in required",
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold

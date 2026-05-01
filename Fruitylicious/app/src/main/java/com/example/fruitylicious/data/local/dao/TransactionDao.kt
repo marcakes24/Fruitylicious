@@ -22,9 +22,6 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE transactionId = :transactionId LIMIT 1")
     suspend fun getTransactionById(transactionId: String): TransactionEntity?
 
-    @Query("SELECT * FROM transactions WHERE userId = :userId ORDER BY dateTime DESC")
-    fun observeTransactionsByUser(userId: Int): Flow<List<TransactionEntity>>
-
     @Query(
         """
         SELECT * FROM transactions
@@ -37,16 +34,6 @@ interface TransactionDao {
 
     @Query(
         """
-        SELECT * FROM transactions
-        WHERE branchId = :branchId
-        AND dateTime BETWEEN :from AND :to
-        ORDER BY dateTime DESC
-        """
-    )
-    suspend fun getTransactionsByDateRange(branchId: Int, from: Long, to: Long): List<TransactionEntity>
-
-    @Query(
-        """
         SELECT COALESCE(SUM(totalAmount), 0.0)
         FROM transactions
         WHERE branchId = :branchId
@@ -55,17 +42,6 @@ interface TransactionDao {
         """
     )
     fun observeCompletedSalesTotal(branchId: Int, from: Long, to: Long): Flow<Double>
-
-    @Query(
-        """
-        SELECT COALESCE(SUM(totalAmount), 0.0)
-        FROM transactions
-        WHERE branchId = :branchId
-        AND status = 'completed'
-        AND dateTime BETWEEN :from AND :to
-        """
-    )
-    suspend fun getCompletedSalesTotal(branchId: Int, from: Long, to: Long): Double
 
     @Query("SELECT * FROM transactions WHERE isSynced = 0")
     suspend fun getUnsyncedTransactions(): List<TransactionEntity>
@@ -78,18 +54,6 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET isSynced = 1, syncedAt = :syncedAt WHERE transactionId = :transactionId")
     suspend fun markSynced(transactionId: String, syncedAt: Long)
-
-    @Query("DELETE FROM transactions WHERE transactionId = :transactionId")
-    suspend fun deleteTransaction(transactionId: String)
-
-    @Transaction
-    suspend fun upsertTransactionAndRun(
-        transaction: TransactionEntity,
-        block: suspend () -> Unit
-    ) {
-        upsertTransaction(transaction)
-        block()
-    }
 
     @Query(
         """

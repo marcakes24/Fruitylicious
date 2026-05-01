@@ -28,6 +28,10 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
@@ -113,6 +117,7 @@ fun ManageProductsScreen(
     var deleteName by remember { mutableStateOf("") }
     var deleteProductVariantId by remember { mutableStateOf<Int?>(null) }
     var deleteAddonId by remember { mutableStateOf<Int?>(null) }
+    var deleteFullProductId by remember { mutableStateOf<Int?>(null) }
 
     val filteredProducts = uiState.productRows.filter {
         it.product.productName.contains(searchQuery, ignoreCase = true) ||
@@ -275,10 +280,18 @@ fun ManageProductsScreen(
                                                     currentProductRow = row
                                                     showProductDialog = true
                                                 },
-                                                onDelete = {
+                                                onDeleteSize = {
                                                     deleteProductVariantId = row.variant.variantId
                                                     deleteAddonId = null
-                                                    deleteName = "${row.product.productName} ${row.variant.sizeName}"
+                                                    deleteFullProductId = null
+                                                    deleteName = "${row.product.productName} (${row.variant.sizeName})"
+                                                    showDeleteDialog = true
+                                                },
+                                                onDeleteProduct = {
+                                                    deleteFullProductId = row.product.productId
+                                                    deleteProductVariantId = null
+                                                    deleteAddonId = null
+                                                    deleteName = "ENTIRE ${row.product.productName}"
                                                     showDeleteDialog = true
                                                 }
                                             )
@@ -300,6 +313,7 @@ fun ManageProductsScreen(
                                                 onDelete = {
                                                     deleteAddonId = addon.productId
                                                     deleteProductVariantId = null
+                                                    deleteFullProductId = null
                                                     deleteName = addon.productName
                                                     showDeleteDialog = true
                                                 }
@@ -316,10 +330,11 @@ fun ManageProductsScreen(
             if (showProductDialog) {
                 ProductEditDialog(
                     row = currentProductRow,
+                    existingProducts = uiState.products,
                     onDismiss = { showProductDialog = false },
-                    onSave = { name, size, price, image ->
+                    onSave = { productId, name, size, price, image ->
                         viewModel.saveProductWithVariant(
-                            existingProductId = currentProductRow?.product?.productId,
+                            existingProductId = productId ?: currentProductRow?.product?.productId,
                             existingVariantId = currentProductRow?.variant?.variantId,
                             name = name,
                             image = image,
@@ -351,10 +366,15 @@ fun ManageProductsScreen(
                 DeleteConfirmationDialog(
                     itemName = deleteName,
                     isAddon = deleteAddonId != null,
+                    isFullProduct = deleteFullProductId != null,
                     onDismiss = { showDeleteDialog = false },
                     onConfirm = {
                         deleteProductVariantId?.let {
                             viewModel.deleteProductVariant(it)
+                        }
+
+                        deleteFullProductId?.let {
+                            viewModel.deleteFullProduct(it)
                         }
 
                         deleteAddonId?.let {
@@ -458,21 +478,78 @@ private fun DialogTextField(
 @Composable
 private fun ProductEditDialog(
     row: ProductVariantRow?,
+    existingProducts: List<ProductEntity>,
     onDismiss: () -> Unit,
-    onSave: (name: String, size: String, price: String, image: String) -> Unit
+    onSave: (productId: Int?, name: String, size: String, price: String, image: String) -> Unit
 ) {
+    var selectedProduct by remember { mutableStateOf<ProductEntity?>(row?.product) }
     var name by remember { mutableStateOf(row?.product?.productName ?: "") }
     var size by remember { mutableStateOf(row?.variant?.sizeName ?: "") }
     var price by remember { mutableStateOf(row?.variant?.price?.toString() ?: "") }
     var image by remember { mutableStateOf(row?.product?.image ?: "") }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+
+    val isEditing = row != null
 
     EditDialogShell(
-        title = "Add / Edit Product",
+        title = if (isEditing) "Edit Product Size" else "Add Product Size",
         onDismiss = onDismiss,
-        onSave = { onSave(name, size, price, image) }
+        onSave = { onSave(selectedProduct?.productId, name, size, price, image) }
     ) {
-        FieldBlock("Product Name") {
-            DialogTextField(name, { name = it }, "e.g. Mango Shake")
+        if (!isEditing) {
+            FieldBlock("Select Product") {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { dropdownExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                    ) {
+                        Text(selectedProduct?.productName ?: "--- Create New Product ---")
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null)
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.8f).background(Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("--- Create New Product ---") },
+                            onClick = {
+                                selectedProduct = null
+                                dropdownExpanded = false
+                            }
+                        )
+                        existingProducts.forEach { product ->
+                            DropdownMenuItem(
+                                text = { Text(product.productName) },
+                                onClick = {
+                                    selectedProduct = product
+                                    name = product.productName
+                                    image = product.image ?: ""
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (selectedProduct == null) {
+            FieldBlock("Product Name") {
+                DialogTextField(name, { name = it }, "e.g. Mango Shake")
+            }
+        } else {
+            FieldBlock("Product Name") {
+                Text(
+                    text = selectedProduct?.productName ?: "",
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         FieldBlock("Size") {
@@ -483,11 +560,12 @@ private fun ProductEditDialog(
             DialogTextField(price, { price = it }, "0.00")
         }
 
-        FieldBlock("Image URI") {
-            DialogTextField(image, { image = it }, "Optional image URI")
+        if (selectedProduct == null) {
+            FieldBlock("Image URI") {
+                DialogTextField(image, { image = it }, "Optional image URI")
+            }
+            UploadBox("Upload product image")
         }
-
-        UploadBox("Upload product image")
     }
 }
 
@@ -672,6 +750,7 @@ private fun UploadBox(label: String) {
 private fun DeleteConfirmationDialog(
     itemName: String,
     isAddon: Boolean,
+    isFullProduct: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -703,8 +782,14 @@ private fun DeleteConfirmationDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                val title = when {
+                    isAddon -> "Delete Add on"
+                    isFullProduct -> "Delete WHOLE Product"
+                    else -> "Delete Product Size"
+                }
+
                 Text(
-                    text = if (isAddon) "Delete Add on" else "Delete Product Size",
+                    text = title,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = MpTextMain
@@ -712,8 +797,14 @@ private fun DeleteConfirmationDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                val warningText = if (isFullProduct) {
+                    "Are you sure you want to remove\n$itemName?\nThis will delete ALL sizes!"
+                } else {
+                    "Are you sure you want to\nremove $itemName?"
+                }
+
                 Text(
-                    text = "Are you sure you want to\nremove $itemName?",
+                    text = warningText,
                     fontSize = 14.sp,
                     color = MpTextSub,
                     textAlign = TextAlign.Center,
@@ -766,7 +857,8 @@ private fun DeleteConfirmationDialog(
 private fun ProductRow(
     row: ProductVariantRow,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDeleteSize: () -> Unit,
+    onDeleteProduct: () -> Unit
 ) {
     RowCard {
         IconCircle(
@@ -793,7 +885,8 @@ private fun ProductRow(
 
         RowButtons(
             onEdit = onEdit,
-            onDelete = onDelete
+            onDelete = onDeleteSize,
+            onDeleteProduct = onDeleteProduct
         )
     }
 }
@@ -873,7 +966,8 @@ private fun IconCircle(
 @Composable
 private fun RowButtons(
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDeleteProduct: (() -> Unit)? = null
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(
@@ -894,16 +988,33 @@ private fun RowButtons(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(7.dp))
-                .background(MpRed)
+                .background(MpRed.copy(alpha = 0.8f))
                 .clickable { onDelete() }
                 .padding(horizontal = 10.dp, vertical = 7.dp)
         ) {
             Text(
-                text = "Delete",
+                text = "Size",
                 color = Color.White,
-                fontSize = 13.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
+        }
+
+        if (onDeleteProduct != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(MpRed)
+                    .clickable { onDeleteProduct() }
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = "Product",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

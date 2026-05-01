@@ -12,6 +12,7 @@ import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
+import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,6 +49,7 @@ data class WasteManagementUiState(
     val isAdmin: Boolean = false,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
+    val isClockedIn: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -59,6 +61,7 @@ class WasteManagementViewModel @Inject constructor(
     private val ingredientDao: IngredientDao,
     private val wasteLogDao: WasteLogDao,
     private val auditLogDao: AuditLogDao,
+    private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig
 ) : ViewModel() {
@@ -79,6 +82,27 @@ class WasteManagementViewModel @Inject constructor(
         observeInventory()
         observeIngredients()
         observeWasteLogs()
+        checkClockInStatus()
+    }
+
+    private fun checkClockInStatus() {
+        viewModelScope.launch {
+            val role = sessionManager.getRole()
+            if (role?.equals("admin", ignoreCase = true) == true) {
+                _uiState.update { it.copy(isClockedIn = true) }
+                return@launch
+            }
+
+            val userId = sessionManager.getUserId()
+            val activeLog = staffLogRepository.getActiveLogForUser(userId)
+
+            _uiState.update {
+                it.copy(
+                    isClockedIn = activeLog != null,
+                    error = if (activeLog == null) "You must clock in before recording waste." else null
+                )
+            }
+        }
     }
 
     private fun observeInventory() {
@@ -154,6 +178,11 @@ class WasteManagementViewModel @Inject constructor(
         quantityText: String,
         reason: String
     ) {
+        if (!_uiState.value.isClockedIn) {
+            setError("You must be clocked in to perform this action.")
+            return
+        }
+
         if (ingredient == null) {
             setError("Select an ingredient.")
             return

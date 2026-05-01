@@ -8,19 +8,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,7 +36,10 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -50,8 +59,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.launch
 
 private val AuditGreenPrimary = Color(0xFF2E7D32)
@@ -78,22 +89,41 @@ fun AuditLogScreen(
         mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
     }
 
-    val filteredLogs = uiState.logs.filter { log ->
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> log.branchId == 1
-            "B2" -> log.branchId == 2
-            else -> true
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    val datePickerState = rememberDatePickerState()
+
+    val filteredLogs = remember(uiState.logs, searchQuery, selectedBranch, selectedDateMillis) {
+        uiState.logs.filter { log ->
+            val matchesBranch = when (selectedBranch) {
+                "B1" -> log.branchId == 1
+                "B2" -> log.branchId == 2
+                else -> true
+            }
+
+            val matchesSearch =
+                log.logId.contains(searchQuery, ignoreCase = true) ||
+                        log.action.contains(searchQuery, ignoreCase = true) ||
+                        log.description.contains(searchQuery, ignoreCase = true) ||
+                        log.tableAffected.contains(searchQuery, ignoreCase = true) ||
+                        log.userName.contains(searchQuery, ignoreCase = true) ||
+                        log.username.contains(searchQuery, ignoreCase = true)
+
+            val matchesDate = if (selectedDateMillis != null) {
+                val cal1 = Calendar.getInstance().apply { timeInMillis = log.timestamp }
+                
+                val filterCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                    timeInMillis = selectedDateMillis!!
+                }
+                val filterDay = filterCal.get(Calendar.DAY_OF_YEAR)
+                val filterYear = filterCal.get(Calendar.YEAR)
+                
+                cal1.get(Calendar.DAY_OF_YEAR) == filterDay && 
+                cal1.get(Calendar.YEAR) == filterYear
+            } else true
+
+            matchesBranch && matchesSearch && matchesDate
         }
-
-        val matchesSearch =
-            log.logId.contains(searchQuery, ignoreCase = true) ||
-                    log.action.contains(searchQuery, ignoreCase = true) ||
-                    log.description.contains(searchQuery, ignoreCase = true) ||
-                    log.tableAffected.contains(searchQuery, ignoreCase = true) ||
-                    log.userName.contains(searchQuery, ignoreCase = true) ||
-                    log.username.contains(searchQuery, ignoreCase = true)
-
-        matchesBranch && matchesSearch
     }
 
     ModalNavigationDrawer(
@@ -136,34 +166,134 @@ fun AuditLogScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .background(Color.White, RoundedCornerShape(12.dp)),
-                    placeholder = {
-                        Text(
-                            text = "Search ID, user, action, table...",
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                        )
-                    },
-                    leadingIcon = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp)
+                            .background(Color.White, RoundedCornerShape(12.dp)),
+                        placeholder = {
+                            Text(
+                                text = "Search...",
+                                color = Color.LightGray,
+                                fontSize = 14.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = Color.LightGray
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear search",
+                                        tint = Color.Gray
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = AuditGreenPrimary
+                        ),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selectedDateMillis != null) AuditGreenPrimary else Color.White)
+                            .clickable { showDatePicker = true },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = Color.LightGray
+                            imageVector = Icons.Outlined.CalendarToday,
+                            contentDescription = "Filter by date",
+                            tint = if (selectedDateMillis != null) Color.White else Color.Gray
                         )
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = AuditGreenPrimary
-                    ),
-                    singleLine = true
-                )
+                    }
+                }
+
+                if (selectedDateMillis != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = AuditGreenPrimary.copy(alpha = 0.1f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AuditGreenPrimary)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(selectedDateMillis!!)),
+                                    fontSize = 12.sp,
+                                    color = AuditGreenPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear date",
+                                    tint = AuditGreenPrimary,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { selectedDateMillis = null }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (showDatePicker) {
+                    DatePickerDialog(
+                        onDismissRequest = { showDatePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                selectedDateMillis = datePickerState.selectedDateMillis
+                                showDatePicker = false
+                            }) {
+                                Text("OK", color = AuditGreenPrimary)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDatePicker = false }) {
+                                Text("Cancel", color = AuditGreenPrimary)
+                            }
+                        }
+                    ) {
+                        DatePicker(
+                            state = datePickerState,
+                            colors = androidx.compose.material3.DatePickerDefaults.colors(
+                                todayContentColor = AuditGreenPrimary,
+                                todayDateBorderColor = AuditGreenPrimary,
+                                selectedDayContainerColor = AuditGreenPrimary,
+                                selectedDayContentColor = Color.White,
+                                selectedYearContainerColor = AuditGreenPrimary,
+                                selectedYearContentColor = Color.White
+                            )
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

@@ -35,9 +35,6 @@ interface TransactionItemAddonDao {
     suspend fun getUnsyncedTransactionItemAddons(): List<TransactionItemAddonEntity>
 
     @Upsert
-    suspend fun upsertAddon(addon: TransactionItemAddonEntity)
-
-    @Upsert
     suspend fun upsertAddons(addons: List<TransactionItemAddonEntity>)
 
     @Query(
@@ -51,12 +48,6 @@ interface TransactionItemAddonDao {
         transactionItemAddonId: String,
         syncedAt: Long
     )
-
-    @Query("DELETE FROM transaction_item_addons WHERE transactionItemAddonId = :transactionItemAddonId")
-    suspend fun deleteAddon(transactionItemAddonId: String)
-
-    @Query("DELETE FROM transaction_item_addons WHERE transactionItemId = :transactionItemId")
-    suspend fun deleteAddonsForTransactionItem(transactionItemId: String)
 
     @Query("SELECT * FROM transaction_item_addons ORDER BY transactionItemId ASC")
     fun observeAllTransactionItemAddons(): Flow<List<TransactionItemAddonEntity>>

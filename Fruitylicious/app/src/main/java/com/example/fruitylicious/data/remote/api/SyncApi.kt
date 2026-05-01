@@ -18,7 +18,7 @@ interface SyncApi {
 
     @GET("/api/sync/pull")
     suspend fun pull(
-        @Query("since") since: String
+        @Query("since") since: Long
     ): Response<PullResponseDto>
 }
 

@@ -28,6 +28,8 @@ data class RecipeLineUi(
 
 data class RecipeManagementUiState(
     val products: List<ProductEntity> = emptyList(),
+    val addons: List<ProductEntity> = emptyList(),
+    val productIdsWithRecipes: Set<Int> = emptySet(),
     val variantsByProductId: Map<Int, List<ProductVariantEntity>> = emptyMap(),
     val ingredients: List<IngredientEntity> = emptyList(),
     val selectedProduct: ProductEntity? = null,
@@ -53,13 +55,29 @@ class RecipeManagementViewModel @Inject constructor(
         observeProducts()
         observeVariants()
         observeIngredients()
+        observeRecipes()
+    }
+
+    private fun observeRecipes() {
+        viewModelScope.launch {
+            productRecipeDao.observeRecipes().collectLatest { recipes ->
+                val ids = recipes.map { it.productId }.toSet()
+                _uiState.update { it.copy(productIdsWithRecipes = ids) }
+            }
+        }
     }
 
     private fun observeProducts() {
         viewModelScope.launch {
-            productRepository.observeMainProducts().collectLatest { products ->
+            productRepository.observeProducts().collectLatest { products ->
+                val main = products.filter { !it.isAddon }
+                val addons = products.filter { it.isAddon }
                 _uiState.update {
-                    it.copy(products = products, isLoading = false)
+                    it.copy(
+                        products = main,
+                        addons = addons,
+                        isLoading = false
+                    )
                 }
             }
         }
@@ -101,8 +119,10 @@ class RecipeManagementViewModel @Inject constructor(
             )
         }
 
-        firstVariant?.let {
-            loadRecipe(it.variantId)
+        if (firstVariant != null) {
+            loadRecipe(firstVariant.variantId)
+        } else {
+            loadProductRecipe(product.productId)
         }
     }
 
@@ -122,27 +142,39 @@ class RecipeManagementViewModel @Inject constructor(
     private fun loadRecipe(variantId: Int) {
         viewModelScope.launch {
             val recipes = productRecipeDao.getRecipesForVariant(variantId)
-            val ingredients = _uiState.value.ingredients.associateBy { it.ingredientId }
+            mapRecipesToUi(recipes)
+        }
+    }
 
-            _uiState.update {
-                it.copy(
-                    recipeLines = if (recipes.isEmpty()) {
-                        listOf(RecipeLineUi())
-                    } else {
-                        recipes.map { recipe ->
-                            val ingredient = ingredients[recipe.ingredientId]
+    private fun loadProductRecipe(productId: Int) {
+        viewModelScope.launch {
+            val recipes = productRecipeDao.getRecipesForProduct(productId)
+                .filter { it.variantId == null }
+            mapRecipesToUi(recipes)
+        }
+    }
 
-                            RecipeLineUi(
-                                ingredientId = recipe.ingredientId,
-                                quantity = recipe.quantityRequired.toString(),
-                                unit = ingredient?.let { item ->
-                                    recipeInputUnitFor(item)
-                                } ?: ""
-                            )
-                        }
+    private fun mapRecipesToUi(recipes: List<ProductRecipeEntity>) {
+        val ingredients = _uiState.value.ingredients.associateBy { it.ingredientId }
+
+        _uiState.update {
+            it.copy(
+                recipeLines = if (recipes.isEmpty()) {
+                    listOf(RecipeLineUi())
+                } else {
+                    recipes.map { recipe ->
+                        val ingredient = ingredients[recipe.ingredientId]
+
+                        RecipeLineUi(
+                            ingredientId = recipe.ingredientId,
+                            quantity = recipe.quantityRequired.toString(),
+                            unit = ingredient?.let { item ->
+                                recipeInputUnitFor(item)
+                            } ?: ""
+                        )
                     }
-                )
-            }
+                }
+            )
         }
     }
 
@@ -194,8 +226,15 @@ class RecipeManagementViewModel @Inject constructor(
         val product = state.selectedProduct
         val variant = state.selectedVariant
 
-        if (product == null || variant == null) {
-            setError("Select a product and size first.")
+        if (product == null) {
+            setError("Select a product first.")
+            return
+        }
+
+        // If product has variants, one must be selected. If no variants, variant can be null.
+        val variants = state.variantsByProductId[product.productId].orEmpty()
+        if (variants.isNotEmpty() && variant == null) {
+            setError("Select a size first.")
             return
         }
 
@@ -216,13 +255,17 @@ class RecipeManagementViewModel @Inject constructor(
         viewModelScope.launch {
             val now = System.currentTimeMillis()
 
-            productRecipeDao.deleteRecipesForVariant(variant.variantId)
+            if (variant != null) {
+                productRecipeDao.deleteRecipesForVariant(variant.variantId)
+            } else {
+                productRecipeDao.deleteRecipesForProduct(product.productId)
+            }
 
             val recipes = validLines.map { (line, quantity) ->
                 ProductRecipeEntity(
                     recipeId = generateId(),
                     productId = product.productId,
-                    variantId = variant.variantId,
+                    variantId = variant?.variantId,
                     ingredientId = line.ingredientId,
                     quantityRequired = quantity,
                     lastModified = now,
@@ -266,7 +309,7 @@ class RecipeManagementViewModel @Inject constructor(
 
     private fun recipeInputUnitFor(ingredient: IngredientEntity): String {
         return when (ingredient.unitType.lowercase()) {
-            "pcs", "piece", "pieces" -> "g"
+            "pcs", "piece", "pieces", "can" -> "g"
             "grams", "gram", "g" -> "g"
             "milliliters", "milliliter", "ml" -> "ml"
             else -> ingredient.unitType

@@ -15,12 +15,6 @@ interface RestockLogDao {
     @Query("SELECT * FROM restock_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
     suspend fun getRestockLogsByBranch(branchId: Int): List<RestockLogEntity>
 
-    @Query("SELECT * FROM restock_logs WHERE restockId = :restockId LIMIT 1")
-    suspend fun getRestockLogById(restockId: String): RestockLogEntity?
-
-    @Query("SELECT * FROM restock_logs WHERE userId = :userId ORDER BY dateTime DESC")
-    fun observeRestockLogsByUser(userId: Int): Flow<List<RestockLogEntity>>
-
     @Query(
         """
         SELECT * FROM restock_logs
@@ -30,16 +24,6 @@ interface RestockLogDao {
         """
     )
     fun observeRestockLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<RestockLogEntity>>
-
-    @Query(
-        """
-        SELECT * FROM restock_logs
-        WHERE branchId = :branchId
-        AND dateTime BETWEEN :from AND :to
-        ORDER BY dateTime DESC
-        """
-    )
-    suspend fun getRestockLogsByDateRange(branchId: Int, from: Long, to: Long): List<RestockLogEntity>
 
     @Query("SELECT * FROM restock_logs WHERE isSynced = 0")
     suspend fun getUnsyncedRestockLogs(): List<RestockLogEntity>

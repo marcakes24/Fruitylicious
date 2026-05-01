@@ -18,9 +18,6 @@ interface StaffLogDao {
     @Query("SELECT * FROM staff_logs WHERE userId = :userId ORDER BY clockIn DESC")
     fun observeStaffLogsByUser(userId: Int): Flow<List<StaffLogEntity>>
 
-    @Query("SELECT * FROM staff_logs WHERE logId = :logId LIMIT 1")
-    suspend fun getStaffLogById(logId: String): StaffLogEntity?
-
     @Query(
         """
         SELECT * FROM staff_logs
@@ -43,24 +40,11 @@ interface StaffLogDao {
     )
     fun observeStaffLogsByDateRange(branchId: Int, from: Long, to: Long): Flow<List<StaffLogEntity>>
 
-    @Query(
-        """
-        SELECT * FROM staff_logs
-        WHERE branchId = :branchId
-        AND clockIn BETWEEN :from AND :to
-        ORDER BY clockIn DESC
-        """
-    )
-    suspend fun getStaffLogsByDateRange(branchId: Int, from: Long, to: Long): List<StaffLogEntity>
-
     @Query("SELECT * FROM staff_logs WHERE isSynced = 0")
     suspend fun getUnsyncedStaffLogs(): List<StaffLogEntity>
 
     @Upsert
     suspend fun upsertStaffLog(staffLog: StaffLogEntity)
-
-    @Upsert
-    suspend fun upsertStaffLogs(staffLogs: List<StaffLogEntity>)
 
     @Query(
         """
@@ -76,9 +60,6 @@ interface StaffLogDao {
 
     @Query("UPDATE staff_logs SET isSynced = 1, syncedAt = :syncedAt WHERE logId = :logId")
     suspend fun markSynced(logId: String, syncedAt: Long)
-
-    @Query("DELETE FROM staff_logs WHERE logId = :logId")
-    suspend fun deleteStaffLog(logId: String)
 
     @Query("SELECT * FROM staff_logs ORDER BY clockIn DESC")
     fun observeAllStaffLogs(): Flow<List<StaffLogEntity>>

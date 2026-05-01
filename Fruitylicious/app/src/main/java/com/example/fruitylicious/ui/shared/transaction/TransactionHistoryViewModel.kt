@@ -193,6 +193,11 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     fun voidTransaction(transactionId: String) {
+        if (sessionManager.getRole()?.equals("admin", ignoreCase = true) != true) {
+            _uiState.update { it.copy(error = "Only admins can void transactions.") }
+            return
+        }
+
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val userId = sessionManager.getUserId()

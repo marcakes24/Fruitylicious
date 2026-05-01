@@ -108,9 +108,6 @@ interface InventoryDao {
     @Query("UPDATE inventory SET isSynced = 1, syncedAt = :syncedAt WHERE ingredientId = :ingredientId AND branchId = :branchId")
     suspend fun markSynced(ingredientId: Int, branchId: Int, syncedAt: Long)
 
-    @Query("DELETE FROM inventory WHERE ingredientId = :ingredientId AND branchId = :branchId")
-    suspend fun deleteInventoryItem(ingredientId: Int, branchId: Int)
-
     @Query("SELECT * FROM inventory ORDER BY branchId ASC, ingredientId ASC")
     fun observeAllInventory(): Flow<List<InventoryEntity>>
 

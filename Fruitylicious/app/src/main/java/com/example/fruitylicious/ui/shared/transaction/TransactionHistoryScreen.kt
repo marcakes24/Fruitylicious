@@ -238,6 +238,7 @@ fun TransactionHistoryScreen(
                     TransactionHistoryCard(
                         transactions = filteredTransactions,
                         isLoading = uiState.isLoading,
+                        isAdmin = uiState.isAdmin,
                         onTransactionClick = { selectedTransaction = it },
                         onVoidClick = { transactionToVoid = it }
                     )
@@ -250,6 +251,7 @@ fun TransactionHistoryScreen(
         if (transactionToVoid == null) {
             TransactionDetailsDialog(
                 transaction = transaction,
+                isAdmin = uiState.isAdmin,
                 onDismiss = { selectedTransaction = null },
                 onVoidClick = {
                     transactionToVoid = transaction
@@ -412,6 +414,7 @@ private fun FilterCard(
 private fun TransactionHistoryCard(
     transactions: List<TransactionHistoryRow>,
     isLoading: Boolean,
+    isAdmin: Boolean,
     onTransactionClick: (TransactionHistoryRow) -> Unit,
     onVoidClick: (TransactionHistoryRow) -> Unit
 ) {
@@ -465,6 +468,7 @@ private fun TransactionHistoryCard(
                     transactions.forEachIndexed { index, transaction ->
                         TransactionListItem(
                             transaction = transaction,
+                            isAdmin = isAdmin,
                             onClick = { onTransactionClick(transaction) },
                             onVoidClick = { onVoidClick(transaction) }
                         )
@@ -494,6 +498,7 @@ private fun EmptyText(text: String) {
 @Composable
 private fun TransactionListItem(
     transaction: TransactionHistoryRow,
+    isAdmin: Boolean,
     onClick: () -> Unit,
     onVoidClick: () -> Unit
 ) {
@@ -543,18 +548,20 @@ private fun TransactionListItem(
             )
 
             if (!isVoid) {
-                Surface(
-                    color = ThRed,
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.clickable { onVoidClick() }
-                ) {
-                    Text(
-                        text = "Void",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
-                    )
+                if (isAdmin) {
+                    Surface(
+                        color = ThRed,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.clickable { onVoidClick() }
+                    ) {
+                        Text(
+                            text = "Void",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             } else {
                 Surface(
@@ -584,6 +591,7 @@ private fun TransactionListItem(
 @Composable
 private fun TransactionDetailsDialog(
     transaction: TransactionHistoryRow,
+    isAdmin: Boolean,
     onDismiss: () -> Unit,
     onVoidClick: () -> Unit
 ) {
@@ -649,7 +657,7 @@ private fun TransactionDetailsDialog(
                         Text("Close", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
 
-                    if (!isVoid) {
+                    if (!isVoid && isAdmin) {
                         Button(
                             onClick = onVoidClick,
                             modifier = Modifier

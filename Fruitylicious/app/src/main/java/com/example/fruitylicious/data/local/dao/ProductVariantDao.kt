@@ -44,9 +44,6 @@ interface ProductVariantDao {
     @Upsert
     suspend fun upsertVariant(variant: ProductVariantEntity)
 
-    @Upsert
-    suspend fun upsertVariants(variants: List<ProductVariantEntity>)
-
     @Query(
         """
         UPDATE product_variants
@@ -64,4 +61,7 @@ interface ProductVariantDao {
 
     @Query("DELETE FROM product_variants WHERE productId = :productId")
     suspend fun deleteVariantsForProduct(productId: Int)
+
+    @Upsert
+    suspend fun upsertVariants(variants: List<ProductVariantEntity>)
 }

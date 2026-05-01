@@ -208,18 +208,22 @@ fun RestockScreen(
                 item {
                     Button(
                         onClick = {
-                            showRestockEntry = true
-                            viewModel.clearMessages()
+                            if (uiState.isClockedIn) {
+                                showRestockEntry = true
+                                viewModel.clearMessages()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .shadow(2.dp, RoundedCornerShape(12.dp)),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = RsGreen)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.isClockedIn) RsGreen else Color.LightGray
+                        )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Add,
+                            imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
                             contentDescription = null,
                             tint = Color.White
                         )
@@ -227,7 +231,7 @@ fun RestockScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = "Restock Entry",
+                            text = if (uiState.isClockedIn) "Restock Entry" else "Clock in required",
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold

@@ -69,7 +69,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fruitylicious.STAFF_CHECKOUT
+import com.example.fruitylicious.data.local.entity.IngredientEntity
+import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.ProductEntity
+import com.example.fruitylicious.data.local.entity.ProductRecipeEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.data.repository.CartItem
 import kotlinx.coroutines.delay
@@ -103,7 +106,11 @@ fun PosScreen(
         ProductCustomizeDialog(
             product = product,
             variants = variants,
+            mainProducts = uiState.products,
             addons = uiState.addons,
+            recipes = uiState.recipes,
+            inventory = uiState.inventory,
+            ingredients = uiState.ingredients,
             onDismiss = { selectedProduct = null },
             onAddToCart = { variant, mixAddon, selectedAddons, quantity ->
                 viewModel.addCustomizedItem(
@@ -118,6 +125,42 @@ fun PosScreen(
                 addedToCartMsg = true
             }
         )
+    }
+
+    if (!uiState.isClockedIn) {
+        Dialog(onDismissRequest = { onBack() }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(text = "🕒", fontSize = 48.sp)
+                    Text(
+                        text = "Not Clocked In",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = uiState.error ?: "You must clock in before using the POS.",
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray
+                    )
+                    Button(
+                        onClick = { onBack() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Go Back")
+                    }
+                }
+            }
+        }
     }
 
     Box(
@@ -312,7 +355,11 @@ private fun ProductGridItem(
 private fun ProductCustomizeDialog(
     product: ProductEntity,
     variants: List<ProductVariantEntity>,
+    mainProducts: List<ProductEntity>,
     addons: List<ProductEntity>,
+    recipes: List<ProductRecipeEntity>,
+    inventory: List<InventoryEntity>,
+    ingredients: List<IngredientEntity>,
     onDismiss: () -> Unit,
     onAddToCart: (
         variant: ProductVariantEntity,
@@ -333,18 +380,59 @@ private fun ProductCustomizeDialog(
 
     val variant = selectedVariant
 
-    val mixCost = if (mixFlavor) {
-        selectedFlavor?.price ?: 0.0
-    } else {
-        0.0
-    }
+    val mixCost = if (mixFlavor && selectedFlavor != null) 15.0 else 0.0
 
     val addOnCost = selectedAddOns.sumOf { it.price }
     val basePrice = variant?.price ?: 0.0
     val itemTotal = (basePrice + mixCost + addOnCost) * quantity
 
-    val availableMixFlavors = addons.filter { it.productId != product.productId }
+    val availableMixFlavors = mainProducts.filter { it.productId != product.productId }
     val availableAddons = addons.filter { it.productId != selectedFlavor?.productId }
+
+    // Validation Logic
+    val variantRecipe = recipes.filter { it.variantId == selectedVariant?.variantId }
+    val productRecipe = recipes.filter { it.productId == product.productId && it.variantId == null }
+    val activeRecipe = if (variantRecipe.isNotEmpty()) variantRecipe else productRecipe
+
+    val mixRecipe = if (mixFlavor && selectedFlavor != null) {
+        // For mix flavor, we might want to check the base product recipe or a specific mix recipe
+        // Usually, a mix flavor uses a portion of the second fruit's recipe
+        recipes.filter { it.productId == selectedFlavor?.productId && it.variantId == null }
+    } else emptyList()
+
+    val hasRecipe = activeRecipe.isNotEmpty()
+
+    val insufficientIngredients = remember(selectedVariant, selectedFlavor, mixFlavor, quantity, recipes, inventory, ingredients) {
+        val requirements = mutableMapOf<Int, Double>()
+
+        // Add main product requirements
+        activeRecipe.forEach { line ->
+            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+        }
+
+        // Add mix flavor requirements (assuming 50% or full portion for now)
+        mixRecipe.forEach { line ->
+            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+        }
+
+        requirements.filter { (ingredientId, req) ->
+            val stockItem = inventory.find { it.ingredientId == ingredientId }
+            val ingredient = ingredients.find { it.ingredientId == ingredientId }
+
+            val available = if (stockItem != null && ingredient != null) {
+                val unit = ingredient.unitType.lowercase(Locale.US)
+                if (unit == "can" || unit == "pcs") {
+                    stockItem.currentStock * ingredient.estimatedWeightPerUnit
+                } else {
+                    stockItem.currentStock
+                }
+            } else 0.0
+
+            available < req
+        }
+    }
+
+    val isStockAvailable = insufficientIngredients.isEmpty()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -465,7 +553,7 @@ private fun ProductCustomizeDialog(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "Add fruit",
+                            text = "+₱15",
                             fontSize = 12.sp,
                             color = Color.Black,
                             fontWeight = FontWeight.Bold
@@ -545,27 +633,26 @@ private fun ProductCustomizeDialog(
                                 .fillMaxWidth(0.8f)
                                 .background(Color.White)
                         ) {
-                            availableMixFlavors.forEach { addon ->
+                            if (availableMixFlavors.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "${addon.productName} • ₱${
-                                                String.format(
-                                                    Locale.US,
-                                                    "%,.2f",
-                                                    addon.price
-                                                )
-                                            }"
-                                        )
-                                    },
-                                    onClick = {
-                                        selectedFlavor = addon
-                                        selectedAddOns = selectedAddOns
-                                            .filterNot { it.productId == addon.productId }
-                                            .toSet()
-                                        dropdownExpanded = false
-                                    }
+                                    text = { Text("No other fruits available", color = Color.Gray) },
+                                    onClick = { dropdownExpanded = false }
                                 )
+                            } else {
+                                availableMixFlavors.forEach { addon ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(addon.productName)
+                                        },
+                                        onClick = {
+                                            selectedFlavor = addon
+                                            selectedAddOns = selectedAddOns
+                                                .filterNot { it.productId == addon.productId }
+                                                .toSet()
+                                            dropdownExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -710,7 +797,33 @@ private fun ProductCustomizeDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+
+                if (!hasRecipe) {
+                    Text(
+                        text = "⚠️ No recipe defined for this size.",
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                } else if (!isStockAvailable) {
+                    val ingredientNames = insufficientIngredients.keys.map { id ->
+                        ingredients.find { it.ingredientId == id }?.ingredientName ?: "ID: $id"
+                    }.joinToString(", ")
+
+                    Text(
+                        text = "⚠️ Insufficient stock for: $ingredientNames",
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -728,7 +841,7 @@ private fun ProductCustomizeDialog(
                             text = "₱${String.format(Locale.US, "%,.2f", itemTotal)}",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GreenPrimary
+                            color = if (hasRecipe && isStockAvailable) GreenPrimary else Color.Gray
                         )
                     }
 
@@ -743,12 +856,14 @@ private fun ProductCustomizeDialog(
                                 )
                             }
                         },
-                        enabled = variant != null,
+                        enabled = variant != null && hasRecipe && isStockAvailable,
                         modifier = Modifier
                             .height(54.dp)
                             .weight(1f)
                             .padding(start = 24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (hasRecipe && isStockAvailable) GreenPrimary else Color.LightGray
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
