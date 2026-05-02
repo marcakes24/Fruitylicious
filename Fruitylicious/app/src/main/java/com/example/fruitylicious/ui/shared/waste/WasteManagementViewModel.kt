@@ -45,7 +45,8 @@ data class WasteHistoryRow(
     val reason: String,
     val branchId: Int,
     val branchName: String,
-    val dateTime: Long
+    val dateTime: Long,
+    val imagePath: String? = null
 )
 
 data class WasteManagementUiState(
@@ -294,7 +295,8 @@ class WasteManagementViewModel @Inject constructor(
                     reason = log.reason,
                     branchId = log.branchId,
                     branchName = branchName,
-                    dateTime = log.dateTime
+                    dateTime = log.dateTime,
+                    imagePath = log.image
                 )
             }
             .sortedByDescending { it.dateTime }
@@ -334,7 +336,8 @@ class WasteManagementViewModel @Inject constructor(
                             reason = item.reason,
                             branchId = report.branchId ?: branchId,
                             branchName = report.branchName ?: "Branch $branchId",
-                            dateTime = item.dateTime
+                            dateTime = item.dateTime,
+                            imagePath = null
                         )
                     }.sortedByDescending { it.dateTime }
 
@@ -402,7 +405,8 @@ class WasteManagementViewModel @Inject constructor(
                                 reason = item.reason,
                                 branchId = report.branchId ?: branch.branchId,
                                 branchName = report.branchName ?: branch.branchName,
-                                dateTime = item.dateTime
+                                dateTime = item.dateTime,
+                                imagePath = null
                             )
                         }
 
@@ -429,7 +433,8 @@ class WasteManagementViewModel @Inject constructor(
     fun submitWaste(
         ingredient: WasteIngredientRow?,
         quantityText: String,
-        reason: String
+        reason: String,
+        imagePath: String?
     ) {
         if (!_uiState.value.isClockedIn) {
             setError("You must be clocked in to perform this action.")
@@ -479,7 +484,7 @@ class WasteManagementViewModel @Inject constructor(
                         userId = userId,
                         quantity = quantity,
                         reason = reason.ifBlank { "Waste entry" },
-                        image = null,
+                        image = imagePath,
                         dateTime = now,
                         lastModified = now,
                         isSynced = false,

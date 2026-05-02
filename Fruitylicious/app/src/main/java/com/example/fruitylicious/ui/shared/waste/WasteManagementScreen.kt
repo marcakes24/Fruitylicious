@@ -81,6 +81,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import com.example.fruitylicious.util.ImageStorage
 
 private val WsGreen = Color(0xFF2E7D32)
 private val WsPageBg = Color(0xFFFFEAA0)
@@ -308,11 +314,12 @@ fun WasteManagementScreen(
             onDismiss = {
                 showWasteEntry = false
             },
-            onSubmit = { ingredient, quantity, reason ->
+            onSubmit = { ingredient, quantity, reason, imagePath ->
                 viewModel.submitWaste(
                     ingredient = ingredient,
                     quantityText = quantity,
-                    reason = reason
+                    reason = reason,
+                    imagePath = imagePath
                 )
                 showWasteEntry = false
             }
@@ -583,6 +590,11 @@ private fun WasteHistoryCard(
 private fun WasteRecordRow(
     entry: WasteHistoryRow
 ) {
+    val context = LocalContext.current
+    val imageFile = entry.imagePath?.let {
+        ImageStorage.getImageFile(context, it)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -594,13 +606,22 @@ private fun WasteRecordRow(
             shape = RoundedCornerShape(10.dp),
             color = Color(0xFFF8FAFC)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Image,
-                    contentDescription = null,
-                    tint = Color(0xFFCBD5E1),
-                    modifier = Modifier.size(24.dp)
+            if (imageFile != null && imageFile.exists()) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = "Waste image",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
+            } else {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null,
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
 
@@ -662,12 +683,23 @@ private fun WasteRecordRow(
 private fun WasteEntryDialog(
     ingredients: List<WasteIngredientRow>,
     onDismiss: () -> Unit,
-    onSubmit: (WasteIngredientRow, String, String) -> Unit
+    onSubmit: (WasteIngredientRow, String, String, String?) -> Unit
 ) {
     var selectedIngredient by remember { mutableStateOf<WasteIngredientRow?>(null) }
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    var selectedImageUri by remember {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        selectedImageUri = uri
+    }
 
     val isFormValid by remember { derivedStateOf { selectedIngredient != null && quantity.isNotBlank() } }
 
@@ -867,6 +899,52 @@ private fun WasteEntryDialog(
                     )
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Image",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF334155)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clickable {
+                            imagePicker.launch("image/*")
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF8FAFC),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = Color(0xFFCBD5E1)
+                    )
+                ) {
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "Selected waste image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Tap to choose image",
+                                color = Color.Gray,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
@@ -874,7 +952,20 @@ private fun WasteEntryDialog(
                         val ingredient = selectedIngredient
 
                         if (ingredient != null) {
-                            onSubmit(ingredient, quantity, reason)
+                            val imagePath = selectedImageUri?.let { uri ->
+                                ImageStorage.saveImageFromUri(
+                                    context = context,
+                                    sourceUri = uri,
+                                    folder = "waste"
+                                )
+                            }
+
+                            onSubmit(
+                                ingredient,
+                                quantity,
+                                reason,
+                                imagePath
+                            )
                         }
                     },
                     modifier = Modifier

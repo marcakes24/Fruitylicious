@@ -25,13 +25,13 @@ import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
-import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen as AdminSalesSummaryScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen as AdminStaffLogScreen
 import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 import com.example.fruitylicious.ui.admin.users.UserManagementScreen
 
 import com.example.fruitylicious.ui.shared.SharedScreenMode
+import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.inventory.InventoryAdjustmentScreen
 import com.example.fruitylicious.ui.shared.inventory.InventoryMonitoringScreen
 import com.example.fruitylicious.ui.shared.notifications.NotificationsScreen as SharedNotificationsScreen
@@ -44,7 +44,6 @@ import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
 import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.PosScreen
 import com.example.fruitylicious.ui.staff.sales.SalesSummaryScreen as StaffSalesSummaryScreen
-import com.example.fruitylicious.ui.staff.stafflog.S
 
 const val LOGIN = "login"
 
@@ -76,7 +75,6 @@ const val ADMIN_SALES_SUMMARY = "admin_sales_summary"
 const val ADMIN_AUDIT_LOGS = "admin_audit_logs"
 const val ADMIN_QUEUE = "admin_queue"
 const val ADMIN_NOTIFICATIONS = "admin_notifications"
-const val STAFF_LOG_TIME_IN = "staff_log_time_in"
 const val TRANSACTION_HISTORY = "transaction_history"
 
 @Composable
@@ -210,8 +208,8 @@ fun FruityliciousNavGraph(
             )
         }
 
-        composable(STAFF_LOG_TIME_IN) {
-            StaffLogScreen(
+        composable(STAFF_LOG) {
+            TimeLogScreen(
                 navController = navController
             )
         }

@@ -45,4 +45,6 @@ interface UserDao {
     @Query("DELETE FROM users WHERE userId = :userId")
     suspend fun deleteUser(userId: Int)
 
+    @Query("SELECT * FROM users WHERE userId = :userId LIMIT 1")
+    fun observeUserById(userId: Int): Flow<UserEntity?>
 }

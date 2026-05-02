@@ -44,4 +44,8 @@ class ManageIngredientUseCase @Inject constructor(
     suspend fun deleteIngredient(ingredientId: Int): Result<Unit> {
         return ingredientRepository.deleteIngredient(ingredientId)
     }
+
+    suspend fun updateIngredientImage(ingredientId: Int, imagePath: String?) {
+        ingredientRepository.updateIngredientImage(ingredientId, imagePath)
+    }
 }
