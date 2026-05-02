@@ -53,7 +53,9 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,14 +72,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
-import kotlinx.coroutines.launch
+import com.example.fruitylicious.util.DateTimeUtil
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val WsGreen = Color(0xFF2E7D32)
 private val WsPageBg = Color(0xFFFFEAA0)
@@ -102,42 +105,58 @@ fun WasteManagementScreen(
     var showWasteEntry by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
 
     val datePickerState = rememberDatePickerState()
 
+    val dateFormatter = remember { SimpleDateFormat("MM/dd/yyyy", Locale.US) }
     val selectedDateText = remember(selectedDateMillis) {
-        if (selectedDateMillis == 0L) {
-            ""
-        } else {
-            SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date(selectedDateMillis))
+        if (selectedDateMillis == 0L) "" else dateFormatter.format(Date(selectedDateMillis))
+    }
+
+    val filteredHistory = remember(uiState.history, searchQuery, selectedDateMillis) {
+        val query = searchQuery.trim()
+        val hasDateFilter = selectedDateMillis != 0L
+        
+        val range = if (hasDateFilter) {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = selectedDateMillis
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val start = cal.timeInMillis
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+            start until cal.timeInMillis
+        } else null
+
+        uiState.history.filter { item ->
+            val matchesSearch = query.isEmpty() ||
+                    item.ingredientName.contains(query, ignoreCase = true) ||
+                    item.reason.contains(query, ignoreCase = true) ||
+                    item.branchName.contains(query, ignoreCase = true)
+
+            val matchesDate = range?.let { item.dateTime in it } ?: true
+
+            matchesSearch && matchesDate
         }
     }
 
-    val filteredHistory = uiState.history.filter { item ->
-        val matchesSearch = item.ingredientName.contains(searchQuery, ignoreCase = true)
-
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> item.branchId == 1
-            "B2" -> item.branchId == 2
-            else -> true
+    val onBranchSelect = remember(viewModel) { { id: Int? -> viewModel.selectBranch(id) } }
+    val onMenuClick = remember(scope, drawerState) { { scope.launch { drawerState.open() }; Unit } }
+    val onEntryClick = {
+        if (uiState.isClockedIn) {
+            showWasteEntry = true
+            viewModel.clearMessages()
         }
-
-        val matchesDate = if (selectedDateMillis == 0L) {
-            true
-        } else {
-            isSameDay(item.dateTime, selectedDateMillis)
-        }
-
-        matchesSearch && matchesBranch && matchesDate
     }
 
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {
+                showDatePicker = false
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -188,13 +207,23 @@ fun WasteManagementScreen(
                 .background(WsPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
+                selectedBranchId = uiState.selectedBranchId,
+                branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
-                onBranchSelect = { selectedBranch = it },
-                onMenuClick = {
-                    scope.launch { drawerState.open() }
-                }
+                isOnline = uiState.isOnline,
+                localBranchId = uiState.localBranchId,
+                onBranchSelect = onBranchSelect,
+                onMenuClick = onMenuClick
             )
+
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: showing local branch waste history only.",
+                    color = WsTextSub,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -204,28 +233,24 @@ fun WasteManagementScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
+                    val containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
                     Button(
-                        onClick = {
-                            if (uiState.isClockedIn) {
-                                showWasteEntry = true
-                                viewModel.clearMessages()
-                            }
-                        },
+                        onClick = onEntryClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                             .shadow(2.dp, RoundedCornerShape(12.dp)),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = containerColor)
                     ) {
                         Icon(
                             imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
                             contentDescription = null,
                             tint = Color.White
                         )
+
                         Spacer(modifier = Modifier.width(8.dp))
+
                         Text(
                             text = if (uiState.isClockedIn) "Waste Entry" else "Clock in required",
                             color = Color.White,
@@ -258,9 +283,13 @@ fun WasteManagementScreen(
                 item {
                     FilterCard(
                         searchQuery = searchQuery,
-                        onSearchChange = { searchQuery = it },
+                        onSearchChange = {
+                            searchQuery = it
+                        },
                         selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true }
+                        onDateClick = {
+                            showDatePicker = true
+                        }
                     )
                 }
 
@@ -275,14 +304,10 @@ fun WasteManagementScreen(
 
     if (showWasteEntry) {
         WasteEntryDialog(
-            ingredients = uiState.ingredients.filter {
-                when (selectedBranch) {
-                    "B1" -> it.branchId == 1
-                    "B2" -> it.branchId == 2
-                    else -> it.branchId == 1
-                }
+            ingredients = uiState.ingredients,
+            onDismiss = {
+                showWasteEntry = false
             },
-            onDismiss = { showWasteEntry = false },
             onSubmit = { ingredient, quantity, reason ->
                 viewModel.submitWaste(
                     ingredient = ingredient,
@@ -297,9 +322,12 @@ fun WasteManagementScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    isOnline: Boolean,
+    localBranchId: Int,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -313,7 +341,11 @@ private fun Header(
             modifier = Modifier.fillMaxWidth()
         ) {
             IconButton(onClick = onMenuClick) {
-                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Menu",
+                    tint = Color.White
+                )
             }
 
             Text(
@@ -331,28 +363,61 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    if (isOnline) {
+                        WasteBranchButton(
+                            label = "All",
+                            selected = selectedBranchId == null,
+                            onClick = {
+                                onBranchSelect(null)
+                            }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) WsGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                        branches.forEach { branch ->
+                            WasteBranchButton(
+                                label = "B${branch.branchId}",
+                                selected = selectedBranchId == branch.branchId,
+                                onClick = {
+                                    onBranchSelect(branch.branchId)
+                                }
                             )
                         }
+                    } else {
+                        WasteBranchButton(
+                            label = "B$localBranchId",
+                            selected = true,
+                            onClick = {
+                                onBranchSelect(localBranchId)
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WasteBranchButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) WsGreen else Color.Transparent)
+            .clickable {
+                onClick()
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color(0xFF666E7A),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -378,10 +443,18 @@ private fun FilterCard(
                 onValueChange = onSearchChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text("Search ingredient", color = Color.LightGray, fontSize = 14.sp)
+                    Text(
+                        text = "Search ingredient, reason, or branch",
+                        color = Color.LightGray,
+                        fontSize = 14.sp
+                    )
                 },
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.LightGray)
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.LightGray
+                    )
                 },
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -398,13 +471,25 @@ private fun FilterCard(
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
-                        Text("mm/dd/yyyy", color = Color.LightGray, fontSize = 14.sp)
+                        Text(
+                            text = "mm/dd/yyyy",
+                            color = Color.LightGray,
+                            fontSize = 14.sp
+                        )
                     },
                     leadingIcon = {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.LightGray)
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = Color.LightGray
+                        )
                     },
                     trailingIcon = {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color.Black)
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = Color.Black
+                        )
                     },
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -416,7 +501,9 @@ private fun FilterCard(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .clickable { onDateClick() }
+                        .clickable {
+                            onDateClick()
+                        }
                 )
             }
         }
@@ -471,14 +558,20 @@ private fun WasteHistoryCard(
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No records found", color = Color.Gray, fontSize = 14.sp)
+                    Text(
+                        text = "No records found",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
                 }
             } else {
                 items.forEachIndexed { index, entry ->
-                    WasteRecordRow(entry)
+                    key(entry.wasteId) {
+                        WasteRecordRow(entry)
 
-                    if (index < items.size - 1) {
-                        HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        if (index < items.size - 1) {
+                            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        }
                     }
                 }
             }
@@ -487,7 +580,9 @@ private fun WasteHistoryCard(
 }
 
 @Composable
-private fun WasteRecordRow(entry: WasteHistoryRow) {
+private fun WasteRecordRow(
+    entry: WasteHistoryRow
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -538,13 +633,15 @@ private fun WasteRecordRow(entry: WasteHistoryRow) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Branch ${entry.branchId}",
+                    text = entry.branchName.ifBlank {
+                        "Branch ${entry.branchId}"
+                    },
                     fontSize = 12.sp,
                     color = Color(0xFF94A3B8)
                 )
 
                 Text(
-                    text = formatDateTime(entry.dateTime),
+                    text = DateTimeUtil.formatDateTime(entry.dateTime),
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8)
                 )
@@ -572,7 +669,7 @@ private fun WasteEntryDialog(
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
-    val isFormValid = selectedIngredient != null && quantity.isNotBlank()
+    val isFormValid by remember { derivedStateOf { selectedIngredient != null && quantity.isNotBlank() } }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -593,18 +690,38 @@ private fun WasteEntryDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Waste Entry", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = WsTextMain)
-                        Text("Record waste of an ingredient", fontSize = 13.sp, color = WsTextSub)
+                        Text(
+                            text = "Waste Entry",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = WsTextMain
+                        )
+
+                        Text(
+                            text = "Record waste of an ingredient",
+                            fontSize = 13.sp,
+                            color = WsTextSub
+                        )
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.Gray
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Ingredient", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Text(
+                    text = "Ingredient",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF334155)
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -614,10 +731,16 @@ private fun WasteEntryDialog(
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
-                            Text("Choose an ingredient", color = Color.LightGray)
+                            Text(
+                                text = "Choose an ingredient",
+                                color = Color.LightGray
+                            )
                         },
                         trailingIcon = {
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null
+                            )
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -629,37 +752,48 @@ private fun WasteEntryDialog(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            .clickable { dropdownExpanded = true }
+                            .clickable {
+                                dropdownExpanded = true
+                            }
                     )
 
                     DropdownMenu(
                         expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false },
+                        onDismissRequest = {
+                            dropdownExpanded = false
+                        },
                         modifier = Modifier
                             .fillMaxWidth(0.85f)
                             .background(Color.White)
                             .heightIn(max = 400.dp)
                     ) {
                         ingredients.forEach { ingredient ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(ingredient.ingredientName, fontSize = 14.sp, color = Color(0xFF334155))
-                                        Text(
-                                            "${formatQuantity(ingredient.currentStock)} ${ingredient.unitType}",
-                                            fontSize = 12.sp,
-                                            color = Color.Gray
-                                        )
+                            key(ingredient.ingredientId) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = ingredient.ingredientName,
+                                                fontSize = 14.sp,
+                                                color = Color(0xFF334155)
+                                            )
+
+                                            Text(
+                                                text = "${formatQuantity(ingredient.currentStock)} ${ingredient.unitType}",
+                                                fontSize = 12.sp,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedIngredient = ingredient
+                                        dropdownExpanded = false
                                     }
-                                },
-                                onClick = {
-                                    selectedIngredient = ingredient
-                                    dropdownExpanded = false
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -684,7 +818,10 @@ private fun WasteEntryDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
-                        Text("Enter quantity", color = Color.LightGray)
+                        Text(
+                            text = "Enter quantity",
+                            color = Color.LightGray
+                        )
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -695,20 +832,33 @@ private fun WasteEntryDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+
                 HorizontalDivider(color = Color(0xFFE2E8F0))
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Reason", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+                Text(
+                    text = "Reason",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF334155)
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = reason,
-                    onValueChange = { reason = it },
+                    onValueChange = {
+                        reason = it
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(100.dp),
                     placeholder = {
-                        Text("Add reason", color = Color.LightGray)
+                        Text(
+                            text = "Add reason",
+                            color = Color.LightGray
+                        )
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -722,6 +872,7 @@ private fun WasteEntryDialog(
                 Button(
                     onClick = {
                         val ingredient = selectedIngredient
+
                         if (ingredient != null) {
                             onSubmit(ingredient, quantity, reason)
                         }
@@ -763,21 +914,4 @@ private fun formatQuantity(value: Double): String {
     } else {
         String.format(Locale.US, "%.2f", value)
     }
-}
-
-private fun formatDateTime(timestamp: Long): String {
-    return SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.US).format(Date(timestamp))
-}
-
-private fun isSameDay(firstMillis: Long, secondMillis: Long): Boolean {
-    val first = Calendar.getInstance().apply {
-        timeInMillis = firstMillis
-    }
-
-    val second = Calendar.getInstance().apply {
-        timeInMillis = secondMillis
-    }
-
-    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
-            first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
 }

@@ -7,13 +7,13 @@ import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class ReportsUiState(
     val adminName: String = "",
@@ -22,25 +22,27 @@ data class ReportsUiState(
     val selectedBranchId: Int? = 1,
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
-    val canAccessCrossBranch: Boolean = false,
+    val canAccessCrossBranch: Boolean = false
 )
 
 @HiltViewModel
 class ReportsViewModel @Inject constructor(
-    sessionManager: SessionManager,
+    private val sessionManager: SessionManager,
     private val branchDao: BranchDao,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
+    private val localBranchId = sessionManager.getBranchId()
+
     private val _uiState = MutableStateFlow(
         ReportsUiState(
             adminName = sessionManager.getUserName().ifBlank { "Admin User" },
-            isAdmin = (sessionManager.getRole()?.equals("admin", ignoreCase = true) == true ||
-                    sessionManager.getRole()?.equals("owner", ignoreCase = true) == true),
-            localBranchId = sessionManager.getBranchId(),
-            selectedBranchId = sessionManager.getBranchId()
+            isAdmin = isAdminUser(),
+            localBranchId = localBranchId,
+            selectedBranchId = localBranchId
         )
     )
+
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
     init {
@@ -51,7 +53,11 @@ class ReportsViewModel @Inject constructor(
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
-                _uiState.update { it.copy(branches = branchList) }
+                _uiState.update {
+                    it.copy(
+                        branches = branchList
+                    )
+                }
             }
         }
     }
@@ -60,17 +66,18 @@ class ReportsViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { state ->
-                    val canAccess = state.isAdmin && online
-                    val newSelectedId = if (!canAccess && state.selectedBranchId != state.localBranchId) {
-                        state.localBranchId
-                    } else {
+                    val canAccessCrossBranch = state.isAdmin && online
+
+                    val selectedBranchId = if (canAccessCrossBranch) {
                         state.selectedBranchId
+                    } else {
+                        state.localBranchId
                     }
 
                     state.copy(
                         isOnline = online,
-                        canAccessCrossBranch = canAccess,
-                        selectedBranchId = newSelectedId
+                        canAccessCrossBranch = canAccessCrossBranch,
+                        selectedBranchId = selectedBranchId
                     )
                 }
             }
@@ -79,10 +86,24 @@ class ReportsViewModel @Inject constructor(
 
     fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
-        if (branchId != state.localBranchId && !state.canAccessCrossBranch) {
-            // Restriction applies
-            return
+
+        val finalBranchId = if (state.canAccessCrossBranch) {
+            branchId
+        } else {
+            state.localBranchId
         }
-        _uiState.update { it.copy(selectedBranchId = branchId) }
+
+        _uiState.update {
+            it.copy(
+                selectedBranchId = finalBranchId
+            )
+        }
+    }
+
+    private fun isAdminUser(): Boolean {
+        val role = sessionManager.getRole()
+
+        return role.equals("admin", ignoreCase = true) ||
+                role.equals("owner", ignoreCase = true)
     }
 }

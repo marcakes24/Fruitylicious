@@ -13,56 +13,63 @@ import retrofit2.http.Query
 
 interface ReportApi {
 
-    @GET("/api/reports/sales")
+    @GET("api/reports/sales")
     suspend fun getSalesReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<SalesReportDto>
 
-    @GET("/api/reports/sales/combined")
+    @GET("api/reports/sales/combined")
     suspend fun getCombinedSalesReport(
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<SalesReportDto>
 
-    @GET("/api/reports/waste")
+    @GET("api/reports/waste")
     suspend fun getWasteReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<WasteReportDto>
 
-    @GET("/api/reports/restock")
+    @GET("api/reports/restock")
     suspend fun getRestockReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<RestockReportDto>
 
-    @GET("/api/reports/inventory")
+    @GET("api/reports/inventory")
     suspend fun getInventoryReport(
         @Query("branchId") branchId: Int
     ): Response<InventoryReportDto>
 
-    @GET("/api/reports/transactions")
+    @GET("api/reports/transactions")
     suspend fun getTransactionReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<TransactionReportDto>
 
-    @GET("/api/reports/staff-logs")
+    @GET("api/reports/transactions/combined")
+    suspend fun getCombinedTransactionReport(
+        @Query("from") from: Long,
+        @Query("to") to: Long
+    ): Response<TransactionReportDto>
+
+    @GET("api/reports/staff-logs")
     suspend fun getStaffLogsReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<StaffLogReportDto>
 
-    @GET("/api/reports/audit-logs")
+    @GET("api/reports/audit-logs")
     suspend fun getAuditLogsReport(
         @Query("branchId") branchId: Int,
         @Query("from") from: Long,
         @Query("to") to: Long
     ): Response<AuditLogReportDto>
+
 }

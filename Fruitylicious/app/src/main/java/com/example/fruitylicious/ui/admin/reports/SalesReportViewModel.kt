@@ -9,13 +9,13 @@ import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.Calendar
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Calendar
-import javax.inject.Inject
 
 data class SalesReportUiState(
     val period: String = "daily",
@@ -40,131 +40,239 @@ class SalesReportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SalesReportUiState())
     val uiState: StateFlow<SalesReportUiState> = _uiState.asStateFlow()
 
-    fun setPeriod(period: String, branchId: Int?) {
-        _uiState.update { it.copy(period = period) }
-        loadReport(branchId, period)
+    fun setPeriod(
+        period: String,
+        branchId: Int?
+    ) {
+        _uiState.update {
+            it.copy(period = period)
+        }
+
+        loadReport(
+            branchId = branchId,
+            period = period
+        )
     }
 
-    fun loadReport(branchId: Int?, period: String = _uiState.value.period) {
+    fun loadReport(
+        branchId: Int?,
+        period: String = _uiState.value.period
+    ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    error = null
+                )
+            }
 
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
+            val isAdmin = isAdminUser()
             val range = getRange(period)
 
-            if (branchId == localBranchId || !isOnline) {
-                try {
-                    val totalSales = transactionDao.getSalesTotal(
-                        branchId = branchId,
-                        from = range.currentStart,
-                        to = range.currentEnd
+            when {
+                !isAdmin -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        period = period,
+                        range = range
                     )
-
-                    val previousSales = transactionDao.getSalesTotal(
-                        branchId = branchId,
-                        from = range.previousStart,
-                        to = range.previousEnd
-                    )
-
-                    val cashTotal = transactionDao.getPaymentTotal(
-                        branchId = branchId,
-                        paymentType = "Cash",
-                        from = range.currentStart,
-                        to = range.currentEnd
-                    )
-
-                    val gcashTotal = transactionDao.getPaymentTotal(
-                        branchId = branchId,
-                        paymentType = "Gcash",
-                        from = range.currentStart,
-                        to = range.currentEnd
-                    )
-
-                    val breakdown = transactionDao.getSalesBreakdown(
-                        branchId = branchId,
-                        from = range.currentStart,
-                        to = range.currentEnd
-                    )
-
-                    val topItems = transactionDao.getTopSellingItems(
-                        branchId = branchId,
-                        from = range.currentStart,
-                        to = range.currentEnd
-                    )
-
-                    _uiState.update {
-                        it.copy(
-                            period = period,
-                            totalSales = totalSales,
-                            previousSales = previousSales,
-                            cashTotal = cashTotal,
-                            gcashTotal = gcashTotal,
-                            salesBreakdown = breakdown,
-                            topItems = topItems,
-                            isLoading = false,
-                            error = null
-                        )
-                    }
-                } catch (e: Exception) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = e.message ?: "Failed to load local sales report."
-                        )
-                    }
                 }
-            } else {
-                try {
-                    val result = if (branchId == null) {
-                        reportRepository.getCombinedSalesReport(range.currentStart, range.currentEnd)
-                    } else {
-                        reportRepository.getSalesReport(branchId, range.currentStart, range.currentEnd)
-                    }
 
-                    result.onSuccess { reportDto ->
-                        _uiState.update {
-                            it.copy(
-                                period = period,
-                                totalSales = reportDto.totalSales,
-                                previousSales = reportDto.previousSales,
-                                cashTotal = reportDto.cashTotal,
-                                gcashTotal = reportDto.gcashTotal,
-                                salesBreakdown = reportDto.items.map { item ->
-                                    SalesBreakdownRow(
-                                        productName = item.productName,
-                                        qty = item.quantitySold,
-                                        totalAmount = item.grossSales
-                                    )
-                                },
-                                topItems = reportDto.items.sortedByDescending { it.quantitySold }.take(5).map { item ->
-                                    TopSellingItemRow(
-                                        productName = item.productName,
-                                        totalQty = item.quantitySold
-                                    )
-                                },
-                                isLoading = false,
-                                error = null
-                            )
-                        }
-                    }.onFailure { e ->
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = e.message ?: "Failed to load remote sales report."
-                            )
-                        }
-                    }
-                } catch (e: Exception) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = e.message ?: "Failed to load remote sales report."
-                        )
-                    }
+                !isOnline -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        period = period,
+                        range = range
+                    )
+                }
+
+                branchId == null -> {
+                    loadRemoteCombinedReport(
+                        period = period,
+                        range = range
+                    )
+                }
+
+                else -> {
+                    loadRemoteBranchReport(
+                        branchId = branchId,
+                        period = period,
+                        range = range
+                    )
                 }
             }
         }
+    }
+
+    private suspend fun loadLocalReport(
+        branchId: Int,
+        period: String,
+        range: Range
+    ) {
+        try {
+            val totalSales = transactionDao.getSalesTotal(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val previousSales = transactionDao.getSalesTotal(
+                branchId = branchId,
+                from = range.previousStart,
+                to = range.previousEnd
+            )
+
+            val cashTotal = transactionDao.getPaymentTotal(
+                branchId = branchId,
+                paymentType = "Cash",
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val gcashTotal = transactionDao.getPaymentTotal(
+                branchId = branchId,
+                paymentType = "Gcash",
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val breakdown = transactionDao.getSalesBreakdown(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val topItems = transactionDao.getTopSellingItems(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            _uiState.update {
+                it.copy(
+                    period = period,
+                    totalSales = totalSales,
+                    previousSales = previousSales,
+                    cashTotal = cashTotal,
+                    gcashTotal = gcashTotal,
+                    salesBreakdown = breakdown,
+                    topItems = topItems,
+                    isLoading = false,
+                    error = null
+                )
+            }
+        } catch (exception: Exception) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = exception.message ?: "Failed to load local sales report."
+                )
+            }
+        }
+    }
+
+    private suspend fun loadRemoteBranchReport(
+        branchId: Int,
+        period: String,
+        range: Range
+    ) {
+        val result = reportRepository.getSalesReport(
+            branchId = branchId,
+            from = range.currentStart,
+            to = range.currentEnd
+        )
+
+        result.fold(
+            onSuccess = { reportDto ->
+                _uiState.update {
+                    it.copy(
+                        period = period,
+                        totalSales = reportDto.totalSales,
+                        previousSales = reportDto.previousSales,
+                        cashTotal = reportDto.cashTotal,
+                        gcashTotal = reportDto.gcashTotal,
+                        salesBreakdown = reportDto.items.map { item ->
+                            SalesBreakdownRow(
+                                productName = item.productName,
+                                qty = item.quantitySold,
+                                totalAmount = item.grossSales
+                            )
+                        },
+                        topItems = reportDto.items
+                            .sortedByDescending { item -> item.quantitySold }
+                            .take(5)
+                            .map { item ->
+                                TopSellingItemRow(
+                                    productName = item.productName,
+                                    totalQty = item.quantitySold
+                                )
+                            },
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            },
+            onFailure = { exception ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Failed to load remote sales report."
+                    )
+                }
+            }
+        )
+    }
+
+    private suspend fun loadRemoteCombinedReport(
+        period: String,
+        range: Range
+    ) {
+        val result = reportRepository.getCombinedSalesReport(
+            from = range.currentStart,
+            to = range.currentEnd
+        )
+
+        result.fold(
+            onSuccess = { reportDto ->
+                _uiState.update {
+                    it.copy(
+                        period = period,
+                        totalSales = reportDto.totalSales,
+                        previousSales = reportDto.previousSales,
+                        cashTotal = reportDto.cashTotal,
+                        gcashTotal = reportDto.gcashTotal,
+                        salesBreakdown = reportDto.items.map { item ->
+                            SalesBreakdownRow(
+                                productName = item.productName,
+                                qty = item.quantitySold,
+                                totalAmount = item.grossSales
+                            )
+                        },
+                        topItems = reportDto.items
+                            .sortedByDescending { item -> item.quantitySold }
+                            .take(5)
+                            .map { item ->
+                                TopSellingItemRow(
+                                    productName = item.productName,
+                                    totalQty = item.quantitySold
+                                )
+                            },
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            },
+            onFailure = { exception ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Failed to load combined sales report."
+                    )
+                }
+            }
+        )
     }
 
     private data class Range(
@@ -181,9 +289,11 @@ class SalesReportViewModel @Inject constructor(
         return when (period) {
             "weekly" -> {
                 val start = Calendar.getInstance()
+
                 while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
                     start.add(Calendar.DAY_OF_YEAR, -1)
                 }
+
                 start.setStartOfDay()
 
                 val previousEnd = start.timeInMillis - 1
@@ -234,5 +344,12 @@ class SalesReportViewModel @Inject constructor(
         set(Calendar.MINUTE, 0)
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
+    }
+
+    private fun isAdminUser(): Boolean {
+        val role = sessionManager.getRole()
+
+        return role.equals("admin", ignoreCase = true) ||
+                role.equals("owner", ignoreCase = true)
     }
 }

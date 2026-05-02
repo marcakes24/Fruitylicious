@@ -1,21 +1,31 @@
 package com.example.fruitylicious
 
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.fruitylicious.ui.auth.LoginScreen
+import com.example.fruitylicious.util.SessionManager
+import kotlinx.coroutines.delay
 
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
 import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
+import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen
 import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen as AdminSalesSummaryScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen as AdminStaffLogScreen
 import com.example.fruitylicious.ui.admin.system.AuditLogScreen
@@ -34,14 +44,13 @@ import com.example.fruitylicious.ui.staff.dashboard.StaffDashboardScreen
 import com.example.fruitylicious.ui.staff.pos.CheckoutScreen
 import com.example.fruitylicious.ui.staff.pos.PosScreen
 import com.example.fruitylicious.ui.staff.sales.SalesSummaryScreen as StaffSalesSummaryScreen
-import com.example.fruitylicious.ui.staff.stafflog.StaffLogScreen as StaffTimeLogScreen
+import com.example.fruitylicious.ui.staff.stafflog.S
 
 const val LOGIN = "login"
 
 const val STAFF_DASHBOARD = "staff_dashboard"
 const val STAFF_POS = "staff_pos"
 const val STAFF_CHECKOUT = "staff_checkout"
-const val STAFF_RECEIPT = "staff_receipt"
 const val STAFF_LOG = "staff_log"
 const val STAFF_WASTE_HISTORY = "staff_waste_history"
 const val STAFF_INVENTORY = "staff_inventory"
@@ -67,13 +76,36 @@ const val ADMIN_SALES_SUMMARY = "admin_sales_summary"
 const val ADMIN_AUDIT_LOGS = "admin_audit_logs"
 const val ADMIN_QUEUE = "admin_queue"
 const val ADMIN_NOTIFICATIONS = "admin_notifications"
-
+const val STAFF_LOG_TIME_IN = "staff_log_time_in"
 const val TRANSACTION_HISTORY = "transaction_history"
 
 @Composable
 fun FruityliciousNavGraph(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    sessionManager: SessionManager
 ) {
+    val startDestination = if (sessionManager.isLoggedIn() && !sessionManager.isSessionExpired()) {
+        if (sessionManager.getRole().equals("admin", ignoreCase = true)) {
+            ADMIN_DASHBOARD
+        } else {
+            STAFF_DASHBOARD
+        }
+    } else {
+        LOGIN
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60000) // Check every minute
+            if (sessionManager.isLoggedIn() && sessionManager.isSessionExpired()) {
+                sessionManager.clearSession()
+                navController.navigate(LOGIN) {
+                    popUpTo(0)
+                }
+            }
+        }
+    }
+
     fun safeBack(fallbackRoute: String) {
         val popped = navController.popBackStack()
 
@@ -84,32 +116,44 @@ fun FruityliciousNavGraph(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = LOGIN,
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                        sessionManager.updateActivity()
+                    }
+                }
+            }
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
         enterTransition = {
-            fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300)
-            )
+            slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = tween(400, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(400))
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300)
-            )
+            slideOutHorizontally(
+                targetOffsetX = { -it / 3 },
+                animationSpec = tween(400, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(400))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(300)) + slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300)
-            )
+            slideInHorizontally(
+                initialOffsetX = { -it / 3 },
+                animationSpec = tween(400, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(400))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(300)) + slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300)
-            )
+            slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = tween(400, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(400))
         }
     ) {
         composable(LOGIN) {
@@ -166,8 +210,8 @@ fun FruityliciousNavGraph(
             )
         }
 
-        composable(STAFF_LOG) {
-            StaffTimeLogScreen(
+        composable(STAFF_LOG_TIME_IN) {
+            StaffLogScreen(
                 navController = navController
             )
         }
@@ -328,6 +372,7 @@ fun FruityliciousNavGraph(
                 navController = navController,
                 mode = SharedScreenMode.ADMIN
             )
+        }
         }
     }
 }

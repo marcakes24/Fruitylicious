@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -123,8 +122,6 @@ fun StaffDashboardScreen(
                 ) {
                     StaffDashboardHeader(
                         hasNotifications = uiState.hasNotifications,
-                        isSyncing = uiState.isSyncing,
-                        onSyncClick = viewModel::syncNow,
                         onNotificationsClick = {
                             navController.navigate(STAFF_NOTIFICATIONS)
                         },
@@ -191,8 +188,6 @@ fun StaffDashboardScreen(
 @Composable
 private fun StaffDashboardHeader(
     hasNotifications: Boolean,
-    isSyncing: Boolean,
-    onSyncClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -223,27 +218,6 @@ private fun StaffDashboardHeader(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
-
-            IconButton(
-                onClick = onSyncClick,
-                enabled = !isSyncing,
-                modifier = Modifier.size(40.dp)
-            ) {
-                if (isSyncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
 
             IconButton(
                 onClick = onNotificationsClick,

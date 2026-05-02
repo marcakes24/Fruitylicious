@@ -65,10 +65,10 @@ class PosViewModel @Inject constructor(
         observeRecipes()
         observeInventory()
         observeIngredients()
-        checkClockInStatus()
+        observeClockInStatus()
     }
 
-    private fun checkClockInStatus() {
+    private fun observeClockInStatus() {
         viewModelScope.launch {
             val role = sessionManager.getRole()
             if (role?.equals("admin", ignoreCase = true) == true) {
@@ -77,13 +77,14 @@ class PosViewModel @Inject constructor(
             }
 
             val userId = sessionManager.getUserId()
-            val activeLog = staffLogRepository.getActiveLogForUser(userId)
-            
-            _uiState.update { 
-                it.copy(
-                    isClockedIn = activeLog != null,
-                    error = if (activeLog == null) "You must clock in before using the POS." else null
-                )
+            staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val hasActiveLog = logs.any { it.clockOut == null }
+                _uiState.update {
+                    it.copy(
+                        isClockedIn = hasActiveLog,
+                        error = if (!hasActiveLog) "You must clock in before using the POS." else null
+                    )
+                }
             }
         }
     }

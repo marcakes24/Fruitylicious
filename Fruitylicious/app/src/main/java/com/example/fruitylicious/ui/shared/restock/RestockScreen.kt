@@ -69,13 +69,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val RsGreen = Color(0xFF2E7D32)
 private val RsPageBg = Color(0xFFFFEAA0)
@@ -100,9 +101,6 @@ fun RestockScreen(
     var showRestockEntry by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
 
     val datePickerState = rememberDatePickerState()
@@ -118,13 +116,8 @@ fun RestockScreen(
     val filteredHistory = uiState.history.filter { item ->
         val matchesSearch =
             item.ingredientName.contains(searchQuery, ignoreCase = true) ||
-                    item.supplier.contains(searchQuery, ignoreCase = true)
-
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> item.branchId == 1
-            "B2" -> item.branchId == 2
-            else -> true
-        }
+                    item.supplier.contains(searchQuery, ignoreCase = true) ||
+                    item.branchName.contains(searchQuery, ignoreCase = true)
 
         val matchesDate = if (selectedDateMillis == 0L) {
             true
@@ -132,12 +125,14 @@ fun RestockScreen(
             isSameDay(item.dateTime, selectedDateMillis)
         }
 
-        matchesSearch && matchesBranch && matchesDate
+        matchesSearch && matchesDate
     }
 
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {
+                showDatePicker = false
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -188,15 +183,29 @@ fun RestockScreen(
                 .background(RsPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
+                selectedBranchId = uiState.selectedBranchId,
+                branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
-                onBranchSelect = { selectedBranch = it },
+                isOnline = uiState.isOnline,
+                localBranchId = uiState.localBranchId,
+                onBranchSelect = { branchId ->
+                    viewModel.selectBranch(branchId)
+                },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
                     }
                 }
             )
+
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: showing local branch restock history only.",
+                    color = RsTextSub,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -219,11 +228,19 @@ fun RestockScreen(
                             .shadow(2.dp, RoundedCornerShape(12.dp)),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.isClockedIn) RsGreen else Color.LightGray
+                            containerColor = if (uiState.isClockedIn) {
+                                RsGreen
+                            } else {
+                                Color.LightGray
+                            }
                         )
                     ) {
                         Icon(
-                            imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
+                            imageVector = if (uiState.isClockedIn) {
+                                Icons.Default.Add
+                            } else {
+                                Icons.Default.History
+                            },
                             contentDescription = null,
                             tint = Color.White
                         )
@@ -231,7 +248,11 @@ fun RestockScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = if (uiState.isClockedIn) "Restock Entry" else "Clock in required",
+                            text = if (uiState.isClockedIn) {
+                                "Restock Entry"
+                            } else {
+                                "Clock in required"
+                            },
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -262,9 +283,13 @@ fun RestockScreen(
                 item {
                     FilterCard(
                         searchQuery = searchQuery,
-                        onSearchChange = { searchQuery = it },
+                        onSearchChange = {
+                            searchQuery = it
+                        },
                         selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true }
+                        onDateClick = {
+                            showDatePicker = true
+                        }
                     )
                 }
 
@@ -279,14 +304,10 @@ fun RestockScreen(
 
     if (showRestockEntry) {
         RestockEntryDialog(
-            ingredients = uiState.ingredients.filter {
-                when (selectedBranch) {
-                    "B1" -> it.branchId == 1
-                    "B2" -> it.branchId == 2
-                    else -> it.branchId == 1
-                }
+            ingredients = uiState.ingredients,
+            onDismiss = {
+                showRestockEntry = false
             },
-            onDismiss = { showRestockEntry = false },
             onSubmit = { ingredient, quantity, supplier ->
                 viewModel.submitRestock(
                     ingredient = ingredient,
@@ -301,9 +322,12 @@ fun RestockScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    isOnline: Boolean,
+    localBranchId: Int,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -339,28 +363,61 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    if (isOnline) {
+                        RestockBranchButton(
+                            label = "All",
+                            selected = selectedBranchId == null,
+                            onClick = {
+                                onBranchSelect(null)
+                            }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) RsGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                        branches.forEach { branch ->
+                            RestockBranchButton(
+                                label = "B${branch.branchId}",
+                                selected = selectedBranchId == branch.branchId,
+                                onClick = {
+                                    onBranchSelect(branch.branchId)
+                                }
                             )
                         }
+                    } else {
+                        RestockBranchButton(
+                            label = "B$localBranchId",
+                            selected = true,
+                            onClick = {
+                                onBranchSelect(localBranchId)
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RestockBranchButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) RsGreen else Color.Transparent)
+            .clickable {
+                onClick()
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color(0xFF666E7A),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -387,7 +444,7 @@ private fun FilterCard(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
                     Text(
-                        text = "Search ingredient or supplier",
+                        text = "Search ingredient, supplier, or branch",
                         color = Color.LightGray,
                         fontSize = 14.sp
                     )
@@ -444,7 +501,9 @@ private fun FilterCard(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .clickable { onDateClick() }
+                        .clickable {
+                            onDateClick()
+                        }
                 )
             }
         }
@@ -552,7 +611,9 @@ private fun RestockRecordRow(entry: RestockHistoryRow) {
             )
 
             Text(
-                text = "Branch ${entry.branchId}",
+                text = entry.branchName.ifBlank {
+                    "Branch ${entry.branchId}"
+                },
                 fontSize = 12.sp,
                 color = Color.Gray
             )
@@ -656,7 +717,10 @@ private fun RestockEntryDialog(
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
-                            Text("Choose an ingredient", color = Color.LightGray)
+                            Text(
+                                text = "Choose an ingredient",
+                                color = Color.LightGray
+                            )
                         },
                         trailingIcon = {
                             Icon(
@@ -674,12 +738,16 @@ private fun RestockEntryDialog(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            .clickable { dropdownExpanded = true }
+                            .clickable {
+                                dropdownExpanded = true
+                            }
                     )
 
                     DropdownMenu(
                         expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false },
+                        onDismissRequest = {
+                            dropdownExpanded = false
+                        },
                         modifier = Modifier
                             .fillMaxWidth(0.85f)
                             .background(Color.White)
@@ -734,7 +802,10 @@ private fun RestockEntryDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
-                        Text("Enter quantity", color = Color.LightGray)
+                        Text(
+                            text = "Enter quantity",
+                            color = Color.LightGray
+                        )
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -757,10 +828,15 @@ private fun RestockEntryDialog(
 
                 OutlinedTextField(
                     value = supplier,
-                    onValueChange = { supplier = it },
+                    onValueChange = {
+                        supplier = it
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
-                        Text("Supplier name", color = Color.LightGray)
+                        Text(
+                            text = "Supplier name",
+                            color = Color.LightGray
+                        )
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -775,6 +851,7 @@ private fun RestockEntryDialog(
                 Button(
                     onClick = {
                         val ingredient = selectedIngredient
+
                         if (ingredient != null) {
                             onSubmit(ingredient, quantity, supplier)
                         }

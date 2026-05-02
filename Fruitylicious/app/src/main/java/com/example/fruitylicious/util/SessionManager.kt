@@ -163,6 +163,6 @@ class SessionManager @Inject constructor(
         private const val KEY_LAST_SYNC_SUCCESSFUL = "last_sync_successful"
         private const val KEY_LAST_SYNC_MESSAGE = "last_sync_message"
 
-        private const val SESSION_TIMEOUT_MILLIS = 8L * 60L * 60L * 1000L
+        private const val SESSION_TIMEOUT_MILLIS = 1L * 60L * 60L * 1000L
     }
 }

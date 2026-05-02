@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.admin.reports
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.WasteItemRow
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.dao.WasteReasonRow
@@ -9,13 +10,13 @@ import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.Calendar
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Calendar
-import javax.inject.Inject
 
 data class WasteReportUiState(
     val totalWaste: Double = 0.0,
@@ -30,6 +31,7 @@ data class WasteReportUiState(
 @HiltViewModel
 class WasteReportViewModel @Inject constructor(
     private val wasteLogDao: WasteLogDao,
+    private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val networkMonitor: NetworkMonitor,
     private val sessionManager: SessionManager
@@ -38,125 +40,258 @@ class WasteReportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WasteReportUiState())
     val uiState: StateFlow<WasteReportUiState> = _uiState.asStateFlow()
 
-    fun loadReport(branchId: Int?) {
+    fun loadReport(
+        branchId: Int?
+    ) {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(isLoading = true, error = null)
+                it.copy(
+                    isLoading = true,
+                    error = null
+                )
             }
 
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
+            val isAdmin = isAdminUser()
+            val range = getCurrentWeekRange()
 
-            val weekStart = Calendar.getInstance().apply {
-                while (get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                    add(Calendar.DAY_OF_YEAR, -1)
+            when {
+                !isAdmin -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        from = range.first,
+                        to = range.second
+                    )
                 }
 
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-            val now = System.currentTimeMillis()
-
-            if (branchId == localBranchId || !isOnline) {
-                try {
-                    val totalWaste = wasteLogDao.getTotalWasteQuantity(
-                        branchId = branchId,
-                        from = weekStart,
-                        to = now
+                !isOnline -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        from = range.first,
+                        to = range.second
                     )
-
-                    val reasonData = wasteLogDao.getWasteReasonReport(
-                        branchId = branchId,
-                        from = weekStart,
-                        to = now
-                    )
-
-                    val wasteByItem = wasteLogDao.getWasteByItemReport(
-                        branchId = branchId,
-                        from = weekStart,
-                        to = now
-                    )
-
-                    val topItem = wasteByItem.maxByOrNull { it.totalQuantity }
-
-                    _uiState.update {
-                        it.copy(
-                            totalWaste = totalWaste,
-                            mostWasted = topItem?.ingredientName ?: "—",
-                            mostWastedQty = topItem?.totalQuantity ?: 0.0,
-                            reasonData = reasonData,
-                            wasteByItem = wasteByItem,
-                            isLoading = false,
-                            error = null
-                        )
-                    }
-                } catch (e: Exception) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = e.message ?: "Failed to load local waste report."
-                        )
-                    }
                 }
-            } else {
-                // Load Remote
-                try {
-                    // Assuming branchId could be null for "All"
-                    // If backend doesn't have a specific combined waste endpoint,
-                    // we might need one or handle it in getWasteReport(null, ...)
-                    val result = reportRepository.getWasteReport(branchId ?: 0, weekStart, now)
 
-                    result.onSuccess { reportDto ->
-                        // Map WasteReportDto to UI State
-                        val reasonRows = reportDto.items.groupBy { it.reason }
-                            .map { (reason, items) ->
-                                WasteReasonRow(
-                                    reason = reason,
-                                    count = items.size
-                                )
-                            }.sortedByDescending { it.count }
+                branchId == null -> {
+                    loadRemoteAllBranchesReport(
+                        from = range.first,
+                        to = range.second
+                    )
+                }
 
-                        val itemRows = reportDto.items.groupBy { it.ingredientName }
-                            .map { (name, items) ->
-                                WasteItemRow(
-                                    ingredientName = name,
-                                    totalQuantity = items.sumOf { it.quantity }
-                                )
-                            }.sortedByDescending { it.totalQuantity }
-
-                        val topItem = itemRows.maxByOrNull { it.totalQuantity }
-
-                        _uiState.update {
-                            it.copy(
-                                totalWaste = reportDto.totalWasteQuantity,
-                                mostWasted = topItem?.ingredientName ?: "—",
-                                mostWastedQty = topItem?.totalQuantity ?: 0.0,
-                                reasonData = reasonRows,
-                                wasteByItem = itemRows,
-                                isLoading = false,
-                                error = null
-                            )
-                        }
-                    }.onFailure { e ->
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = e.message ?: "Failed to load remote waste report."
-                            )
-                        }
-                    }
-                } catch (e: Exception) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = e.message ?: "Failed to load remote waste report."
-                        )
-                    }
+                else -> {
+                    loadRemoteBranchReport(
+                        branchId = branchId,
+                        from = range.first,
+                        to = range.second
+                    )
                 }
             }
         }
+    }
+
+    private suspend fun loadLocalReport(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ) {
+        try {
+            val totalWaste = wasteLogDao.getTotalWasteQuantity(
+                branchId = branchId,
+                from = from,
+                to = to
+            )
+
+            val reasonData = wasteLogDao.getWasteReasonReport(
+                branchId = branchId,
+                from = from,
+                to = to
+            )
+
+            val wasteByItem = wasteLogDao.getWasteByItemReport(
+                branchId = branchId,
+                from = from,
+                to = to
+            )
+
+            val topItem = wasteByItem.maxByOrNull {
+                it.totalQuantity
+            }
+
+            _uiState.update {
+                it.copy(
+                    totalWaste = totalWaste,
+                    mostWasted = topItem?.ingredientName ?: "—",
+                    mostWastedQty = topItem?.totalQuantity ?: 0.0,
+                    reasonData = reasonData,
+                    wasteByItem = wasteByItem,
+                    isLoading = false,
+                    error = null
+                )
+            }
+        } catch (exception: Exception) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = exception.message ?: "Failed to load local waste report."
+                )
+            }
+        }
+    }
+
+    private suspend fun loadRemoteBranchReport(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ) {
+        val result = reportRepository.getWasteReport(
+            branchId = branchId,
+            from = from,
+            to = to
+        )
+
+        result.fold(
+            onSuccess = { reportDto ->
+                applyRemoteItems(
+                    totalWaste = reportDto.totalWasteQuantity,
+                    items = reportDto.items
+                )
+            },
+            onFailure = { exception ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Failed to load remote waste report."
+                    )
+                }
+            }
+        )
+    }
+
+    private suspend fun loadRemoteAllBranchesReport(
+        from: Long,
+        to: Long
+    ) {
+        try {
+            val branches = branchDao.getAllBranches()
+
+            val branchList = branches.ifEmpty {
+                emptyList()
+            }
+
+            if (branchList.isEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "No branches found."
+                    )
+                }
+                return
+            }
+
+            val allItems = mutableListOf<com.example.fruitylicious.data.remote.dto.WasteReportItemDto>()
+            var totalWaste = 0.0
+            var firstError: String? = null
+
+            for (branch in branchList) {
+                val result = reportRepository.getWasteReport(
+                    branchId = branch.branchId,
+                    from = from,
+                    to = to
+                )
+
+                result.fold(
+                    onSuccess = { report ->
+                        totalWaste += report.totalWasteQuantity
+                        allItems.addAll(report.items)
+                    },
+                    onFailure = { exception ->
+                        if (firstError == null) {
+                            firstError = exception.message
+                        }
+                    }
+                )
+            }
+
+            applyRemoteItems(
+                totalWaste = totalWaste,
+                items = allItems,
+                warning = firstError
+            )
+        } catch (exception: Exception) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = exception.message ?: "Failed to load combined waste report."
+                )
+            }
+        }
+    }
+
+    private fun applyRemoteItems(
+        totalWaste: Double,
+        items: List<com.example.fruitylicious.data.remote.dto.WasteReportItemDto>,
+        warning: String? = null
+    ) {
+        val reasonRows = items
+            .groupBy { it.reason.ifBlank { "Unspecified" } }
+            .map { (reason, groupedItems) ->
+                WasteReasonRow(
+                    reason = reason,
+                    count = groupedItems.size
+                )
+            }
+            .sortedByDescending { it.count }
+
+        val itemRows = items
+            .groupBy { it.ingredientName }
+            .map { (ingredientName, groupedItems) ->
+                WasteItemRow(
+                    ingredientName = ingredientName,
+                    totalQuantity = groupedItems.sumOf { it.quantity }
+                )
+            }
+            .sortedByDescending { it.totalQuantity }
+
+        val topItem = itemRows.maxByOrNull {
+            it.totalQuantity
+        }
+
+        _uiState.update {
+            it.copy(
+                totalWaste = totalWaste,
+                mostWasted = topItem?.ingredientName ?: "—",
+                mostWastedQty = topItem?.totalQuantity ?: 0.0,
+                reasonData = reasonRows,
+                wasteByItem = itemRows,
+                isLoading = false,
+                error = warning
+            )
+        }
+    }
+
+    private fun getCurrentWeekRange(): Pair<Long, Long> {
+        val start = Calendar.getInstance()
+
+        while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+            start.add(Calendar.DAY_OF_YEAR, -1)
+        }
+
+        start.set(Calendar.HOUR_OF_DAY, 0)
+        start.set(Calendar.MINUTE, 0)
+        start.set(Calendar.SECOND, 0)
+        start.set(Calendar.MILLISECOND, 0)
+
+        val end = System.currentTimeMillis()
+
+        return start.timeInMillis to end
+    }
+
+    private fun isAdminUser(): Boolean {
+        val role = sessionManager.getRole()
+
+        return role.equals("admin", ignoreCase = true) ||
+                role.equals("owner", ignoreCase = true)
     }
 }

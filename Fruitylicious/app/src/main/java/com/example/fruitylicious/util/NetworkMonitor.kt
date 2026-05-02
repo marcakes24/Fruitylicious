@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +21,7 @@ class NetworkMonitor @Inject constructor(
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     fun observeNetworkStatus(): Flow<Boolean> = callbackFlow {
+        // Emit current state immediately
         trySend(isOnline())
 
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -28,7 +30,7 @@ class NetworkMonitor @Inject constructor(
             }
 
             override fun onLost(network: Network) {
-                trySend(isOnline())
+                trySend(false)
             }
 
             override fun onCapabilitiesChanged(
@@ -39,12 +41,16 @@ class NetworkMonitor @Inject constructor(
             }
         }
 
-        connectivityManager.registerDefaultNetworkCallback(callback)
+        try {
+            connectivityManager.registerDefaultNetworkCallback(callback)
+        } catch (e: Exception) {
+            trySend(isOnline())
+        }
 
         awaitClose {
             connectivityManager.unregisterNetworkCallback(callback)
         }
-    }
+    }.distinctUntilChanged()
 
     fun isOnline(): Boolean {
         val network = connectivityManager.activeNetwork ?: return false
@@ -54,6 +60,9 @@ class NetworkMonitor @Inject constructor(
 
     private fun hasInternetCapability(capabilities: NetworkCapabilities): Boolean {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
     }
 }

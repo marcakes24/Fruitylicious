@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +25,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -85,44 +86,37 @@ fun AuditLogScreen(
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
-
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
     val datePickerState = rememberDatePickerState()
 
-    val filteredLogs = remember(uiState.logs, searchQuery, selectedBranch, selectedDateMillis) {
+    val filteredLogs = remember(uiState.logs, searchQuery, selectedDateMillis) {
         uiState.logs.filter { log ->
-            val matchesBranch = when (selectedBranch) {
-                "B1" -> log.branchId == 1
-                "B2" -> log.branchId == 2
-                else -> true
-            }
-
             val matchesSearch =
                 log.logId.contains(searchQuery, ignoreCase = true) ||
                         log.action.contains(searchQuery, ignoreCase = true) ||
                         log.description.contains(searchQuery, ignoreCase = true) ||
                         log.tableAffected.contains(searchQuery, ignoreCase = true) ||
                         log.userName.contains(searchQuery, ignoreCase = true) ||
-                        log.username.contains(searchQuery, ignoreCase = true)
+                        log.username.contains(searchQuery, ignoreCase = true) ||
+                        log.branchName.contains(searchQuery, ignoreCase = true)
 
             val matchesDate = if (selectedDateMillis != null) {
-                val cal1 = Calendar.getInstance().apply { timeInMillis = log.timestamp }
-                
-                val filterCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                val logCalendar = Calendar.getInstance().apply {
+                    timeInMillis = log.timestamp
+                }
+
+                val filterCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                     timeInMillis = selectedDateMillis!!
                 }
-                val filterDay = filterCal.get(Calendar.DAY_OF_YEAR)
-                val filterYear = filterCal.get(Calendar.YEAR)
-                
-                cal1.get(Calendar.DAY_OF_YEAR) == filterDay && 
-                cal1.get(Calendar.YEAR) == filterYear
-            } else true
 
-            matchesBranch && matchesSearch && matchesDate
+                logCalendar.get(Calendar.DAY_OF_YEAR) == filterCalendar.get(Calendar.DAY_OF_YEAR) &&
+                        logCalendar.get(Calendar.YEAR) == filterCalendar.get(Calendar.YEAR)
+            } else {
+                true
+            }
+
+            matchesSearch && matchesDate
         }
     }
 
@@ -146,9 +140,14 @@ fun AuditLogScreen(
         Scaffold(
             topBar = {
                 AuditHeader(
-                    selectedBranch = selectedBranch,
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
                     isAdmin = uiState.isAdmin,
-                    onBranchSelect = { selectedBranch = it },
+                    isOnline = uiState.isOnline,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = { branchId ->
+                        viewModel.selectBranch(branchId)
+                    },
                     onMenuClick = {
                         scope.launch {
                             drawerState.open()
@@ -165,6 +164,24 @@ fun AuditLogScreen(
                     .padding(horizontal = 16.dp)
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
+
+                if (!uiState.error.isNullOrBlank()) {
+                    Text(
+                        text = uiState.error ?: "",
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: showing local branch audit logs only.",
+                        color = AuditGrayText,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -216,7 +233,13 @@ fun AuditLogScreen(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (selectedDateMillis != null) AuditGreenPrimary else Color.White)
+                            .background(
+                                if (selectedDateMillis != null) {
+                                    AuditGreenPrimary
+                                } else {
+                                    Color.White
+                                }
+                            )
                             .clickable { showDatePicker = true },
                         contentAlignment = Alignment.Center
                     ) {
@@ -238,19 +261,27 @@ fun AuditLogScreen(
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = AuditGreenPrimary.copy(alpha = 0.1f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, AuditGreenPrimary)
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = AuditGreenPrimary
+                            )
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(selectedDateMillis!!)),
+                                    text = SimpleDateFormat(
+                                        "MMM dd, yyyy",
+                                        Locale.US
+                                    ).format(Date(selectedDateMillis!!)),
                                     fontSize = 12.sp,
                                     color = AuditGreenPrimary,
                                     fontWeight = FontWeight.Bold
                                 )
+
                                 Spacer(modifier = Modifier.width(4.dp))
+
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Clear date",
@@ -268,10 +299,12 @@ fun AuditLogScreen(
                     DatePickerDialog(
                         onDismissRequest = { showDatePicker = false },
                         confirmButton = {
-                            TextButton(onClick = {
-                                selectedDateMillis = datePickerState.selectedDateMillis
-                                showDatePicker = false
-                            }) {
+                            TextButton(
+                                onClick = {
+                                    selectedDateMillis = datePickerState.selectedDateMillis
+                                    showDatePicker = false
+                                }
+                            ) {
                                 Text("OK", color = AuditGreenPrimary)
                             }
                         },
@@ -283,7 +316,7 @@ fun AuditLogScreen(
                     ) {
                         DatePicker(
                             state = datePickerState,
-                            colors = androidx.compose.material3.DatePickerDefaults.colors(
+                            colors = DatePickerDefaults.colors(
                                 todayContentColor = AuditGreenPrimary,
                                 todayDateBorderColor = AuditGreenPrimary,
                                 selectedDayContainerColor = AuditGreenPrimary,
@@ -331,9 +364,12 @@ fun AuditLogScreen(
 
 @Composable
 private fun AuditHeader(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    isOnline: Boolean,
+    localBranchId: Int,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -369,28 +405,55 @@ private fun AuditHeader(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    if (isOnline) {
+                        AuditBranchButton(
+                            label = "All",
+                            selected = selectedBranchId == null,
+                            onClick = { onBranchSelect(null) }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) AuditGreenPrimary else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                        branches.forEach { branch ->
+                            AuditBranchButton(
+                                label = "B${branch.branchId}",
+                                selected = selectedBranchId == branch.branchId,
+                                onClick = { onBranchSelect(branch.branchId) }
                             )
                         }
+                    } else {
+                        val localBranch = branches.firstOrNull { it.branchId == localBranchId }
+
+                        AuditBranchButton(
+                            label = "B${localBranch?.branchId ?: localBranchId}",
+                            selected = true,
+                            onClick = { onBranchSelect(localBranchId) }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AuditBranchButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) AuditGreenPrimary else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color(0xFF666E7A),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -530,7 +593,7 @@ private fun AuditLogCard(log: AuditLogRow) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "B${log.branchId}",
+                        text = log.branchName.ifBlank { "B${log.branchId}" },
                         fontSize = 11.sp,
                         color = AuditDarkText,
                         fontWeight = FontWeight.Bold

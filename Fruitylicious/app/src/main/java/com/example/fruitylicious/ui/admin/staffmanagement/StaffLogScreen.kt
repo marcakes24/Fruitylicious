@@ -49,11 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val SlGreen = Color(0xFF2E7D32)
 private val SlPageBg = Color(0xFFFFEAA0)
@@ -72,23 +73,14 @@ fun StaffLogScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
     var searchQuery by remember { mutableStateOf("") }
 
-    val filteredLogs = uiState.logs.filter { log ->
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> log.branchId == 1
-            "B2" -> log.branchId == 2
-            else -> true
-        }
-
-        val matchesSearch =
+    val filteredLogs = remember(uiState.logs, searchQuery) {
+        uiState.logs.filter { log ->
             log.staffName.contains(searchQuery, ignoreCase = true) ||
-                    log.username.contains(searchQuery, ignoreCase = true)
-
-        matchesBranch && matchesSearch
+                    log.username.contains(searchQuery, ignoreCase = true) ||
+                    log.branchName.contains(searchQuery, ignoreCase = true)
+        }
     }
 
     ModalNavigationDrawer(
@@ -114,15 +106,38 @@ fun StaffLogScreen(
                 .background(SlPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
+                selectedBranchId = uiState.selectedBranchId,
+                branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
-                onBranchSelect = { selectedBranch = it },
+                isOnline = uiState.isOnline,
+                localBranchId = uiState.localBranchId,
+                onBranchSelect = { branchId ->
+                    viewModel.selectBranch(branchId)
+                },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
                     }
                 }
             )
+
+            if (!uiState.error.isNullOrBlank()) {
+                Text(
+                    text = uiState.error ?: "",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: showing local branch staff logs only.",
+                    color = SlTextSub,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
             SearchCard(
                 searchQuery = searchQuery,
@@ -134,26 +149,26 @@ fun StaffLogScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (filteredLogs.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (uiState.isLoading) "Loading staff logs..." else "No staff logs found",
-                                color = SlTextSub
-                            )
+                when {
+                    uiState.isLoading -> {
+                        item {
+                            EmptyStaffLogText("Loading staff logs...")
                         }
                     }
-                } else {
-                    items(
-                        items = filteredLogs,
-                        key = { it.logId }
-                    ) { log ->
-                        StaffLogCard(log)
+
+                    filteredLogs.isEmpty() -> {
+                        item {
+                            EmptyStaffLogText("No staff logs found")
+                        }
+                    }
+
+                    else -> {
+                        items(
+                            items = filteredLogs,
+                            key = { it.logId }
+                        ) { log ->
+                            StaffLogCard(log)
+                        }
                     }
                 }
             }
@@ -163,9 +178,12 @@ fun StaffLogScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    isOnline: Boolean,
+    localBranchId: Int,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -192,40 +210,64 @@ private fun Header(
                 text = "STAFF LOG",
                 color = Color.White,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
 
             if (isAdmin) {
-                Spacer(modifier = Modifier.weight(1f))
-
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    if (isOnline) {
+                        StaffBranchButton(
+                            label = "All",
+                            selected = selectedBranchId == null,
+                            onClick = { onBranchSelect(null) }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) SlGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                        branches.forEach { branch ->
+                            StaffBranchButton(
+                                label = "B${branch.branchId}",
+                                selected = selectedBranchId == branch.branchId,
+                                onClick = { onBranchSelect(branch.branchId) }
                             )
                         }
+                    } else {
+                        StaffBranchButton(
+                            label = "B$localBranchId",
+                            selected = true,
+                            onClick = { onBranchSelect(localBranchId) }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StaffBranchButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) SlGreen else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color(0xFF666E7A),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -248,7 +290,7 @@ private fun SearchCard(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    text = "Search staff name or username",
+                    text = "Search staff name, username, or branch",
                     color = Color.Gray,
                     fontSize = 14.sp
                 )
@@ -267,6 +309,22 @@ private fun SearchCard(
                 focusedIndicatorColor = Color.Transparent
             ),
             singleLine = true
+        )
+    }
+}
+
+@Composable
+private fun EmptyStaffLogText(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = SlTextSub,
+            fontSize = 14.sp
         )
     }
 }
@@ -326,7 +384,7 @@ private fun StaffLogCard(log: StaffLogRow) {
                                     shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(
-                                        text = "B${log.branchId}",
+                                        text = log.branchName.ifBlank { "B${log.branchId}" },
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,

@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Notifications
@@ -120,8 +119,6 @@ fun AdminDashboardScreen(
                     DashboardHeader(
                         selectedBranch = uiState.selectedBranch,
                         hasNotifications = uiState.hasNotifications,
-                        isSyncing = uiState.isSyncing,
-                        onSyncClick = viewModel::syncNow,
                         onBranchSelect = viewModel::onBranchSelected,
                         onNotificationsClick = {
                             navController.navigate(ADMIN_NOTIFICATIONS)
@@ -187,8 +184,6 @@ fun AdminDashboardScreen(
 private fun DashboardHeader(
     selectedBranch: String,
     hasNotifications: Boolean,
-    isSyncing: Boolean,
-    onSyncClick: () -> Unit,
     onBranchSelect: (String) -> Unit,
     onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
@@ -218,27 +213,6 @@ private fun DashboardHeader(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
-
-            IconButton(
-                onClick = onSyncClick,
-                enabled = !isSyncing,
-                modifier = Modifier.size(40.dp)
-            ) {
-                if (isSyncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
 
             IconButton(
                 onClick = onNotificationsClick,

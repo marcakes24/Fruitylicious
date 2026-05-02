@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.ProductDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
@@ -11,26 +12,25 @@ import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.TransactionEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
-import com.example.fruitylicious.util.BranchConfig
-import com.example.fruitylicious.util.SessionManager
-import com.example.fruitylicious.data.local.dao.BranchDao
-import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
-import javax.inject.Inject
 
 data class TransactionHistoryItemRow(
     val transactionItemId: String,
@@ -83,37 +83,40 @@ class TransactionHistoryViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
+    private val localBranchId = branchConfig.branchId
+
     private val _uiState = MutableStateFlow(
         TransactionHistoryUiState(
-            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true ||
-                    sessionManager.getRole()?.equals("owner", ignoreCase = true) == true,
-            localBranchId = sessionManager.getBranchId(),
-            selectedBranchId = sessionManager.getBranchId()
+            isAdmin = isAdminUser(),
+            localBranchId = localBranchId,
+            selectedBranchId = localBranchId
         )
     )
+
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
     private var localTransactions: List<TransactionEntity> = emptyList()
-    private var remoteTransactions: List<TransactionHistoryRow> = emptyList()
-    private var transactionItems: List<TransactionItemEntity> = emptyList()
-    private var transactionAddons: List<TransactionItemAddonEntity> = emptyList()
+    private var localTransactionItems: List<TransactionItemEntity> = emptyList()
+    private var localTransactionAddons: List<TransactionItemAddonEntity> = emptyList()
     private var products: List<ProductEntity> = emptyList()
     private var users: List<UserEntity> = emptyList()
 
     init {
+        observeBranches()
+        observeNetworkStatus()
         observeTransactions()
         observeItems()
         observeAddons()
         observeProducts()
         observeUsers()
-        observeBranches()
-        observeNetworkStatus()
     }
 
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
-                _uiState.update { it.copy(branches = branchList) }
+                _uiState.update {
+                    it.copy(branches = branchList)
+                }
             }
         }
     }
@@ -123,8 +126,9 @@ class TransactionHistoryViewModel @Inject constructor(
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { state ->
                     val canAccess = state.isAdmin && online
-                    val newSelectedId = if (!canAccess && state.selectedBranchId != state.localBranchId) {
-                        state.localBranchId
+
+                    val selected = if (!canAccess) {
+                        localBranchId
                     } else {
                         state.selectedBranchId
                     }
@@ -132,75 +136,144 @@ class TransactionHistoryViewModel @Inject constructor(
                     state.copy(
                         isOnline = online,
                         canAccessCrossBranch = canAccess,
-                        selectedBranchId = newSelectedId
+                        selectedBranchId = selected
                     )
                 }
-                loadRemoteIfNecessary()
+
+                loadTransactions()
             }
         }
     }
 
     fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
-        if (branchId != state.localBranchId && !state.canAccessCrossBranch) {
-            return
-        }
-        _uiState.update { it.copy(selectedBranchId = branchId) }
-        loadRemoteIfNecessary()
-        rebuildRows()
-    }
 
-    private fun loadRemoteIfNecessary() {
-        val state = _uiState.value
-        if (state.selectedBranchId != state.localBranchId && state.isOnline) {
-            fetchRemoteTransactions(state.selectedBranchId)
+        val finalBranchId = if (state.isAdmin && state.isOnline) {
+            branchId
         } else {
-            remoteTransactions = emptyList()
-            rebuildRows()
+            localBranchId
+        }
+
+        _uiState.update {
+            it.copy(
+                selectedBranchId = finalBranchId,
+                isLoading = true,
+                error = null
+            )
+        }
+
+        loadTransactions()
+    }
+
+    fun refresh() {
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                error = null
+            )
+        }
+
+        loadTransactions()
+    }
+
+    private fun loadTransactions() {
+        val state = _uiState.value
+
+        when {
+            !state.isAdmin -> {
+                rebuildLocalRows()
+            }
+
+            !state.isOnline -> {
+                rebuildLocalRows()
+            }
+
+            state.selectedBranchId == null -> {
+                fetchRemoteCombinedTransactions()
+            }
+
+            else -> {
+                fetchRemoteBranchTransactions(state.selectedBranchId)
+            }
         }
     }
 
-    private fun fetchRemoteTransactions(requestedBranchId: Int?) {
+    private fun fetchRemoteBranchTransactions(branchId: Int) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            
+            _uiState.update {
+                it.copy(isLoading = true, error = null)
+            }
+
             val now = System.currentTimeMillis()
             val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
-            
-            val result = if (requestedBranchId == null) {
-                reportRepository.getTransactionReport(0, monthAgo, now)
-            } else {
-                reportRepository.getTransactionReport(requestedBranchId, monthAgo, now)
+
+            val result = reportRepository.getTransactionReport(
+                branchId = branchId,
+                from = monthAgo,
+                to = now
+            )
+
+            result.fold(
+                onSuccess = { report ->
+                    _uiState.update {
+                        it.copy(
+                            transactions = report.transactions.map { item ->
+                                item.toHistoryRow()
+                            }.sortedByDescending { row -> row.dateTime },
+                            isLoading = false,
+                            error = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            transactions = emptyList(),
+                            isLoading = false,
+                            error = error.message ?: "Failed to load transactions."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun fetchRemoteCombinedTransactions() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isLoading = true, error = null)
             }
 
-            result.onSuccess { reportDto ->
-                remoteTransactions = reportDto.transactions.map { item ->
-                    TransactionHistoryRow(
-                        transactionId = item.transactionId,
-                        displayId = buildDisplayId(item.transactionId),
-                        staffName = item.userName,
-                        username = "",
-                        branchId = item.branchId,
-                        totalAmount = item.totalAmount,
-                        paymentType = item.paymentType,
-                        status = item.status,
-                        dateTime = item.dateTime,
-                        items = item.items.map { line ->
-                            TransactionHistoryItemRow(
-                                transactionItemId = "",
-                                productName = line.productName,
-                                sizeName = line.sizeName ?: "",
-                                quantity = line.quantity,
-                                subtotal = line.subtotal,
-                                addons = line.addons
-                            )
-                        }
-                    )
+            val now = System.currentTimeMillis()
+            val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
+
+            val result = reportRepository.getCombinedTransactionReport(
+                from = monthAgo,
+                to = now
+            )
+
+            result.fold(
+                onSuccess = { report ->
+                    _uiState.update {
+                        it.copy(
+                            transactions = report.transactions.map { item ->
+                                item.toHistoryRow()
+                            }.sortedByDescending { row -> row.dateTime },
+                            isLoading = false,
+                            error = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            transactions = emptyList(),
+                            isLoading = false,
+                            error = error.message ?: "Failed to load combined transactions."
+                        )
+                    }
                 }
-                rebuildRows()
-            }.onFailure { e ->
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
-            }
+            )
         }
     }
 
@@ -208,7 +281,7 @@ class TransactionHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             transactionDao.observeAllTransactions().collectLatest { items ->
                 localTransactions = items
-                rebuildRows()
+                loadTransactions()
             }
         }
     }
@@ -216,8 +289,8 @@ class TransactionHistoryViewModel @Inject constructor(
     private fun observeItems() {
         viewModelScope.launch {
             transactionItemDao.observeAllTransactionItems().collectLatest { items ->
-                transactionItems = items
-                rebuildRows()
+                localTransactionItems = items
+                loadTransactions()
             }
         }
     }
@@ -225,8 +298,8 @@ class TransactionHistoryViewModel @Inject constructor(
     private fun observeAddons() {
         viewModelScope.launch {
             transactionItemAddonDao.observeAllTransactionItemAddons().collectLatest { items ->
-                transactionAddons = items
-                rebuildRows()
+                localTransactionAddons = items
+                loadTransactions()
             }
         }
     }
@@ -235,7 +308,7 @@ class TransactionHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             productDao.observeProducts().collectLatest { items ->
                 products = items
-                rebuildRows()
+                loadTransactions()
             }
         }
     }
@@ -244,67 +317,57 @@ class TransactionHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             userDao.observeUsers().collectLatest { items ->
                 users = items
-                rebuildRows()
+                loadTransactions()
             }
         }
     }
 
-    private fun rebuildRows() {
-        val state = _uiState.value
-        
-        if (state.selectedBranchId != state.localBranchId && state.isOnline) {
-            _uiState.update {
-                it.copy(
-                    transactions = remoteTransactions,
-                    isLoading = false,
-                    error = null
-                )
-            }
-            return
-        }
-
+    private fun rebuildLocalRows() {
         val userMap = users.associateBy { it.userId }
         val productMap = products.associateBy { it.productId }
-        val itemsByTransaction = transactionItems.groupBy { it.transactionId }
-        val addonsByItem = transactionAddons.groupBy { it.transactionItemId }
+        val itemsByTransaction = localTransactionItems.groupBy { it.transactionId }
+        val addonsByItem = localTransactionAddons.groupBy { it.transactionItemId }
 
-        val rows = localTransactions.map { transaction ->
-            val user = userMap[transaction.userId]
+        val rows = localTransactions
+            .filter { it.branchId == localBranchId }
+            .map { transaction ->
+                val user = userMap[transaction.userId]
 
-            val itemRows = itemsByTransaction[transaction.transactionId]
-                .orEmpty()
-                .map { item ->
-                    val product = productMap[item.productId]
+                val itemRows = itemsByTransaction[transaction.transactionId]
+                    .orEmpty()
+                    .map { item ->
+                        val product = productMap[item.productId]
 
-                    val addonNames = addonsByItem[item.transactionItemId]
-                        .orEmpty()
-                        .mapNotNull { addon ->
-                            productMap[addon.addonProductId]?.productName
-                        }
+                        val addonNames = addonsByItem[item.transactionItemId]
+                            .orEmpty()
+                            .mapNotNull { addon ->
+                                productMap[addon.addonProductId]?.productName
+                            }
 
-                    TransactionHistoryItemRow(
-                        transactionItemId = item.transactionItemId,
-                        productName = product?.productName ?: "Unknown Product",
-                        sizeName = item.sizeName ?: "",
-                        quantity = item.quantity,
-                        subtotal = item.subtotal,
-                        addons = addonNames
-                    )
-                }
+                        TransactionHistoryItemRow(
+                            transactionItemId = item.transactionItemId,
+                            productName = product?.productName ?: "Unknown Product",
+                            sizeName = item.sizeName ?: "",
+                            quantity = item.quantity,
+                            subtotal = item.subtotal,
+                            addons = addonNames
+                        )
+                    }
 
-            TransactionHistoryRow(
-                transactionId = transaction.transactionId,
-                displayId = buildDisplayId(transaction.transactionId),
-                staffName = user?.name ?: "Unknown Staff",
-                username = user?.username ?: "unknown",
-                branchId = transaction.branchId,
-                totalAmount = transaction.totalAmount,
-                paymentType = transaction.paymentType,
-                status = transaction.status,
-                dateTime = transaction.dateTime,
-                items = itemRows
-            )
-        }.sortedByDescending { it.dateTime }
+                TransactionHistoryRow(
+                    transactionId = transaction.transactionId,
+                    displayId = buildDisplayId(transaction.transactionId),
+                    staffName = user?.name ?: "Unknown Staff",
+                    username = user?.username ?: "unknown",
+                    branchId = transaction.branchId,
+                    totalAmount = transaction.totalAmount,
+                    paymentType = transaction.paymentType,
+                    status = transaction.status,
+                    dateTime = transaction.dateTime,
+                    items = itemRows
+                )
+            }
+            .sortedByDescending { it.dateTime }
 
         _uiState.update {
             it.copy(
@@ -316,15 +379,16 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     fun voidTransaction(transactionId: String) {
-        if (sessionManager.getRole()?.equals("admin", ignoreCase = true) != true) {
-            _uiState.update { it.copy(error = "Only admins can void transactions.") }
+        if (!isAdminUser()) {
+            _uiState.update {
+                it.copy(error = "Only admins can void transactions.")
+            }
             return
         }
 
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val userId = sessionManager.getUserId()
-            val branchId = branchConfig.branchId
 
             database.withTransaction {
                 transactionDao.voidTransaction(
@@ -336,7 +400,7 @@ class TransactionHistoryViewModel @Inject constructor(
                     AuditLogEntity(
                         logId = UUID.randomUUID().toString(),
                         userId = userId,
-                        branchId = branchId,
+                        branchId = localBranchId,
                         action = "Voided transaction $transactionId.",
                         tableAffected = "transactions",
                         timestamp = now,
@@ -353,6 +417,8 @@ class TransactionHistoryViewModel @Inject constructor(
                     error = null
                 )
             }
+
+            loadTransactions()
         }
     }
 
@@ -360,6 +426,37 @@ class TransactionHistoryViewModel @Inject constructor(
         _uiState.update {
             it.copy(error = null, successMessage = null)
         }
+    }
+
+    private fun com.example.fruitylicious.data.remote.dto.TransactionReportItemDto.toHistoryRow(): TransactionHistoryRow {
+        return TransactionHistoryRow(
+            transactionId = transactionId,
+            displayId = buildDisplayId(transactionId),
+            staffName = userName,
+            username = "",
+            branchId = branchId,
+            totalAmount = totalAmount,
+            paymentType = paymentType,
+            status = status,
+            dateTime = dateTime,
+            items = items.map { line ->
+                TransactionHistoryItemRow(
+                    transactionItemId = "",
+                    productName = line.productName,
+                    sizeName = line.sizeName ?: "",
+                    quantity = line.quantity,
+                    subtotal = line.subtotal,
+                    addons = line.addons
+                )
+            }
+        )
+    }
+
+    private fun isAdminUser(): Boolean {
+        val role = sessionManager.getRole()
+
+        return role.equals("admin", ignoreCase = true) ||
+                role.equals("owner", ignoreCase = true)
     }
 
     private fun buildDisplayId(transactionId: String): String {

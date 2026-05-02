@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 import com.example.fruitylicious.sync.SyncManager
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -16,6 +17,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var syncManager: SyncManager
+
+    @Inject
+    lateinit var sessionManager: SessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,7 +30,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(color = Color(0xFFFFFDF6)) {
-                    FruityliciousNavGraph()
+                    FruityliciousNavGraph(sessionManager = sessionManager)
                 }
             }
         }
