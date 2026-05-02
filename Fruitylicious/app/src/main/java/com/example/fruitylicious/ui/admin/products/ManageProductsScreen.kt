@@ -1,5 +1,8 @@
 package com.example.fruitylicious.ui.admin.products
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,6 +62,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,8 +72,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.util.ImageStorage
 import kotlinx.coroutines.launch
 
 private val MpGreen = Color(0xFF2C8C44)
@@ -489,6 +496,16 @@ private fun ProductEditDialog(
     var image by remember { mutableStateOf(row?.product?.image ?: "") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val path = ImageStorage.saveImageFromUri(context, it, "products")
+            image = path
+        }
+    }
+
     val isEditing = row != null
 
     EditDialogShell(
@@ -560,11 +577,14 @@ private fun ProductEditDialog(
             DialogTextField(price, { price = it }, "0.00")
         }
 
-        if (selectedProduct == null) {
-            FieldBlock("Image URI") {
-                DialogTextField(image, { image = it }, "Optional image URI")
-            }
-            UploadBox("Upload product image")
+        Spacer(modifier = Modifier.height(10.dp))
+
+        FieldBlock("Product Image") {
+            UploadBox(
+                label = "Upload product image",
+                imagePath = image.ifBlank { null },
+                onClick = { imagePicker.launch("image/*") }
+            )
         }
     }
 }
@@ -579,6 +599,16 @@ private fun AddonEditDialog(
     var price by remember { mutableStateOf(addon?.price?.toString() ?: "") }
     var image by remember { mutableStateOf(addon?.image ?: "") }
 
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val path = ImageStorage.saveImageFromUri(context, it, "products")
+            image = path
+        }
+    }
+
     EditDialogShell(
         title = "Add / Edit Add ons",
         onDismiss = onDismiss,
@@ -592,11 +622,15 @@ private fun AddonEditDialog(
             DialogTextField(price, { price = it }, "0.00")
         }
 
-        FieldBlock("Image URI") {
-            DialogTextField(image, { image = it }, "Optional image URI")
-        }
+        Spacer(modifier = Modifier.height(10.dp))
 
-        UploadBox("Upload add ons image")
+        FieldBlock("Add-on Image") {
+            UploadBox(
+                label = "Upload add ons image",
+                imagePath = image.ifBlank { null },
+                onClick = { imagePicker.launch("image/*") }
+            )
+        }
     }
 }
 
@@ -711,38 +745,65 @@ private fun FieldBlock(
 }
 
 @Composable
-private fun UploadBox(label: String) {
+private fun UploadBox(
+    label: String,
+    imagePath: String?,
+    onClick: () -> Unit
+) {
     val dashPath = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .height(110.dp)
             .drawBehind {
-                drawRoundRect(
-                    color = Color.Gray,
-                    style = Stroke(width = 1.5f, pathEffect = dashPath),
-                    cornerRadius = CornerRadius(8.dp.toPx())
-                )
+                if (imagePath == null) {
+                    drawRoundRect(
+                        color = Color.Gray,
+                        style = Stroke(width = 1.5f, pathEffect = dashPath),
+                        cornerRadius = CornerRadius(8.dp.toPx())
+                    )
+                }
             }
-            .background(DialogBgGray, RoundedCornerShape(8.dp)),
+            .background(DialogBgGray, RoundedCornerShape(8.dp))
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Image,
-                contentDescription = null,
-                tint = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+        if (imagePath != null) {
+            val imageFile = ImageStorage.getImageFile(context, imagePath)
+            if (imageFile.exists()) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                UploadPlaceholder(label)
+            }
+        } else {
+            UploadPlaceholder(label)
         }
+    }
+}
+
+@Composable
+private fun UploadPlaceholder(label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = Icons.Default.Image,
+            contentDescription = null,
+            tint = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
     }
 }
 
@@ -861,9 +922,10 @@ private fun ProductRow(
     onDeleteProduct: () -> Unit
 ) {
     RowCard {
-        IconCircle(
-            icon = Icons.Default.Inventory2,
-            contentDescription = "Product"
+        ProductImageCircle(
+            imagePath = row.product.image,
+            productName = row.product.productName,
+            fallbackIcon = Icons.Default.Inventory2
         )
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -898,9 +960,10 @@ private fun AddOnRow(
     onDelete: () -> Unit
 ) {
     RowCard {
-        IconCircle(
-            icon = Icons.Default.AddCircle,
-            contentDescription = "Add-on"
+        ProductImageCircle(
+            imagePath = addon.image,
+            productName = addon.productName,
+            fallbackIcon = Icons.Default.AddCircle
         )
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -943,9 +1006,10 @@ private fun RowCard(
 }
 
 @Composable
-private fun IconCircle(
-    icon: ImageVector,
-    contentDescription: String
+private fun ProductImageCircle(
+    imagePath: String?,
+    productName: String,
+    fallbackIcon: ImageVector
 ) {
     Box(
         modifier = Modifier
@@ -954,9 +1018,41 @@ private fun IconCircle(
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
+        ProductImage(
+            imagePath = imagePath,
+            productName = productName,
+            fallbackIcon = fallbackIcon
+        )
+    }
+}
+
+@Composable
+private fun ProductImage(
+    imagePath: String?,
+    productName: String,
+    fallbackIcon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    val imageFile = imagePath?.let {
+        ImageStorage.getImageFile(
+            context = context,
+            relativePath = it
+        )
+    }
+
+    if (imageFile != null && imageFile.exists()) {
+        AsyncImage(
+            model = imageFile,
+            contentDescription = productName,
+            modifier = modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    } else {
         Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
+            imageVector = fallbackIcon,
+            contentDescription = productName,
             tint = MpGreen,
             modifier = Modifier.size(24.dp)
         )

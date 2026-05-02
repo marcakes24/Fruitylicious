@@ -67,8 +67,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.util.ImageStorage
 import kotlinx.coroutines.launch
 
 private val MiGreen = Color(0xFF2C8C44)
@@ -309,11 +316,35 @@ private fun IngredientRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
+    val imageFile = ingredient.image?.let {
+        ImageStorage.getImageFile(context, it)
+    }
+
     RowCard {
-        IconCircle(
-            icon = Icons.Default.Inventory2,
-            contentDescription = "Ingredient"
-        )
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageFile != null && imageFile.exists()) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = ingredient.ingredientName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Inventory2,
+                    contentDescription = "Ingredient",
+                    tint = MiGreen,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(10.dp))
 
@@ -356,16 +387,30 @@ private fun IngredientEditDialog(
         weight: String,
         threshold: String,
         isPackaging: Boolean,
-        image: String
+        image: String?
     ) -> Unit
 ) {
     var name by remember { mutableStateOf(ingredient?.ingredientName ?: "") }
     var selectedUnit by remember { mutableStateOf(ingredient?.unitType ?: "") }
     var weight by remember { mutableStateOf(ingredient?.estimatedWeightPerUnit?.toString() ?: "") }
     var threshold by remember { mutableStateOf(ingredient?.lowStockThreshold?.toString() ?: "") }
-    var image by remember { mutableStateOf(ingredient?.image ?: "") }
+    var imagePath by remember { mutableStateOf(ingredient?.image) }
     var packagingChecked by remember { mutableStateOf(ingredient?.isPackaging ?: false) }
     var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val path = ImageStorage.saveImageFromUri(
+                context = context,
+                sourceUri = uri,
+                folder = "ingredients"
+            )
+            imagePath = path
+        }
+    }
 
     val units = listOf("pcs", "can", "pack", "grams", "ml")
 
@@ -382,25 +427,10 @@ private fun IngredientEditDialog(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(DialogBlueIcon),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "Add / Edit Ingredient",
+                    text = if (ingredient == null) "Add Ingredient" else "Edit Ingredient",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiTextMain
@@ -497,14 +527,6 @@ private fun IngredientEditDialog(
                     )
                 }
 
-                FieldBlock("Image URI") {
-                    DialogTextField(
-                        value = image,
-                        onValueChange = { image = it },
-                        placeholder = "Optional image URI"
-                    )
-                }
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -527,11 +549,15 @@ private fun IngredientEditDialog(
                     )
                 }
 
-                FieldBlock("Insert Image") {
-                    ImageUploadBox()
-                }
+                Spacer(modifier = Modifier.height(14.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
+                FieldBlock("Ingredient Image") {
+                    UploadBox(
+                        label = "Upload ingredient image",
+                        imagePath = imagePath,
+                        onClick = { imagePicker.launch("image/*") }
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -560,7 +586,7 @@ private fun IngredientEditDialog(
                                 weight,
                                 threshold,
                                 packagingChecked,
-                                image
+                                imagePath
                             )
                         },
                         modifier = Modifier
@@ -578,6 +604,69 @@ private fun IngredientEditDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun UploadBox(
+    label: String,
+    imagePath: String?,
+    onClick: () -> Unit
+) {
+    val dashPath = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+    val context = LocalContext.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(110.dp)
+            .drawBehind {
+                if (imagePath == null) {
+                    drawRoundRect(
+                        color = Color.Gray,
+                        style = Stroke(width = 1.5f, pathEffect = dashPath),
+                        cornerRadius = CornerRadius(8.dp.toPx())
+                    )
+                }
+            }
+            .background(DialogBgGray, RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (imagePath != null) {
+            val imageFile = ImageStorage.getImageFile(context, imagePath)
+            if (imageFile.exists()) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                UploadPlaceholder(label)
+            }
+        } else {
+            UploadPlaceholder(label)
+        }
+    }
+}
+
+@Composable
+private fun UploadPlaceholder(label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = Icons.Default.Image,
+            contentDescription = null,
+            tint = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
     }
 }
 
@@ -726,43 +815,6 @@ private fun DialogTextField(
 }
 
 @Composable
-private fun ImageUploadBox() {
-    val dashPath = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(90.dp)
-            .drawBehind {
-                drawRoundRect(
-                    color = Color.Gray,
-                    style = Stroke(width = 1.5f, pathEffect = dashPath),
-                    cornerRadius = CornerRadius(8.dp.toPx())
-                )
-            }
-            .background(DialogBgGray, RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Image,
-                contentDescription = null,
-                tint = Color.Gray,
-                modifier = Modifier.size(28.dp)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Upload ingredient image",
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-        }
-    }
-}
-
-@Composable
 private fun RowCard(
     content: @Composable RowScope.() -> Unit
 ) {
@@ -775,27 +827,6 @@ private fun RowCard(
         verticalAlignment = Alignment.CenterVertically,
         content = content
     )
-}
-
-@Composable
-private fun IconCircle(
-    icon: ImageVector,
-    contentDescription: String
-) {
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(Color.White),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = MiGreen,
-            modifier = Modifier.size(24.dp)
-        )
-    }
 }
 
 @Composable

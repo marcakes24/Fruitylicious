@@ -55,7 +55,8 @@ data class WasteReportItemDto(
     val reason: String,
     val userId: Int,
     val userName: String,
-    val dateTime: Long
+    val dateTime: Long,
+    val image: String? = null
 )
 
 data class RestockReportDto(

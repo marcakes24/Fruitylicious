@@ -229,6 +229,20 @@ class ManageProductsViewModel @Inject constructor(
         }
     }
 
+    fun updateProductImage(
+        productId: Int,
+        imagePath: String?
+    ) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            manageProductUseCase.updateProductImage(
+                productId = productId,
+                imagePath = imagePath,
+                lastModified = now
+            )
+        }
+    }
+
     fun clearMessages() {
         _uiState.update {
             it.copy(error = null, successMessage = null)

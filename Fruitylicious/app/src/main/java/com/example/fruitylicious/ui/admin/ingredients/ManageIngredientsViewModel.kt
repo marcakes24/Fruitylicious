@@ -134,6 +134,12 @@ class ManageIngredientsViewModel @Inject constructor(
         }
     }
 
+    fun updateIngredientImage(ingredientId: Int, imagePath: String?) {
+        viewModelScope.launch {
+            manageIngredientUseCase.updateIngredientImage(ingredientId, imagePath)
+        }
+    }
+
     fun clearMessages() {
         _uiState.update {
             it.copy(

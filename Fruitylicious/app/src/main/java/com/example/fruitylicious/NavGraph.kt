@@ -210,7 +210,14 @@ fun FruityliciousNavGraph(
 
         composable(STAFF_LOG) {
             TimeLogScreen(
-                navController = navController
+                navController = navController,
+                userName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) {
+                        popUpTo(0)
+                    }
+                }
             )
         }
 

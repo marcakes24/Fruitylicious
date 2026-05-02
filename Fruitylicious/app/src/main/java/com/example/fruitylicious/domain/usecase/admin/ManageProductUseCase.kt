@@ -40,4 +40,12 @@ class ManageProductUseCase @Inject constructor(
     suspend fun deleteProduct(productId: Int): Result<Unit> {
         return productRepository.deleteProduct(productId)
     }
+
+    suspend fun updateProductImage(
+        productId: Int,
+        imagePath: String?,
+        lastModified: Long
+    ) {
+        productRepository.updateProductImage(productId, imagePath, lastModified)
+    }
 }

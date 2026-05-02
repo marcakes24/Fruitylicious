@@ -30,14 +30,19 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,12 +56,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.SharedDrawerContent
+import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val HeaderGreen = Color(0xFF2C8C44)
 private val ScreenBackground = Color(0xFFFFEAA0)
@@ -70,11 +80,17 @@ private val DarkButton = Color(0xFF333333)
 
 @Composable
 fun TimeLogScreen(
-    onMenuClick: () -> Unit = {},
+    navController: NavController,
+    userName: String = "User",
+    branchName: String = "",
+    onLogout: () -> Unit = {},
     viewModel: TimeLogViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -101,21 +117,45 @@ fun TimeLogScreen(
         }
     }
 
-    TimeLogContent(
-        uiState = uiState,
-        onMenuClick = onMenuClick,
-        onClockActionClick = {
-            when (uiState.attendanceState) {
-                AttendanceState.CLOCKED_OUT -> {
-                    imagePicker.launch("image/*")
-                }
-
-                AttendanceState.CLOCKED_IN -> {
-                    viewModel.clockOut()
-                }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Color.Transparent,
+                drawerTonalElevation = 0.dp
+            ) {
+                SharedDrawerContent(
+                    mode = SharedScreenMode.STAFF,
+                    navController = navController,
+                    drawerState = drawerState,
+                    scope = scope,
+                    userName = userName,
+                    branchName = branchName,
+                    onLogout = onLogout
+                )
             }
         }
-    )
+    ) {
+        TimeLogContent(
+            uiState = uiState,
+            onMenuClick = {
+                scope.launch {
+                    drawerState.open()
+                }
+            },
+            onClockActionClick = {
+                when (uiState.attendanceState) {
+                    AttendanceState.CLOCKED_OUT -> {
+                        imagePicker.launch("image/*")
+                    }
+
+                    AttendanceState.CLOCKED_IN -> {
+                        viewModel.clockOut()
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable

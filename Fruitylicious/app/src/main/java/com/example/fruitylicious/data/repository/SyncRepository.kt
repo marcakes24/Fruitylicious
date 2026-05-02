@@ -20,6 +20,9 @@ import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.remote.api.SyncApi
 import com.example.fruitylicious.data.remote.dto.PushRequestDto
 import com.example.fruitylicious.data.remote.dto.SyncRecordResultDto
+import android.content.Context
+import com.example.fruitylicious.util.ImageStorage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,6 +35,7 @@ data class SyncResult(
 
 @Singleton
 class SyncRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: PosDatabase,
     private val syncApi: SyncApi,
     private val branchDao: BranchDao,
@@ -89,6 +93,16 @@ class SyncRepository @Inject constructor(
             val restockLogs = restockLogDao.getUnsyncedRestockLogs()
             val inventoryAdjustments = inventoryAdjustmentDao.getUnsyncedAdjustments()
             val wasteLogs = wasteLogDao.getUnsyncedWasteLogs()
+            val wasteLogsForPush = wasteLogs.map { wasteLog ->
+                val convertedImage = ImageStorage.imageFileToBase64(
+                    context = context,
+                    relativePath = wasteLog.image
+                )
+
+                wasteLog.copy(
+                    image = convertedImage ?: wasteLog.image
+                )
+            }
             val transactions = transactionDao.getUnsyncedTransactions()
             val transactionItems = transactionItemDao.getUnsyncedTransactionItems()
             val transactionItemAddons = transactionItemAddonDao.getUnsyncedTransactionItemAddons()
@@ -132,7 +146,7 @@ class SyncRepository @Inject constructor(
                     inventory = inventory,
                     restockLogs = restockLogs,
                     inventoryAdjustments = inventoryAdjustments,
-                    wasteLogs = wasteLogs,
+                    wasteLogs = wasteLogsForPush,
                     transactions = transactions,
                     transactionItems = transactionItems,
                     transactionItemAddons = transactionItemAddons,
@@ -271,11 +285,21 @@ class SyncRepository @Inject constructor(
                     )
                 }
 
-                wasteLogDao.upsertWasteLogs(
-                    body.wasteLogs.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                val pulledWasteLogs = body.wasteLogs.map { wasteLog ->
+                    val localImagePath = ImageStorage.saveBase64Image(
+                        context = context,
+                        base64Value = wasteLog.image,
+                        folder = "waste"
+                    )
+
+                    wasteLog.copy(
+                        image = localImagePath ?: wasteLog.image,
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+
+                wasteLogDao.upsertWasteLogs(pulledWasteLogs)
 
                 transactionDao.upsertTransactions(
                     body.transactions.map {

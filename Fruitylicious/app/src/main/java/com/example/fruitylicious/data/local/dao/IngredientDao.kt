@@ -39,6 +39,22 @@ interface IngredientDao {
     @Query("UPDATE ingredients SET isSynced = 1, syncedAt = :syncedAt WHERE ingredientId = :ingredientId")
     suspend fun markSynced(ingredientId: Int, syncedAt: Long)
 
+    @Query(
+        """
+        UPDATE ingredients
+        SET image = :imagePath,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE ingredientId = :ingredientId
+        """
+    )
+    suspend fun updateIngredientImage(
+        ingredientId: Int,
+        imagePath: String?,
+        lastModified: Long
+    )
+
     @Query("DELETE FROM ingredients WHERE ingredientId = :ingredientId")
     suspend fun deleteIngredient(ingredientId: Int)
 

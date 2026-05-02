@@ -99,4 +99,9 @@ class IngredientRepository @Inject constructor(
     suspend fun savePulledIngredients(ingredients: List<IngredientEntity>) {
         ingredientDao.upsertIngredients(ingredients.map { it.copy(isSynced = true, syncedAt = it.syncedAt ?: System.currentTimeMillis()) })
     }
+
+    suspend fun updateIngredientImage(ingredientId: Int, imagePath: String?) {
+        val now = System.currentTimeMillis()
+        ingredientDao.updateIngredientImage(ingredientId, imagePath, now)
+    }
 }

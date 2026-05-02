@@ -45,6 +45,22 @@ interface ProductDao {
     @Query("DELETE FROM products WHERE productId = :productId")
     suspend fun deleteProduct(productId: Int)
 
+    @Query(
+        """
+        UPDATE products
+        SET image = :imagePath,
+            lastModified = :lastModified,
+            isSynced = 0,
+            syncedAt = NULL
+        WHERE productId = :productId
+        """
+    )
+    suspend fun updateProductImage(
+        productId: Int,
+        imagePath: String?,
+        lastModified: Long
+    )
+
     @Query("SELECT * FROM products ORDER BY productName ASC")
     fun observeProducts(): Flow<List<ProductEntity>>
 

@@ -16,6 +16,7 @@ import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
+import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
@@ -75,7 +76,8 @@ class RestockViewModel @Inject constructor(
     private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val localBranchId = branchConfig.branchId
@@ -520,6 +522,11 @@ class RestockViewModel @Inject constructor(
                     successMessage = "Restock saved.",
                     error = null
                 )
+            }
+
+            if (_uiState.value.isOnline) {
+                syncRepository.pushUnsynced()
+                loadHistory()
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.example.fruitylicious.ui.shared.waste
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
@@ -16,10 +17,13 @@ import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
+import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.ImageStorage
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +70,7 @@ data class WasteManagementUiState(
 
 @HiltViewModel
 class WasteManagementViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: PosDatabase,
     private val inventoryDao: InventoryDao,
     private val ingredientDao: IngredientDao,
@@ -76,7 +81,8 @@ class WasteManagementViewModel @Inject constructor(
     private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val localBranchId = branchConfig.branchId
@@ -337,7 +343,11 @@ class WasteManagementViewModel @Inject constructor(
                             branchId = report.branchId ?: branchId,
                             branchName = report.branchName ?: "Branch $branchId",
                             dateTime = item.dateTime,
-                            imagePath = null
+                            imagePath = ImageStorage.saveBase64Image(
+                                context = context,
+                                base64Value = item.image,
+                                folder = "waste"
+                            )
                         )
                     }.sortedByDescending { it.dateTime }
 
@@ -406,7 +416,11 @@ class WasteManagementViewModel @Inject constructor(
                                 branchId = report.branchId ?: branch.branchId,
                                 branchName = report.branchName ?: branch.branchName,
                                 dateTime = item.dateTime,
-                                imagePath = null
+                                imagePath = ImageStorage.saveBase64Image(
+                                    context = context,
+                                    base64Value = item.image,
+                                    folder = "waste"
+                                )
                             )
                         }
 
@@ -512,6 +526,11 @@ class WasteManagementViewModel @Inject constructor(
                     successMessage = "Waste entry saved.",
                     error = null
                 )
+            }
+
+            if (_uiState.value.isOnline) {
+                syncRepository.pushUnsynced()
+                loadHistory()
             }
         }
     }

@@ -79,6 +79,14 @@ class ProductRepository @Inject constructor(
         return Result.success(Unit)
     }
 
+    suspend fun updateProductImage(
+        productId: Int,
+        imagePath: String?,
+        lastModified: Long
+    ) {
+        productDao.updateProductImage(productId, imagePath, lastModified)
+    }
+
     suspend fun getUnsyncedProducts(): List<ProductEntity> {
         return productDao.getUnsyncedProducts()
     }
