@@ -395,14 +395,16 @@ private fun ProductCustomizeDialog(
     val activeRecipe = if (variantRecipe.isNotEmpty()) variantRecipe else productRecipe
 
     val mixRecipe = if (mixFlavor && selectedFlavor != null) {
-        // For mix flavor, we might want to check the base product recipe or a specific mix recipe
-        // Usually, a mix flavor uses a portion of the second fruit's recipe
         recipes.filter { it.productId == selectedFlavor?.productId && it.variantId == null }
     } else emptyList()
 
+    val selectedAddonRecipes = recipes.filter { r ->
+        selectedAddOns.any { it.productId == r.productId } && r.variantId == null
+    }
+
     val hasRecipe = activeRecipe.isNotEmpty()
 
-    val insufficientIngredients = remember(selectedVariant, selectedFlavor, mixFlavor, quantity, recipes, inventory, ingredients) {
+    val insufficientIngredients = remember(selectedVariant, selectedFlavor, mixFlavor, selectedAddOns, quantity, recipes, inventory, ingredients) {
         val requirements = mutableMapOf<Int, Double>()
 
         // Add main product requirements
@@ -410,8 +412,13 @@ private fun ProductCustomizeDialog(
             requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
-        // Add mix flavor requirements (assuming 50% or full portion for now)
+        // Add mix flavor requirements
         mixRecipe.forEach { line ->
+            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+        }
+
+        // Add selected add-ons requirements
+        selectedAddonRecipes.forEach { line ->
             requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
@@ -421,7 +428,7 @@ private fun ProductCustomizeDialog(
 
             val available = if (stockItem != null && ingredient != null) {
                 val unit = ingredient.unitType.lowercase(Locale.US)
-                if (unit == "can" || unit == "pcs") {
+                if (unit == "can" || unit == "pcs" || unit == "pack") {
                     stockItem.currentStock * ingredient.estimatedWeightPerUnit
                 } else {
                     stockItem.currentStock
@@ -682,17 +689,54 @@ private fun ProductCustomizeDialog(
                                 rowItems.forEach { addon ->
                                     val isSelected = addon in selectedAddOns
 
+                                    // Individual addon validation
+                                    val addonRecipe = recipes.filter { it.productId == addon.productId && it.variantId == null }
+                                    val hasAddonRecipe = addonRecipe.isNotEmpty()
+
+                                    val isAddonStockAvailable = remember(addon, quantity, recipes, inventory, ingredients) {
+                                        if (!hasAddonRecipe) return@remember false
+
+                                        addonRecipe.all { line ->
+                                            val req = line.quantityRequired * quantity
+                                            val stockItem = inventory.find { it.ingredientId == line.ingredientId }
+                                            val ingredient = ingredients.find { it.ingredientId == line.ingredientId }
+
+                                            val available = if (stockItem != null && ingredient != null) {
+                                                val unit = ingredient.unitType.lowercase(Locale.US)
+                                                if (unit == "can" || unit == "pcs" || unit == "pack") {
+                                                    stockItem.currentStock * ingredient.estimatedWeightPerUnit
+                                                } else {
+                                                    stockItem.currentStock
+                                                }
+                                            } else 0.0
+
+                                            available >= req
+                                        }
+                                    }
+
+                                    val isAddonSelectable = hasAddonRecipe && isAddonStockAvailable
+
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) GreenPrimary else Color.White)
+                                            .background(
+                                                when {
+                                                    isSelected -> GreenPrimary
+                                                    !isAddonSelectable -> Color(0xFFF5F5F5)
+                                                    else -> Color.White
+                                                }
+                                            )
                                             .border(
                                                 1.dp,
-                                                if (isSelected) GreenPrimary else Color(0xFFEEEEEE),
+                                                when {
+                                                    isSelected -> GreenPrimary
+                                                    !isAddonSelectable -> Color(0xFFE0E0E0)
+                                                    else -> Color(0xFFEEEEEE)
+                                                },
                                                 RoundedCornerShape(12.dp)
                                             )
-                                            .clickable {
+                                            .clickable(enabled = isAddonSelectable || isSelected) {
                                                 selectedAddOns = if (isSelected) {
                                                     selectedAddOns - addon
                                                 } else {
@@ -706,18 +750,26 @@ private fun ProductCustomizeDialog(
                                             Text(
                                                 text = addon.productName,
                                                 fontSize = 12.sp,
-                                                color = if (isSelected) Color.White else Color(0xFF1B1B1B),
+                                                color = when {
+                                                    isSelected -> Color.White
+                                                    !isAddonSelectable -> Color.LightGray
+                                                    else -> Color(0xFF1B1B1B)
+                                                },
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                 textAlign = TextAlign.Center
                                             )
 
                                             Text(
-                                                text = "+ ₱${String.format(Locale.US, "%,.2f", addon.price)}",
+                                                text = when {
+                                                    !hasAddonRecipe -> "No Recipe"
+                                                    !isAddonStockAvailable -> "Out of Stock"
+                                                    else -> "+ ₱${String.format(Locale.US, "%,.2f", addon.price)}"
+                                                },
                                                 fontSize = 10.sp,
-                                                color = if (isSelected) {
-                                                    Color.White.copy(alpha = 0.8f)
-                                                } else {
-                                                    Color.Gray
+                                                color = when {
+                                                    isSelected -> Color.White.copy(alpha = 0.8f)
+                                                    !isAddonSelectable -> Color.Red.copy(alpha = 0.6f)
+                                                    else -> Color.Gray
                                                 }
                                             )
                                         }

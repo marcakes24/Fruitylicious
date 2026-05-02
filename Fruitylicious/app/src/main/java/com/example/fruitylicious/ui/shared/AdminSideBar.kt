@@ -121,7 +121,8 @@ fun AdminSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -135,7 +136,8 @@ fun AdminSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -149,7 +151,8 @@ fun AdminSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -416,17 +419,20 @@ private fun adminNavigateTo(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,
-    route: String
+    route: String,
+    currentRoute: String?
 ) {
     scope.launch {
         drawerState.close()
     }
 
+    if (route == currentRoute) return
+
     navController.navigate(route) {
         popUpTo(ADMIN_DASHBOARD) {
-            saveState = true
+            saveState = (route != ADMIN_DASHBOARD)
         }
         launchSingleTop = true
-        restoreState = true
+        restoreState = (route != ADMIN_DASHBOARD)
     }
 }

@@ -309,7 +309,7 @@ class RecipeManagementViewModel @Inject constructor(
 
     private fun recipeInputUnitFor(ingredient: IngredientEntity): String {
         return when (ingredient.unitType.lowercase()) {
-            "pcs", "piece", "pieces", "can" -> "g"
+            "pcs", "piece", "pieces", "can", "pack" -> "g"
             "grams", "gram", "g" -> "g"
             "milliliters", "milliliter", "ml" -> "ml"
             else -> ingredient.unitType

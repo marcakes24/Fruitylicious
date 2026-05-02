@@ -607,9 +607,11 @@ private fun RecipeIngredientRow(
         }
 
         val unit = selectedIngredient?.unitType ?: ""
-        val isPcsOrCan = unit.equals("pcs", ignoreCase = true) || unit.equals("can", ignoreCase = true)
+        val isPcsCanOrPack = unit.equals("pcs", ignoreCase = true) || 
+                             unit.equals("can", ignoreCase = true) ||
+                             unit.equals("pack", ignoreCase = true)
 
-        if (isPcsOrCan) {
+        if (isPcsCanOrPack) {
             Text(
                 text = "Enter grams. Inventory deducts $unit using estimated weight per unit.",
                 fontSize = 9.sp,

@@ -103,7 +103,7 @@ fun WasteManagementScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+        mutableStateOf(uiState.userBranchId)
     }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
 

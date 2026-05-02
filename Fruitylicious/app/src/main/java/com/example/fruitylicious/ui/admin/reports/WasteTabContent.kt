@@ -37,13 +37,13 @@ import java.util.Locale
 
 @Composable
 fun WasteTabContent(
-    branch: String,
+    branchId: Int?,
     viewModel: WasteReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(branch) {
-        viewModel.loadReport(branch)
+    LaunchedEffect(branchId) {
+        viewModel.loadReport(branchId)
     }
 
     val maxReason = uiState.reasonData.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1

@@ -365,13 +365,14 @@ class TransactionRepository @Inject constructor(
         estimatedWeightPerUnit: Double,
         ingredientName: String
     ): Double {
-        val isPcsOrCan = unitType.equals("pcs", ignoreCase = true) || 
-                         unitType.equals("can", ignoreCase = true)
+        val isPcsCanOrPack = unitType.equals("pcs", ignoreCase = true) || 
+                             unitType.equals("can", ignoreCase = true) ||
+                             unitType.equals("pack", ignoreCase = true)
 
-        return if (isPcsOrCan) {
+        return if (isPcsCanOrPack) {
             if (estimatedWeightPerUnit <= 0.0) {
                 throw IllegalStateException(
-                    "$ingredientName uses $unitType but estimated weight per unit is not set."
+                    "$ingredientName uses $unitType but estimated weight per unit is not set or invalid."
                 )
             }
 

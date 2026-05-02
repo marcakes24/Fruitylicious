@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -16,9 +17,13 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,8 +56,6 @@ import kotlin.math.ceil
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavController
 import com.example.fruitylicious.ui.shared.StaffSideBarContent
 import kotlinx.coroutines.launch
@@ -65,6 +68,7 @@ private val StaffChartBar = Color(0xFFE53935)
 private val StaffTextPrimary = Color(0xFF1A1A1A)
 private val StaffTextSecondary = Color(0xFF757575)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StaffDashboardScreen(
     navController: NavController,
@@ -74,6 +78,18 @@ fun StaffDashboardScreen(
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.syncMessage, uiState.syncError) {
+        uiState.syncMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSyncMessage()
+        }
+        uiState.syncError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSyncMessage()
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -93,70 +109,90 @@ fun StaffDashboardScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(StaffPageBg)
-                .verticalScroll(rememberScrollState())
+        PullToRefreshBox(
+            isRefreshing = uiState.isSyncing,
+            onRefresh = viewModel::syncNow,
+            modifier = Modifier.fillMaxSize()
         ) {
-            StaffDashboardHeader(
-                hasNotifications = uiState.hasNotifications,
-                onNotificationsClick = {
-                    navController.navigate(STAFF_NOTIFICATIONS)
-                },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(StaffPageBg)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    StaffDashboardHeader(
+                        hasNotifications = uiState.hasNotifications,
+                        isSyncing = uiState.isSyncing,
+                        onSyncClick = viewModel::syncNow,
+                        onNotificationsClick = {
+                            navController.navigate(STAFF_NOTIFICATIONS)
+                        },
+                        onMenuClick = {
+                            scope.launch {
+                                drawerState.open()
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    StaffGreetingCard(
+                        staffName = uiState.userName.ifBlank { "Staff User" },
+                        branchName = uiState.branchName,
+                        dateText = uiState.dateText,
+                        isOnline = uiState.isOnline,
+                        onStartPos = {
+                            navController.navigate(STAFF_POS)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    StaffQuickActionsSection(
+                        onNavigate = { route ->
+                            navController.navigate(route)
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    StaffSalesChartSection(
+                        weeklySales = uiState.weeklySalesData,
+                        totalAmount = uiState.weeklyTotalSales,
+                        transactionCount = uiState.weeklyTransactionCount
+                    )
+
+                    val error = uiState.error
+                    if (!error.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            StaffGreetingCard(
-                staffName = uiState.userName.ifBlank { "Staff User" },
-                branchName = uiState.branchName,
-                dateText = uiState.dateText,
-                isOnline = uiState.isOnline,
-                onStartPos = {
-                    navController.navigate(STAFF_POS)
-                }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            StaffQuickActionsSection(
-                onNavigate = { route ->
-                    navController.navigate(route)
-                }
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            StaffSalesChartSection(
-                weeklySales = uiState.weeklySalesData,
-                totalAmount = uiState.weeklyTotalSales,
-                transactionCount = uiState.weeklyTransactionCount
-            )
-
-            val error = uiState.error
-            if (!error.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StaffDashboardHeader(
     hasNotifications: Boolean,
+    isSyncing: Boolean,
+    onSyncClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -187,6 +223,27 @@ private fun StaffDashboardHeader(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
+
+            IconButton(
+                onClick = onSyncClick,
+                enabled = !isSyncing,
+                modifier = Modifier.size(40.dp)
+            ) {
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sync",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
 
             IconButton(
                 onClick = onNotificationsClick,

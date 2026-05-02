@@ -367,7 +367,7 @@ private fun IngredientEditDialog(
     var packagingChecked by remember { mutableStateOf(ingredient?.isPackaging ?: false) }
     var unitDropdownExpanded by remember { mutableStateOf(false) }
 
-    val units = listOf("pcs", "can", "pack", "grams", "ml", "box", "kg", "liter")
+    val units = listOf("pcs", "can", "pack", "grams", "ml")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -481,7 +481,7 @@ private fun IngredientEditDialog(
                             placeholder = "0.00"
                         )
                         Text(
-                            text = "For 'pcs' or 'can', enter weight/volume in g/ml per unit.",
+                            text = "For 'pcs', 'can', or 'pack', enter weight/volume in g/ml per unit.",
                             fontSize = 11.sp,
                             color = MiTextSub,
                             modifier = Modifier.padding(top = 4.dp, start = 4.dp)

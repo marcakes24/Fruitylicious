@@ -31,14 +31,14 @@ import kotlin.math.abs
 
 @Composable
 fun SalesTabContent(
-    branch: String,
+    branchId: Int?,
     navController: NavController,
     viewModel: SalesReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(branch) {
-        viewModel.loadReport(branch)
+    LaunchedEffect(branchId) {
+        viewModel.loadReport(branchId)
     }
 
     val pctChange = if (uiState.previousSales > 0.0) {
@@ -72,7 +72,7 @@ fun SalesTabContent(
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSelected) Color(0xFFE8F5E9) else Color.Transparent)
                         .clickable {
-                            viewModel.setPeriod(period, branch)
+                            viewModel.setPeriod(period, branchId)
                         }
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center

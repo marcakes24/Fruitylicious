@@ -84,7 +84,7 @@ fun InventoryMonitoringScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "B1" else uiState.userBranchId) 
+        mutableStateOf(uiState.userBranchId)
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }

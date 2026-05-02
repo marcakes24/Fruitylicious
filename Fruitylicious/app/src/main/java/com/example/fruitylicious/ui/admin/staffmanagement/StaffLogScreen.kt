@@ -73,7 +73,7 @@ fun StaffLogScreen(
     val scope = rememberCoroutineScope()
 
     var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+        mutableStateOf(uiState.userBranchId)
     }
     var searchQuery by remember { mutableStateOf("") }
 

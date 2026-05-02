@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -90,9 +91,10 @@ fun SalesSummaryScreen(
                 .background(SsPageBg)
         ) {
             Header(
-                selectedBranch = uiState.selectedBranch,
-                isAdmin = uiState.isAdmin,
-                onBranchSelect = viewModel::onBranchSelected,
+                selectedBranchId = uiState.selectedBranchId,
+                canAccessCrossBranch = uiState.canAccessCrossBranch,
+                branches = uiState.branches,
+                onBranchSelected = { viewModel.onBranchSelected(it) },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
@@ -304,9 +306,10 @@ fun SalesSummaryScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
-    isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    selectedBranchId: Int?,
+    canAccessCrossBranch: Boolean,
+    branches: List<BranchEntity>,
+    onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -335,32 +338,60 @@ private fun Header(
                 modifier = Modifier.weight(1f)
             )
 
-            if (isAdmin) {
+            if (canAccessCrossBranch) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    // "All" option
+                    val isAllSelected = selectedBranchId == null
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isAllSelected) SsGreen else Color.Transparent)
+                            .clickable { onBranchSelected(null) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "All",
+                            color = if (isAllSelected) Color.White else Color(0xFF666E7A),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    branches.forEach { branch ->
+                        val isSelected = selectedBranchId == branch.branchId
 
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (isSelected) SsGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
+                                .clickable { onBranchSelected(branch.branchId) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = branch,
+                                text = "B${branch.branchId}",
                                 color = if (isSelected) Color.White else Color(0xFF666E7A),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
+                }
+            } else {
+                selectedBranchId?.let { id ->
+                    Text(
+                        text = "B$id",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
                 }
             }
         }

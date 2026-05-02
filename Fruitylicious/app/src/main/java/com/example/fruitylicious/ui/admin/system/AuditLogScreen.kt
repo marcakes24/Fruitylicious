@@ -86,7 +86,7 @@ fun AuditLogScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+        mutableStateOf(uiState.userBranchId)
     }
 
     var showDatePicker by remember { mutableStateOf(false) }

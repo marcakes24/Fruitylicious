@@ -18,6 +18,10 @@ import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
+import com.example.fruitylicious.data.local.dao.BranchDao
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,8 +57,12 @@ data class TransactionHistoryRow(
 data class TransactionHistoryUiState(
     val transactions: List<TransactionHistoryRow> = emptyList(),
     val isAdmin: Boolean = false,
-    val userBranchId: String = "B1",
-    val isLoading: Boolean = true,
+    val localBranchId: Int = 1,
+    val selectedBranchId: Int? = 1,
+    val branches: List<BranchEntity> = emptyList(),
+    val isOnline: Boolean = false,
+    val canAccessCrossBranch: Boolean = false,
+    val isLoading: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -69,18 +77,24 @@ class TransactionHistoryViewModel @Inject constructor(
     private val userDao: UserDao,
     private val auditLogDao: AuditLogDao,
     private val sessionManager: SessionManager,
-    private val branchConfig: BranchConfig
+    private val branchConfig: BranchConfig,
+    private val branchDao: BranchDao,
+    private val reportRepository: ReportRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         TransactionHistoryUiState(
-            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
-            userBranchId = "B${sessionManager.getBranchId()}"
+            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true ||
+                    sessionManager.getRole()?.equals("owner", ignoreCase = true) == true,
+            localBranchId = sessionManager.getBranchId(),
+            selectedBranchId = sessionManager.getBranchId()
         )
     )
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
-    private var transactions: List<TransactionEntity> = emptyList()
+    private var localTransactions: List<TransactionEntity> = emptyList()
+    private var remoteTransactions: List<TransactionHistoryRow> = emptyList()
     private var transactionItems: List<TransactionItemEntity> = emptyList()
     private var transactionAddons: List<TransactionItemAddonEntity> = emptyList()
     private var products: List<ProductEntity> = emptyList()
@@ -92,12 +106,108 @@ class TransactionHistoryViewModel @Inject constructor(
         observeAddons()
         observeProducts()
         observeUsers()
+        observeBranches()
+        observeNetworkStatus()
+    }
+
+    private fun observeBranches() {
+        viewModelScope.launch {
+            branchDao.observeAllBranches().collectLatest { branchList ->
+                _uiState.update { it.copy(branches = branchList) }
+            }
+        }
+    }
+
+    private fun observeNetworkStatus() {
+        viewModelScope.launch {
+            networkMonitor.observeNetworkStatus().collectLatest { online ->
+                _uiState.update { state ->
+                    val canAccess = state.isAdmin && online
+                    val newSelectedId = if (!canAccess && state.selectedBranchId != state.localBranchId) {
+                        state.localBranchId
+                    } else {
+                        state.selectedBranchId
+                    }
+
+                    state.copy(
+                        isOnline = online,
+                        canAccessCrossBranch = canAccess,
+                        selectedBranchId = newSelectedId
+                    )
+                }
+                loadRemoteIfNecessary()
+            }
+        }
+    }
+
+    fun onBranchSelected(branchId: Int?) {
+        val state = _uiState.value
+        if (branchId != state.localBranchId && !state.canAccessCrossBranch) {
+            return
+        }
+        _uiState.update { it.copy(selectedBranchId = branchId) }
+        loadRemoteIfNecessary()
+        rebuildRows()
+    }
+
+    private fun loadRemoteIfNecessary() {
+        val state = _uiState.value
+        if (state.selectedBranchId != state.localBranchId && state.isOnline) {
+            fetchRemoteTransactions(state.selectedBranchId)
+        } else {
+            remoteTransactions = emptyList()
+            rebuildRows()
+        }
+    }
+
+    private fun fetchRemoteTransactions(requestedBranchId: Int?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            val now = System.currentTimeMillis()
+            val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
+            
+            val result = if (requestedBranchId == null) {
+                reportRepository.getTransactionReport(0, monthAgo, now)
+            } else {
+                reportRepository.getTransactionReport(requestedBranchId, monthAgo, now)
+            }
+
+            result.onSuccess { reportDto ->
+                remoteTransactions = reportDto.transactions.map { item ->
+                    TransactionHistoryRow(
+                        transactionId = item.transactionId,
+                        displayId = buildDisplayId(item.transactionId),
+                        staffName = item.userName,
+                        username = "",
+                        branchId = item.branchId,
+                        totalAmount = item.totalAmount,
+                        paymentType = item.paymentType,
+                        status = item.status,
+                        dateTime = item.dateTime,
+                        items = item.items.map { line ->
+                            TransactionHistoryItemRow(
+                                transactionItemId = "",
+                                productName = line.productName,
+                                sizeName = line.sizeName ?: "",
+                                quantity = line.quantity,
+                                subtotal = line.subtotal,
+                                addons = line.addons
+                            )
+                        }
+                    )
+                }
+                rebuildRows()
+            }.onFailure { e ->
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
     }
 
     private fun observeTransactions() {
         viewModelScope.launch {
             transactionDao.observeAllTransactions().collectLatest { items ->
-                transactions = items
+                localTransactions = items
                 rebuildRows()
             }
         }
@@ -140,12 +250,25 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     private fun rebuildRows() {
+        val state = _uiState.value
+        
+        if (state.selectedBranchId != state.localBranchId && state.isOnline) {
+            _uiState.update {
+                it.copy(
+                    transactions = remoteTransactions,
+                    isLoading = false,
+                    error = null
+                )
+            }
+            return
+        }
+
         val userMap = users.associateBy { it.userId }
         val productMap = products.associateBy { it.productId }
         val itemsByTransaction = transactionItems.groupBy { it.transactionId }
         val addonsByItem = transactionAddons.groupBy { it.transactionItemId }
 
-        val rows = transactions.map { transaction ->
+        val rows = localTransactions.map { transaction ->
             val user = userMap[transaction.userId]
 
             val itemRows = itemsByTransaction[transaction.transactionId]

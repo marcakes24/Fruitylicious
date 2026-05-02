@@ -91,8 +91,8 @@ fun TransactionHistoryScreen(
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+    var selectedBranchId by remember(uiState.canAccessCrossBranch, uiState.selectedBranchId) { 
+        mutableStateOf(uiState.selectedBranchId)
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
@@ -117,10 +117,9 @@ fun TransactionHistoryScreen(
                     transaction.staffName.contains(searchQuery, ignoreCase = true) ||
                     transaction.username.contains(searchQuery, ignoreCase = true)
 
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> transaction.branchId == 1
-            "B2" -> transaction.branchId == 2
-            else -> true
+        val matchesBranch = when (selectedBranchId) {
+            null -> true // All
+            else -> transaction.branchId == selectedBranchId
         }
 
         val matchesDate = if (selectedDateMillis == 0L) {
@@ -185,10 +184,11 @@ fun TransactionHistoryScreen(
                 .background(ThPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
-                isAdmin = uiState.isAdmin,
+                selectedBranchId = uiState.selectedBranchId,
+                canAccessCrossBranch = uiState.canAccessCrossBranch,
+                branches = uiState.branches,
                 onBranchSelect = {
-                    selectedBranch = it
+                    viewModel.onBranchSelected(it)
                     viewModel.clearMessages()
                 },
                 onMenuClick = {
@@ -276,9 +276,10 @@ fun TransactionHistoryScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
-    isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    selectedBranchId: Int?,
+    canAccessCrossBranch: Boolean,
+    branches: List<com.example.fruitylicious.data.local.entity.BranchEntity>,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -303,32 +304,60 @@ private fun Header(
                 modifier = Modifier.weight(1f)
             )
 
-            if (isAdmin) {
+            if (canAccessCrossBranch) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    // "All" option
+                    val isAllSelected = selectedBranchId == null
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isAllSelected) ThGreen else Color.Transparent)
+                            .clickable { onBranchSelect(null) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "All",
+                            color = if (isAllSelected) Color.White else Color(0xFF666E7A),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    branches.forEach { branch ->
+                        val isSelected = selectedBranchId == branch.branchId
 
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (isSelected) ThGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
+                                .clickable { onBranchSelect(branch.branchId) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = branch,
+                                text = "B${branch.branchId}",
                                 color = if (isSelected) Color.White else Color(0xFF666E7A),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
+                }
+            } else {
+                selectedBranchId?.let { id ->
+                    Text(
+                        text = "B$id",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
                 }
             }
         }

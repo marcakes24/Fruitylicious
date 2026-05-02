@@ -77,7 +77,7 @@ fun NotificationsScreen(
     val scope = rememberCoroutineScope()
 
     var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
+        mutableStateOf(uiState.userBranchId)
     }
 
     val filteredNotifications = uiState.notifications.filter { item ->

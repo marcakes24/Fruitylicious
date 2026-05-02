@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,18 +35,16 @@ private val RptOkStock = Color(0xFF2C8C44)
 
 @Composable
 fun InventoryTabContent(
-    branch: String,
+    branchId: Int?,
     viewModel: InventoryReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val filteredRows = uiState.rows.filter { row ->
-        when (branch) {
-            "B1" -> row.branchId == 1
-            "B2" -> row.branchId == 2
-            else -> true
-        }
+    LaunchedEffect(branchId) {
+        viewModel.loadReport(branchId)
     }
+
+    val filteredRows = uiState.rows // Already filtered/aggregated by ViewModel
 
     val totalUnits = filteredRows.sumOf { it.currentStock }
     val lowStockCount = filteredRows.count {

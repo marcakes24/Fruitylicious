@@ -43,13 +43,13 @@ private data class RestockFrequencyItem(
 
 @Composable
 fun RestockTabContent(
-    branch: String,
+    branchId: Int?,
     viewModel: RestockReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(branch) {
-        viewModel.loadReport(branch)
+    LaunchedEffect(branchId) {
+        viewModel.loadReport(branchId)
     }
 
     val restockItems = uiState.frequencyItems.map { row ->

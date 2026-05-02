@@ -109,7 +109,8 @@ fun StaffSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -123,7 +124,8 @@ fun StaffSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -137,7 +139,8 @@ fun StaffSideBarContent(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
-                        route = route
+                        route = route,
+                        currentRoute = currentRoute
                     )
                 }
             )
@@ -397,17 +400,20 @@ private fun staffNavigateTo(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,
-    route: String
+    route: String,
+    currentRoute: String?
 ) {
     scope.launch {
         drawerState.close()
     }
 
+    if (route == currentRoute) return
+
     navController.navigate(route) {
         popUpTo(STAFF_DASHBOARD) {
-            saveState = true
+            saveState = (route != STAFF_DASHBOARD)
         }
         launchSingleTop = true
-        restoreState = true
+        restoreState = (route != STAFF_DASHBOARD)
     }
 }

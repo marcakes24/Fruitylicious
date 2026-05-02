@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.SalesBreakdownRow
 import com.example.fruitylicious.data.local.dao.TopSellingItemRow
 import com.example.fruitylicious.data.local.dao.TransactionDao
+import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.NetworkMonitor
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,87 +31,137 @@ data class SalesReportUiState(
 
 @HiltViewModel
 class SalesReportViewModel @Inject constructor(
-    private val transactionDao: TransactionDao
+    private val transactionDao: TransactionDao,
+    private val reportRepository: ReportRepository,
+    private val networkMonitor: NetworkMonitor,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SalesReportUiState())
     val uiState: StateFlow<SalesReportUiState> = _uiState.asStateFlow()
 
-    fun setPeriod(period: String, branch: String) {
+    fun setPeriod(period: String, branchId: Int?) {
         _uiState.update { it.copy(period = period) }
-        loadReport(branch = branch, period = period)
+        loadReport(branchId, period)
     }
 
-    fun loadReport(branch: String, period: String = _uiState.value.period) {
+    fun loadReport(branchId: Int?, period: String = _uiState.value.period) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            val branchId = when (branch) {
-                "B1" -> 1
-                "B2" -> 2
-                else -> null
-            }
-
+            val localBranchId = sessionManager.getBranchId()
+            val isOnline = networkMonitor.isOnline()
             val range = getRange(period)
 
-            try {
-                val totalSales = transactionDao.getSalesTotal(
-                    branchId = branchId,
-                    from = range.currentStart,
-                    to = range.currentEnd
-                )
-
-                val previousSales = transactionDao.getSalesTotal(
-                    branchId = branchId,
-                    from = range.previousStart,
-                    to = range.previousEnd
-                )
-
-                val cashTotal = transactionDao.getPaymentTotal(
-                    branchId = branchId,
-                    paymentType = "Cash",
-                    from = range.currentStart,
-                    to = range.currentEnd
-                )
-
-                val gcashTotal = transactionDao.getPaymentTotal(
-                    branchId = branchId,
-                    paymentType = "Gcash",
-                    from = range.currentStart,
-                    to = range.currentEnd
-                )
-
-                val breakdown = transactionDao.getSalesBreakdown(
-                    branchId = branchId,
-                    from = range.currentStart,
-                    to = range.currentEnd
-                )
-
-                val topItems = transactionDao.getTopSellingItems(
-                    branchId = branchId,
-                    from = range.currentStart,
-                    to = range.currentEnd
-                )
-
-                _uiState.update {
-                    it.copy(
-                        period = period,
-                        totalSales = totalSales,
-                        previousSales = previousSales,
-                        cashTotal = cashTotal,
-                        gcashTotal = gcashTotal,
-                        salesBreakdown = breakdown,
-                        topItems = topItems,
-                        isLoading = false,
-                        error = null
+            if (branchId == localBranchId || !isOnline) {
+                try {
+                    val totalSales = transactionDao.getSalesTotal(
+                        branchId = branchId,
+                        from = range.currentStart,
+                        to = range.currentEnd
                     )
+
+                    val previousSales = transactionDao.getSalesTotal(
+                        branchId = branchId,
+                        from = range.previousStart,
+                        to = range.previousEnd
+                    )
+
+                    val cashTotal = transactionDao.getPaymentTotal(
+                        branchId = branchId,
+                        paymentType = "Cash",
+                        from = range.currentStart,
+                        to = range.currentEnd
+                    )
+
+                    val gcashTotal = transactionDao.getPaymentTotal(
+                        branchId = branchId,
+                        paymentType = "Gcash",
+                        from = range.currentStart,
+                        to = range.currentEnd
+                    )
+
+                    val breakdown = transactionDao.getSalesBreakdown(
+                        branchId = branchId,
+                        from = range.currentStart,
+                        to = range.currentEnd
+                    )
+
+                    val topItems = transactionDao.getTopSellingItems(
+                        branchId = branchId,
+                        from = range.currentStart,
+                        to = range.currentEnd
+                    )
+
+                    _uiState.update {
+                        it.copy(
+                            period = period,
+                            totalSales = totalSales,
+                            previousSales = previousSales,
+                            cashTotal = cashTotal,
+                            gcashTotal = gcashTotal,
+                            salesBreakdown = breakdown,
+                            topItems = topItems,
+                            isLoading = false,
+                            error = null
+                        )
+                    }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = e.message ?: "Failed to load local sales report."
+                        )
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message ?: "Failed to load sales report."
-                    )
+            } else {
+                try {
+                    val result = if (branchId == null) {
+                        reportRepository.getCombinedSalesReport(range.currentStart, range.currentEnd)
+                    } else {
+                        reportRepository.getSalesReport(branchId, range.currentStart, range.currentEnd)
+                    }
+
+                    result.onSuccess { reportDto ->
+                        _uiState.update {
+                            it.copy(
+                                period = period,
+                                totalSales = reportDto.totalSales,
+                                previousSales = reportDto.previousSales,
+                                cashTotal = reportDto.cashTotal,
+                                gcashTotal = reportDto.gcashTotal,
+                                salesBreakdown = reportDto.items.map { item ->
+                                    SalesBreakdownRow(
+                                        productName = item.productName,
+                                        qty = item.quantitySold,
+                                        totalAmount = item.grossSales
+                                    )
+                                },
+                                topItems = reportDto.items.sortedByDescending { it.quantitySold }.take(5).map { item ->
+                                    TopSellingItemRow(
+                                        productName = item.productName,
+                                        totalQty = item.quantitySold
+                                    )
+                                },
+                                isLoading = false,
+                                error = null
+                            )
+                        }
+                    }.onFailure { e ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = e.message ?: "Failed to load remote sales report."
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = e.message ?: "Failed to load remote sales report."
+                        )
+                    }
                 }
             }
         }

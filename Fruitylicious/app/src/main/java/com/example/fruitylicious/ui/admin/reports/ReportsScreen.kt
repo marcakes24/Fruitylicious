@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import androidx.compose.runtime.collectAsState
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import kotlinx.coroutines.launch
 
 val RptGreen = Color(0xFF2E7D32)
@@ -65,14 +67,11 @@ fun ReportsScreen(
     onLogout: () -> Unit = {},
     viewModel: ReportsViewModel = hiltViewModel()
 ) {
-    val uiState = viewModel.uiState
+    val uiState by viewModel.uiState.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableStateOf(ReportTab.SALES) }
-    var selectedBranch by remember { 
-        mutableStateOf(if (uiState.isAdmin) "All" else uiState.userBranchId) 
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -97,9 +96,10 @@ fun ReportsScreen(
                 .background(RptPageBg)
         ) {
             ReportsHeader(
-                selectedBranch = selectedBranch,
-                isAdmin = uiState.isAdmin,
-                onBranchSelected = { selectedBranch = it },
+                selectedBranchId = uiState.selectedBranchId,
+                canAccessCrossBranch = uiState.canAccessCrossBranch,
+                branches = uiState.branches,
+                onBranchSelected = { viewModel.onBranchSelected(it) },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
@@ -116,26 +116,26 @@ fun ReportsScreen(
                 when (selectedTab) {
                     ReportTab.SALES -> {
                         SalesTabContent(
-                            branch = selectedBranch,
+                            branchId = uiState.selectedBranchId,
                             navController = navController
                         )
                     }
 
                     ReportTab.WASTE -> {
                         WasteTabContent(
-                            branch = selectedBranch
+                            branchId = uiState.selectedBranchId
                         )
                     }
 
                     ReportTab.RESTOCK -> {
                         RestockTabContent(
-                            branch = selectedBranch
+                            branchId = uiState.selectedBranchId
                         )
                     }
 
                     ReportTab.INVENTORY -> {
                         InventoryTabContent(
-                            branch = selectedBranch
+                            branchId = uiState.selectedBranchId
                         )
                     }
                 }
@@ -146,9 +146,10 @@ fun ReportsScreen(
 
 @Composable
 private fun ReportsHeader(
-    selectedBranch: String,
-    isAdmin: Boolean,
-    onBranchSelected: (String) -> Unit,
+    selectedBranchId: Int?,
+    canAccessCrossBranch: Boolean,
+    branches: List<BranchEntity>,
+    onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Row(
@@ -177,32 +178,62 @@ private fun ReportsHeader(
             modifier = Modifier.weight(1f)
         )
 
-        if (isAdmin) {
+        if (canAccessCrossBranch) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.White)
                     .padding(2.dp)
             ) {
-                listOf("B1", "B2", "All").forEach { branch ->
-                    val isSelected = selectedBranch == branch
+                // "All" option
+                val isAllSelected = selectedBranchId == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (isAllSelected) RptGreen else Color.Transparent)
+                        .clickable { onBranchSelected(null) }
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "All",
+                        color = if (isAllSelected) Color.White else RptTextSub,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                branches.forEach { branch ->
+                    val isSelected = selectedBranchId == branch.branchId
+                    val displayName = "B${branch.branchId}"
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(18.dp))
                             .background(if (isSelected) RptGreen else Color.Transparent)
-                            .clickable { onBranchSelected(branch) }
+                            .clickable { onBranchSelected(branch.branchId) }
                             .padding(horizontal = 12.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = branch,
+                            text = displayName,
                             color = if (isSelected) Color.White else RptTextSub,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
+            }
+        } else {
+            // Display only local branch name if restricted
+            selectedBranchId?.let { id ->
+                Text(
+                    text = "B$id",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
             }
         }
     }
