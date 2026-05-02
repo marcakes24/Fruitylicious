@@ -85,9 +85,9 @@ class InventoryMonitoringViewModel @Inject constructor(
 
     val uiState: StateFlow<InventoryMonitoringUiState> = _uiState.asStateFlow()
 
-    private var localInventoryItems = emptyList<InventoryEntity>()
-    private var localIngredients = emptyList<IngredientEntity>()
-    private var branches = emptyList<BranchEntity>()
+    private var localInventoryItems: List<InventoryEntity> = emptyList()
+    private var localIngredients: List<IngredientEntity> = emptyList()
+    private var branches: List<BranchEntity> = emptyList()
 
     init {
         observeBranches()
@@ -130,10 +130,14 @@ class InventoryMonitoringViewModel @Inject constructor(
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
-                branches = branchList
+                val finalBranches = ensureLocalBranchExists(branchList)
+
+                branches = finalBranches
 
                 _uiState.update {
-                    it.copy(branches = branchList)
+                    it.copy(
+                        branches = finalBranches
+                    )
                 }
 
                 loadRows()
@@ -182,6 +186,7 @@ class InventoryMonitoringViewModel @Inject constructor(
 
     private fun loadRows() {
         val state = _uiState.value
+        val selectedBranchId = state.selectedBranchId
 
         when {
             !state.isAdmin -> {
@@ -192,25 +197,38 @@ class InventoryMonitoringViewModel @Inject constructor(
                 loadLocalRows(localBranchId)
             }
 
-            state.selectedBranchId == null -> {
+            selectedBranchId == localBranchId -> {
+                loadLocalRows(localBranchId)
+            }
+
+            selectedBranchId == null -> {
                 loadRemoteAllBranches()
             }
 
             else -> {
-                loadRemoteBranch(state.selectedBranchId)
+                loadRemoteBranch(selectedBranchId)
             }
         }
     }
 
     private fun loadLocalRows(branchId: Int) {
-        val ingredientMap = localIngredients.associateBy { it.ingredientId }
-        val branchName = branches.firstOrNull { it.branchId == branchId }?.branchName
-            ?: "Branch $branchId"
+        val ingredientMap = localIngredients.associateBy {
+            it.ingredientId
+        }
+
+        val branchName = branches.firstOrNull {
+            it.branchId == branchId
+        }?.branchName ?: branchConfig.branchName.ifBlank {
+            "Branch $branchId"
+        }
 
         val rows = localInventoryItems
-            .filter { it.branchId == branchId }
+            .filter {
+                it.branchId == branchId
+            }
             .mapNotNull { inventory ->
-                val ingredient = ingredientMap[inventory.ingredientId] ?: return@mapNotNull null
+                val ingredient = ingredientMap[inventory.ingredientId]
+                    ?: return@mapNotNull null
 
                 InventoryMonitoringRow(
                     ingredientId = inventory.ingredientId,
@@ -223,7 +241,9 @@ class InventoryMonitoringViewModel @Inject constructor(
                     lastModified = inventory.lastModified
                 )
             }
-            .sortedBy { it.ingredientName.lowercase() }
+            .sortedBy {
+                it.ingredientName.lowercase()
+            }
 
         _uiState.update {
             it.copy(
@@ -237,25 +257,34 @@ class InventoryMonitoringViewModel @Inject constructor(
     private fun loadRemoteBranch(branchId: Int) {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(isLoading = true, error = null)
+                it.copy(
+                    isLoading = true,
+                    error = null
+                )
             }
 
-            val result = reportRepository.getInventoryReport(branchId)
+            val result = reportRepository.getInventoryReport(
+                branchId = branchId
+            )
 
             result.fold(
                 onSuccess = { report ->
-                    val rows = report.items.map { item ->
-                        InventoryMonitoringRow(
-                            ingredientId = item.ingredientId,
-                            branchId = report.branchId ?: branchId,
-                            branchName = report.branchName ?: "Branch $branchId",
-                            ingredientName = item.ingredientName,
-                            currentStock = item.currentStock,
-                            unitType = item.unitType,
-                            lowStockThreshold = item.lowStockThreshold,
-                            lastModified = report.generatedAt
-                        )
-                    }.sortedBy { it.ingredientName.lowercase() }
+                    val rows = report.items
+                        .map { item ->
+                            InventoryMonitoringRow(
+                                ingredientId = item.ingredientId,
+                                branchId = report.branchId ?: branchId,
+                                branchName = report.branchName ?: "Branch $branchId",
+                                ingredientName = item.ingredientName,
+                                currentStock = item.currentStock,
+                                unitType = item.unitType,
+                                lowStockThreshold = item.lowStockThreshold,
+                                lastModified = report.generatedAt
+                            )
+                        }
+                        .sortedBy {
+                            it.ingredientName.lowercase()
+                        }
 
                     _uiState.update {
                         it.copy(
@@ -281,28 +310,21 @@ class InventoryMonitoringViewModel @Inject constructor(
     private fun loadRemoteAllBranches() {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(isLoading = true, error = null)
-            }
-
-            val branchList = branches.ifEmpty {
-                listOf(
-                    BranchEntity(
-                        branchId = localBranchId,
-                        branchName = "Branch $localBranchId",
-                        address = "",
-                        contactNumber = "",
-                        lastModified = 0L,
-                        isSynced = true,
-                        syncedAt = null
-                    )
+                it.copy(
+                    isLoading = true,
+                    error = null
                 )
             }
+
+            val branchList = ensureLocalBranchExists(branches)
 
             val allRows = mutableListOf<InventoryMonitoringRow>()
             var firstError: String? = null
 
             for (branch in branchList) {
-                val result = reportRepository.getInventoryReport(branch.branchId)
+                val result = reportRepository.getInventoryReport(
+                    branchId = branch.branchId
+                )
 
                 result.fold(
                     onSuccess = { report ->
@@ -345,11 +367,17 @@ class InventoryMonitoringViewModel @Inject constructor(
         rows: List<InventoryMonitoringRow>
     ): List<InventoryMonitoringRow> {
         return rows
-            .groupBy { it.ingredientId }
+            .groupBy {
+                it.ingredientId
+            }
             .map { (_, groupedRows) ->
                 val first = groupedRows.first()
-                val totalStock = groupedRows.sumOf { it.currentStock }
-                val latestModified = groupedRows.maxOfOrNull { it.lastModified } ?: first.lastModified
+                val totalStock = groupedRows.sumOf {
+                    it.currentStock
+                }
+                val latestModified = groupedRows.maxOfOrNull {
+                    it.lastModified
+                } ?: first.lastModified
 
                 InventoryMonitoringRow(
                     ingredientId = first.ingredientId,
@@ -362,7 +390,39 @@ class InventoryMonitoringViewModel @Inject constructor(
                     lastModified = latestModified
                 )
             }
-            .sortedBy { it.ingredientName.lowercase() }
+            .sortedBy {
+                it.ingredientName.lowercase()
+            }
+    }
+
+    private fun ensureLocalBranchExists(
+        branchList: List<BranchEntity>
+    ): List<BranchEntity> {
+        val hasLocalBranch = branchList.any {
+            it.branchId == localBranchId
+        }
+
+        if (hasLocalBranch) {
+            return branchList.sortedBy {
+                it.branchId
+            }
+        }
+
+        val localBranch = BranchEntity(
+            branchId = localBranchId,
+            branchName = branchConfig.branchName.ifBlank {
+                "Branch $localBranchId"
+            },
+            address = "",
+            contactNumber = "",
+            lastModified = 0L,
+            isSynced = true,
+            syncedAt = null
+        )
+
+        return (branchList + localBranch).sortedBy {
+            it.branchId
+        }
     }
 
     private fun isAdminUser(): Boolean {

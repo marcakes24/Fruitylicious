@@ -86,8 +86,28 @@ class SyncRepository @Inject constructor(
             val branches = branchDao.getUnsyncedBranches()
             val users = userDao.getUnsyncedUsers()
             val products = productDao.getUnsyncedProducts()
+            val productsForPush = products.map { product ->
+                val convertedImage = ImageStorage.imageFileToBase64(
+                    context = context,
+                    relativePath = product.image
+                )
+
+                product.copy(
+                    image = convertedImage ?: product.image
+                )
+            }
             val productVariants = productVariantDao.getUnsyncedVariants()
             val ingredients = ingredientDao.getUnsyncedIngredients()
+            val ingredientsForPush = ingredients.map { ingredient ->
+                val convertedImage = ImageStorage.imageFileToBase64(
+                    context = context,
+                    relativePath = ingredient.image
+                )
+
+                ingredient.copy(
+                    image = convertedImage ?: ingredient.image
+                )
+            }
             val productRecipes = productRecipeDao.getUnsyncedRecipes()
             val inventory = inventoryDao.getUnsyncedInventory()
             val restockLogs = restockLogDao.getUnsyncedRestockLogs()
@@ -107,6 +127,16 @@ class SyncRepository @Inject constructor(
             val transactionItems = transactionItemDao.getUnsyncedTransactionItems()
             val transactionItemAddons = transactionItemAddonDao.getUnsyncedTransactionItemAddons()
             val staffLogs = staffLogDao.getUnsyncedStaffLogs()
+            val staffLogsForPush = staffLogs.map { staffLog ->
+                val convertedImage = ImageStorage.imageFileToBase64(
+                    context = context,
+                    relativePath = staffLog.image
+                )
+
+                staffLog.copy(
+                    image = convertedImage ?: staffLog.image
+                )
+            }
             val auditLogs = auditLogDao.getUnsyncedAuditLogs()
 
             val totalCount =
@@ -139,9 +169,9 @@ class SyncRepository @Inject constructor(
                 PushRequestDto(
                     branches = branches,
                     users = users,
-                    products = products,
+                    products = productsForPush,
                     productVariants = productVariants,
-                    ingredients = ingredients,
+                    ingredients = ingredientsForPush,
                     productRecipes = productRecipes,
                     inventory = inventory,
                     restockLogs = restockLogs,
@@ -150,7 +180,7 @@ class SyncRepository @Inject constructor(
                     transactions = transactions,
                     transactionItems = transactionItems,
                     transactionItemAddons = transactionItemAddons,
-                    staffLogs = staffLogs,
+                    staffLogs = staffLogsForPush,
                     auditLogs = auditLogs
                 )
             )
@@ -243,11 +273,21 @@ class SyncRepository @Inject constructor(
                     }
                 )
 
-                productDao.upsertProducts(
-                    body.products.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                val pulledProducts = body.products.map { product ->
+                    val localImagePath = ImageStorage.saveBase64Image(
+                        context = context,
+                        base64Value = product.image,
+                        folder = "products"
+                    )
+
+                    product.copy(
+                        image = localImagePath ?: product.image,
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+
+                productDao.upsertProducts(pulledProducts)
 
                 productVariantDao.upsertVariants(
                     body.productVariants.map {
@@ -255,11 +295,21 @@ class SyncRepository @Inject constructor(
                     }
                 )
 
-                ingredientDao.upsertIngredients(
-                    body.ingredients.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                val pulledIngredients = body.ingredients.map { ingredient ->
+                    val localImagePath = ImageStorage.saveBase64Image(
+                        context = context,
+                        base64Value = ingredient.image,
+                        folder = "ingredients"
+                    )
+
+                    ingredient.copy(
+                        image = localImagePath ?: ingredient.image,
+                        isSynced = true,
+                        syncedAt = pulledAt
+                    )
+                }
+
+                ingredientDao.upsertIngredients(pulledIngredients)
 
                 productRecipeDao.upsertRecipes(
                     body.productRecipes.map {
@@ -319,11 +369,21 @@ class SyncRepository @Inject constructor(
                     }
                 )
 
-                body.staffLogs.forEach {
-                    staffLogDao.upsertStaffLog(
-                        it.copy(isSynced = true, syncedAt = pulledAt)
+                val pulledStaffLogs = body.staffLogs.map { staffLog ->
+                    val localImagePath = ImageStorage.saveBase64Image(
+                        context = context,
+                        base64Value = staffLog.image,
+                        folder = "staff_logs"
+                    )
+
+                    staffLog.copy(
+                        image = localImagePath ?: staffLog.image,
+                        isSynced = true,
+                        syncedAt = pulledAt
                     )
                 }
+
+                staffLogDao.upsertStaffLogs(pulledStaffLogs)
 
                 body.auditLogs.forEach {
                     auditLogDao.upsertAuditLog(

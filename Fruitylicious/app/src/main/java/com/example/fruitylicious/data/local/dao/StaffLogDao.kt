@@ -46,6 +46,9 @@ interface StaffLogDao {
     @Upsert
     suspend fun upsertStaffLog(staffLog: StaffLogEntity)
 
+    @Upsert
+    suspend fun upsertStaffLogs(staffLogs: List<StaffLogEntity>)
+
     @Query(
         """
         UPDATE staff_logs

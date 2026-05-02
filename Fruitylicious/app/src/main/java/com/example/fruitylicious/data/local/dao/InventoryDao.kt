@@ -56,13 +56,14 @@ interface InventoryDao {
 
     @Query(
         """
-        UPDATE inventory
-        SET currentStock = currentStock + :amount,
-            lastModified = :lastModified,
-            isSynced = 0,
-            syncedAt = NULL
-        WHERE ingredientId = :ingredientId AND branchId = :branchId
-        """
+    UPDATE inventory
+    SET currentStock = currentStock + :amount,
+        lastModified = :lastModified,
+        isSynced = 0,
+        syncedAt = NULL
+    WHERE ingredientId = :ingredientId
+      AND branchId = :branchId
+    """
     )
     suspend fun addStock(
         ingredientId: Int,
@@ -73,13 +74,14 @@ interface InventoryDao {
 
     @Query(
         """
-        UPDATE inventory
-        SET currentStock = currentStock - :amount,
-            lastModified = :lastModified,
-            isSynced = 0,
-            syncedAt = NULL
-        WHERE ingredientId = :ingredientId AND branchId = :branchId
-        """
+    UPDATE inventory
+    SET currentStock = currentStock - :amount,
+        lastModified = :lastModified,
+        isSynced = 0,
+        syncedAt = NULL
+    WHERE ingredientId = :ingredientId
+    AND branchId = :branchId
+    """
     )
     suspend fun deductStock(
         ingredientId: Int,

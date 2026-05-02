@@ -53,14 +53,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val ImGreen = Color(0xFF2E7D32)
 private val ImPageBg = Color(0xFFFFEAA0)
@@ -83,9 +83,6 @@ fun InventoryMonitoringScreen(
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
 
@@ -99,27 +96,31 @@ fun InventoryMonitoringScreen(
         }
     }
 
-    val filteredRows = uiState.rows.filter { row ->
-        val matchesSearch = row.ingredientName.contains(searchQuery, ignoreCase = true)
+    val filteredRows = remember(
+        uiState.rows,
+        searchQuery,
+        selectedDateMillis
+    ) {
+        uiState.rows.filter { row ->
+            val matchesSearch =
+                row.ingredientName.contains(searchQuery, ignoreCase = true) ||
+                        row.branchName.contains(searchQuery, ignoreCase = true)
 
-        val matchesBranch = when (selectedBranch) {
-            "B1" -> row.branchId == 1
-            "B2" -> row.branchId == 2
-            else -> true
+            val matchesDate = if (selectedDateMillis == 0L) {
+                true
+            } else {
+                isSameDay(row.lastModified, selectedDateMillis)
+            }
+
+            matchesSearch && matchesDate
         }
-
-        val matchesDate = if (selectedDateMillis == 0L) {
-            true
-        } else {
-            isSameDay(row.lastModified, selectedDateMillis)
-        }
-
-        matchesSearch && matchesBranch && matchesDate
     }
 
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {
+                showDatePicker = false
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -170,15 +171,38 @@ fun InventoryMonitoringScreen(
                 .background(ImPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
+                selectedBranchId = uiState.selectedBranchId,
+                branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
-                onBranchSelect = { selectedBranch = it },
+                isOnline = uiState.isOnline,
+                localBranchId = uiState.localBranchId,
+                onBranchSelect = { branchId ->
+                    viewModel.selectBranch(branchId)
+                },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
                     }
                 }
             )
+
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: showing local branch inventory only.",
+                    color = ImTextSub,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            if (!uiState.error.isNullOrBlank()) {
+                Text(
+                    text = uiState.error ?: "",
+                    color = Color.Red,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -190,9 +214,13 @@ fun InventoryMonitoringScreen(
                 item {
                     FilterCard(
                         searchQuery = searchQuery,
-                        onSearchChange = { searchQuery = it },
+                        onSearchChange = {
+                            searchQuery = it
+                        },
                         selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true }
+                        onDateClick = {
+                            showDatePicker = true
+                        }
                     )
                 }
 
@@ -214,32 +242,26 @@ fun InventoryMonitoringScreen(
                         shadowElevation = 2.dp
                     ) {
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            if (filteredRows.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = if (uiState.isLoading) {
-                                            "Loading inventory..."
-                                        } else {
-                                            "No ingredients found"
-                                        },
-                                        color = ImTextSub
-                                    )
+                            when {
+                                uiState.isLoading -> {
+                                    EmptyInventoryText("Loading inventory...")
                                 }
-                            } else {
-                                filteredRows.forEachIndexed { index, item ->
-                                    InventoryListItem(item)
 
-                                    if (index < filteredRows.size - 1) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(horizontal = 16.dp),
-                                            color = Color(0xFFF1F5F9),
-                                            thickness = 1.dp
-                                        )
+                                filteredRows.isEmpty() -> {
+                                    EmptyInventoryText("No ingredients found")
+                                }
+
+                                else -> {
+                                    filteredRows.forEachIndexed { index, item ->
+                                        InventoryListItem(item)
+
+                                        if (index < filteredRows.size - 1) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(horizontal = 16.dp),
+                                                color = Color(0xFFF1F5F9),
+                                                thickness = 1.dp
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -253,9 +275,12 @@ fun InventoryMonitoringScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelect: (String) -> Unit,
+    isOnline: Boolean,
+    localBranchId: Int,
+    onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -291,28 +316,61 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    if (isOnline) {
+                        InventoryBranchButton(
+                            label = "All",
+                            selected = selectedBranchId == null,
+                            onClick = {
+                                onBranchSelect(null)
+                            }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) ImGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = branch,
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                        branches.forEach { branch ->
+                            InventoryBranchButton(
+                                label = "B${branch.branchId}",
+                                selected = selectedBranchId == branch.branchId,
+                                onClick = {
+                                    onBranchSelect(branch.branchId)
+                                }
                             )
                         }
+                    } else {
+                        InventoryBranchButton(
+                            label = "B$localBranchId",
+                            selected = true,
+                            onClick = {
+                                onBranchSelect(localBranchId)
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun InventoryBranchButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) ImGreen else Color.Transparent)
+            .clickable {
+                onClick()
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else Color(0xFF666E7A),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -339,7 +397,7 @@ private fun FilterCard(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
                     Text(
-                        text = "Search ingredient",
+                        text = "Search ingredient or branch",
                         color = Color.LightGray,
                         fontSize = 14.sp
                     )
@@ -396,7 +454,9 @@ private fun FilterCard(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .clickable { onDateClick() }
+                        .clickable {
+                            onDateClick()
+                        }
                 )
             }
         }
@@ -404,7 +464,26 @@ private fun FilterCard(
 }
 
 @Composable
-private fun InventoryListItem(item: InventoryMonitoringRow) {
+private fun EmptyInventoryText(
+    text: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = ImTextSub
+        )
+    }
+}
+
+@Composable
+private fun InventoryListItem(
+    item: InventoryMonitoringRow
+) {
     val statusColor = when (item.status) {
         "Good" -> Color(0xFF4CAF50)
         "Normal" -> Color(0xFFFFB300)
@@ -445,7 +524,13 @@ private fun InventoryListItem(item: InventoryMonitoringRow) {
                 )
 
                 Text(
-                    text = "Branch ${item.branchId}",
+                    text = item.branchName.ifBlank {
+                        if (item.branchId == 0) {
+                            "All Branches"
+                        } else {
+                            "Branch ${item.branchId}"
+                        }
+                    },
                     fontSize = 12.sp,
                     color = ImTextSub
                 )
@@ -469,7 +554,9 @@ private fun InventoryListItem(item: InventoryMonitoringRow) {
     }
 }
 
-private fun formatQuantity(value: Double): String {
+private fun formatQuantity(
+    value: Double
+): String {
     return if (value % 1.0 == 0.0) {
         value.toInt().toString()
     } else {
@@ -477,7 +564,10 @@ private fun formatQuantity(value: Double): String {
     }
 }
 
-private fun isSameDay(firstMillis: Long, secondMillis: Long): Boolean {
+private fun isSameDay(
+    firstMillis: Long,
+    secondMillis: Long
+): Boolean {
     val first = Calendar.getInstance().apply {
         timeInMillis = firstMillis
     }

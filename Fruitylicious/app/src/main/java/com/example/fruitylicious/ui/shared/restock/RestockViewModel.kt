@@ -59,7 +59,8 @@ data class RestockUiState(
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
-    val isClockedIn: Boolean = true,
+    val isSubmitting: Boolean = false,
+    val isClockedIn: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -183,7 +184,12 @@ class RestockViewModel @Inject constructor(
                 role?.equals("admin", ignoreCase = true) == true ||
                 role?.equals("owner", ignoreCase = true) == true
             ) {
-                _uiState.update { it.copy(isClockedIn = true) }
+                _uiState.update {
+                    it.copy(
+                        isClockedIn = true,
+                        error = null
+                    )
+                }
                 return@launch
             }
 
@@ -237,17 +243,19 @@ class RestockViewModel @Inject constructor(
     private fun rebuildIngredientRows() {
         val inventoryMap = localInventory.associateBy { it.ingredientId }
 
-        val ingredientRows = localIngredients.map { ingredient ->
-            val inventory = inventoryMap[ingredient.ingredientId]
+        val ingredientRows = localIngredients
+            .map { ingredient ->
+                val inventory = inventoryMap[ingredient.ingredientId]
 
-            RestockIngredientRow(
-                ingredientId = ingredient.ingredientId,
-                branchId = localBranchId,
-                ingredientName = ingredient.ingredientName,
-                currentStock = inventory?.currentStock ?: 0.0,
-                unitType = ingredient.unitType
-            )
-        }.sortedBy { it.ingredientName.lowercase() }
+                RestockIngredientRow(
+                    ingredientId = ingredient.ingredientId,
+                    branchId = localBranchId,
+                    ingredientName = ingredient.ingredientName,
+                    currentStock = inventory?.currentStock ?: 0.0,
+                    unitType = ingredient.unitType
+                )
+            }
+            .sortedBy { it.ingredientName.lowercase() }
 
         _uiState.update {
             it.copy(
@@ -259,6 +267,7 @@ class RestockViewModel @Inject constructor(
 
     private fun loadHistory() {
         val state = _uiState.value
+        val selectedBranchId = state.selectedBranchId
 
         when {
             !state.isAdmin -> {
@@ -269,12 +278,16 @@ class RestockViewModel @Inject constructor(
                 loadLocalHistory(localBranchId)
             }
 
-            state.selectedBranchId == null -> {
+            selectedBranchId == localBranchId -> {
+                loadLocalHistory(localBranchId)
+            }
+
+            selectedBranchId == null -> {
                 loadRemoteAllBranchesHistory()
             }
 
             else -> {
-                loadRemoteBranchHistory(state.selectedBranchId)
+                loadRemoteBranchHistory(selectedBranchId)
             }
         }
     }
@@ -328,18 +341,20 @@ class RestockViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { report ->
-                    val rows = report.items.map { item ->
-                        RestockHistoryRow(
-                            restockId = item.restockId,
-                            ingredientName = item.ingredientName,
-                            supplier = item.supplier,
-                            quantityAdded = item.quantityAdded,
-                            unitType = item.unitType,
-                            branchId = report.branchId ?: branchId,
-                            branchName = report.branchName ?: "Branch $branchId",
-                            dateTime = item.dateTime
-                        )
-                    }.sortedByDescending { it.dateTime }
+                    val rows = report.items
+                        .map { item ->
+                            RestockHistoryRow(
+                                restockId = item.restockId,
+                                ingredientName = item.ingredientName,
+                                supplier = item.supplier,
+                                quantityAdded = item.quantityAdded,
+                                unitType = item.unitType,
+                                branchId = report.branchId ?: branchId,
+                                branchName = report.branchName ?: "Branch $branchId",
+                                dateTime = item.dateTime
+                            )
+                        }
+                        .sortedByDescending { it.dateTime }
 
                     _uiState.update {
                         it.copy(
@@ -434,18 +449,12 @@ class RestockViewModel @Inject constructor(
         quantityText: String,
         supplier: String
     ) {
-        if (!_uiState.value.isClockedIn) {
-            setError("You must be clocked in to perform this action.")
+        if (_uiState.value.isSubmitting) {
             return
         }
 
         if (ingredient == null) {
             setError("Select an ingredient.")
-            return
-        }
-
-        if (ingredient.branchId != localBranchId) {
-            setError("Restock can only be recorded for the local branch.")
             return
         }
 
@@ -456,90 +465,149 @@ class RestockViewModel @Inject constructor(
             return
         }
 
+        if (!_uiState.value.isClockedIn) {
+            setError("You must be clocked in to perform this action.")
+            return
+        }
+
+        if (ingredient.branchId != localBranchId) {
+            setError("Restock can only be recorded for the local branch.")
+            return
+        }
+
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val userId = sessionManager.getUserId()
-            val branchId = localBranchId
-
-            database.withTransaction {
-                val existingInventory = inventoryDao.getInventoryItem(
-                    ingredientId = ingredient.ingredientId,
-                    branchId = branchId
+            _uiState.update {
+                it.copy(
+                    isSubmitting = true,
+                    error = null,
+                    successMessage = null
                 )
+            }
 
-                if (existingInventory == null) {
-                    inventoryDao.upsertInventoryItem(
-                        InventoryEntity(
+            var shouldSync = false
+
+            try {
+                val now = System.currentTimeMillis()
+                val userId = sessionManager.getUserId()
+                val branchId = localBranchId
+                val restockId = UUID.randomUUID().toString()
+                val auditLogId = UUID.randomUUID().toString()
+
+                database.withTransaction {
+                    val existingInventory = inventoryDao.getInventoryItem(
+                        ingredientId = ingredient.ingredientId,
+                        branchId = branchId
+                    )
+
+                    if (existingInventory == null) {
+                        inventoryDao.upsertInventoryItem(
+                            InventoryEntity(
+                                ingredientId = ingredient.ingredientId,
+                                branchId = branchId,
+                                currentStock = quantity,
+                                lastModified = now,
+                                isSynced = false,
+                                syncedAt = null
+                            )
+                        )
+                    } else {
+                        inventoryDao.addStock(
                             ingredientId = ingredient.ingredientId,
                             branchId = branchId,
-                            currentStock = quantity,
+                            amount = quantity,
+                            lastModified = now
+                        )
+                    }
+
+                    restockLogDao.upsertRestockLog(
+                        RestockLogEntity(
+                            restockId = restockId,
+                            ingredientId = ingredient.ingredientId,
+                            branchId = branchId,
+                            userId = userId,
+                            quantityAdded = quantity,
+                            supplier = supplier.ifBlank { "N/A" },
+                            dateTime = now,
                             lastModified = now,
                             isSynced = false,
                             syncedAt = null
                         )
                     )
-                } else {
-                    inventoryDao.addStock(
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        amount = quantity,
-                        lastModified = now
+
+                    auditLogDao.upsertAuditLog(
+                        AuditLogEntity(
+                            logId = auditLogId,
+                            userId = userId,
+                            branchId = branchId,
+                            action = "Restocked ${ingredient.ingredientName}: $quantity ${ingredient.unitType}.",
+                            tableAffected = "restock_logs",
+                            timestamp = now,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
                     )
                 }
 
-                restockLogDao.upsertRestockLog(
-                    RestockLogEntity(
-                        restockId = UUID.randomUUID().toString(),
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        userId = userId,
-                        quantityAdded = quantity,
-                        supplier = supplier.ifBlank { "N/A" },
-                        dateTime = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
-                    )
-                )
+                shouldSync = networkMonitor.isOnline()
 
-                auditLogDao.upsertAuditLog(
-                    AuditLogEntity(
-                        logId = UUID.randomUUID().toString(),
-                        userId = userId,
-                        branchId = branchId,
-                        action = "Restocked ${ingredient.ingredientName}: $quantity ${ingredient.unitType}.",
-                        tableAffected = "restock_logs",
-                        timestamp = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
+                _uiState.update {
+                    it.copy(
+                        successMessage = "Restock saved.",
+                        error = null
                     )
-                )
+                }
+
+                rebuildIngredientRows()
+                loadLocalHistory(localBranchId)
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        error = e.message ?: "Failed to save restock.",
+                        successMessage = null
+                    )
+                }
+            } finally {
+                // ✅ Always resets isSubmitting — even if a CancellationException
+                // is thrown, ensuring the button never stays permanently grayed out.
+                _uiState.update {
+                    it.copy(isSubmitting = false)
+                }
             }
 
-            _uiState.update {
-                it.copy(
-                    successMessage = "Restock saved.",
-                    error = null
-                )
-            }
-
-            if (_uiState.value.isOnline) {
-                syncRepository.pushUnsynced()
-                loadHistory()
+            if (shouldSync) {
+                launch {
+                    try {
+                        syncRepository.pushUnsynced()
+                    } catch (_: Exception) {
+                        // Local save already succeeded.
+                        // Do not lock or gray out the UI if sync fails.
+                    }
+                }
             }
         }
     }
 
     fun clearMessages() {
         _uiState.update {
-            it.copy(error = null, successMessage = null)
+            it.copy(
+                error = null,
+                successMessage = null
+                // ✅ Removed isSubmitting = false — submitRestock owns that flag
+                // via its finally block. Resetting it here could cause a race condition
+                // if clearMessages() is called while a submission is still in flight.
+            )
         }
     }
 
     private fun setError(message: String) {
         _uiState.update {
-            it.copy(error = message, successMessage = null)
+            it.copy(
+                error = message,
+                successMessage = null,
+                isSubmitting = false
+            )
         }
     }
 

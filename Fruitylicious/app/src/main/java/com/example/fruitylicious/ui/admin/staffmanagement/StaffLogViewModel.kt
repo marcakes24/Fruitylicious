@@ -1,4 +1,5 @@
 package com.example.fruitylicious.ui.admin.staffmanagement
+import android.content.Context
 import com.example.fruitylicious.data.repository.ReportRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,9 +10,11 @@ import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.ImageStorage
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +31,8 @@ data class StaffLogRow(
     val branchId: Int,
     val branchName: String,
     val clockIn: Long,
-    val clockOut: Long?
+    val clockOut: Long?,
+    val imagePath: String? = null
 )
 
 data class StaffLogUiState(
@@ -45,6 +49,7 @@ data class StaffLogUiState(
 
 @HiltViewModel
 class StaffLogViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val staffLogDao: StaffLogDao,
     private val userDao: UserDao,
     private val branchDao: BranchDao,
@@ -202,7 +207,8 @@ class StaffLogViewModel @Inject constructor(
                     branchId = log.branchId,
                     branchName = branchName,
                     clockIn = log.clockIn,
-                    clockOut = log.clockOut
+                    clockOut = log.clockOut,
+                    imagePath = log.image
                 )
             }
             .sortedByDescending { it.clockIn }
@@ -238,7 +244,12 @@ class StaffLogViewModel @Inject constructor(
                             branchId = report.branchId ?: branchId,
                             branchName = report.branchName ?: "Branch $branchId",
                             clockIn = log.clockIn,
-                            clockOut = log.clockOut
+                            clockOut = log.clockOut,
+                            imagePath = ImageStorage.saveBase64Image(
+                                context = context,
+                                base64Value = log.image,
+                                folder = "staff_logs"
+                            )
                         )
                     }.sortedByDescending { it.clockIn }
 
@@ -303,7 +314,12 @@ class StaffLogViewModel @Inject constructor(
                                 branchId = report.branchId ?: branch.branchId,
                                 branchName = report.branchName ?: branch.branchName,
                                 clockIn = log.clockIn,
-                                clockOut = log.clockOut
+                                clockOut = log.clockOut,
+                                imagePath = ImageStorage.saveBase64Image(
+                                    context = context,
+                                    base64Value = log.image,
+                                    folder = "staff_logs"
+                                )
                             )
                         }
 

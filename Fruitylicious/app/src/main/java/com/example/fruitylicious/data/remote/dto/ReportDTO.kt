@@ -123,7 +123,9 @@ data class StaffLogReportItemDto(
     val userName: String,
     val clockIn: Long,
     val clockOut: Long?,
-    val image: String?
+    val image: String?,
+    val branchId: Int? = null,
+    val branchName: String? = null
 )
 
 data class AuditLogReportDto(

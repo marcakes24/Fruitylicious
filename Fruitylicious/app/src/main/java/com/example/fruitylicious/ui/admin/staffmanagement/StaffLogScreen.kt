@@ -49,8 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.util.ImageStorage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -331,6 +335,12 @@ private fun EmptyStaffLogText(text: String) {
 
 @Composable
 private fun StaffLogCard(log: StaffLogRow) {
+    val context = LocalContext.current
+
+    val imageFile = log.imagePath?.let {
+        ImageStorage.getImageFile(context, it)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -346,12 +356,21 @@ private fun StaffLogCard(log: StaffLogRow) {
                         .background(Color(0xFFF5F5F5)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Staff",
-                        tint = SlGreen,
-                        modifier = Modifier.size(34.dp)
-                    )
+                    if (imageFile != null && imageFile.exists()) {
+                        AsyncImage(
+                            model = imageFile,
+                            contentDescription = "Staff log image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Staff",
+                            tint = SlGreen,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
