@@ -39,6 +39,10 @@ import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.ui.shared.AdminSideBarContent
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import com.example.fruitylicious.util.ImageStorage
+import androidx.compose.ui.layout.ContentScale
 
 private val RmGreen = Color(0xFF2E7D32)
 private val RmPageBg = Color(0xFFFFEAA0)
@@ -174,6 +178,7 @@ fun RecipeManagementScreen(
                 variants = uiState.variantsByProductId[selectedProduct.productId].orEmpty(),
                 selectedVariant = uiState.selectedVariant,
                 ingredients = uiState.ingredients,
+                packagingLines = uiState.packagingLines,
                 recipeLines = uiState.recipeLines,
                 error = uiState.error,
                 successMessage = uiState.successMessage,
@@ -182,6 +187,10 @@ fun RecipeManagementScreen(
                 onRemoveLine = viewModel::removeLine,
                 onIngredientSelected = viewModel::updateLineIngredient,
                 onQuantityChanged = viewModel::updateLineQuantity,
+                onAddPackagingLine = viewModel::addPackagingLine,
+                onRemovePackagingLine = viewModel::removePackagingLine,
+                onPackagingSelected = viewModel::updatePackagingIngredient,
+                onPackagingQuantityChanged = viewModel::updatePackagingQuantity,
                 onSave = viewModel::saveRecipe,
                 onDismiss = viewModel::dismissDialog
             )
@@ -245,9 +254,9 @@ private fun ProductGridItem(
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-                IconCircle(
-                    icon = Icons.Outlined.RestaurantMenu,
-                    contentDescription = "Product"
+                ProductImage(
+                    imagePath = product.image,
+                    contentDescription = product.productName
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -299,6 +308,7 @@ private fun RecipeDetailDialog(
     variants: List<ProductVariantEntity>,
     selectedVariant: ProductVariantEntity?,
     ingredients: List<IngredientEntity>,
+    packagingLines: List<RecipeLineUi>,
     recipeLines: List<RecipeLineUi>,
     error: String?,
     successMessage: String?,
@@ -307,9 +317,16 @@ private fun RecipeDetailDialog(
     onRemoveLine: (Int) -> Unit,
     onIngredientSelected: (Int, IngredientEntity) -> Unit,
     onQuantityChanged: (Int, String) -> Unit,
+    onAddPackagingLine: () -> Unit,
+    onRemovePackagingLine: (Int) -> Unit,
+    onPackagingSelected: (Int, IngredientEntity) -> Unit,
+    onPackagingQuantityChanged: (Int, String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val packagingIngredients = ingredients.filter { it.isPackaging }
+    val regularIngredients = ingredients.filter { !it.isPackaging }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -324,9 +341,10 @@ private fun RecipeDetailDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconCircle(
-                        icon = Icons.Default.Inventory2,
-                        contentDescription = "Recipe"
+                    ProductImage(
+                        imagePath = product.image,
+                        contentDescription = product.productName,
+                        size = 56.dp
                     )
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -371,6 +389,52 @@ private fun RecipeDetailDialog(
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
+                if (!product.isAddon) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Packaging (Required)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+
+                        Text(
+                            text = "+ Add packaging",
+                            color = RmGreen,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onAddPackagingLine() }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (packagingLines.isNotEmpty()) {
+                        RecipeHeaderRow()
+                    }
+
+                    packagingLines.forEachIndexed { index, line ->
+                        RecipeIngredientRow(
+                            line = line,
+                            ingredients = packagingIngredients,
+                            onRemove = { onRemovePackagingLine(index) },
+                            onIngredientSelected = { ingredient ->
+                                onPackagingSelected(index, ingredient)
+                            },
+                            onQuantityChanged = { value ->
+                                onPackagingQuantityChanged(index, value)
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -394,42 +458,13 @@ private fun RecipeDetailDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (recipeLines.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Ingredient",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RmTextSub,
-                            modifier = Modifier.weight(1.8f)
-                        )
-                        Text(
-                            text = "Qty",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RmTextSub,
-                            modifier = Modifier.width(75.dp)
-                        )
-                        Text(
-                            text = "Unit",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RmTextSub,
-                            modifier = Modifier.width(45.dp)
-                        )
-                        Spacer(modifier = Modifier.size(28.dp)) // Offset for delete button
-                    }
+                    RecipeHeaderRow()
                 }
 
                 recipeLines.forEachIndexed { index, line ->
                     RecipeIngredientRow(
                         line = line,
-                        ingredients = ingredients,
+                        ingredients = regularIngredients,
                         onRemove = { onRemoveLine(index) },
                         onIngredientSelected = { ingredient ->
                             onIngredientSelected(index, ingredient)
@@ -471,6 +506,40 @@ private fun RecipeDetailDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RecipeHeaderRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Ingredient",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = RmTextSub,
+            modifier = Modifier.weight(1.8f)
+        )
+        Text(
+            text = "Qty",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = RmTextSub,
+            modifier = Modifier.width(75.dp)
+        )
+        Text(
+            text = "Unit",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = RmTextSub,
+            modifier = Modifier.width(45.dp)
+        )
+        Spacer(modifier = Modifier.size(28.dp)) // Offset for delete button
     }
 }
 
@@ -517,7 +586,7 @@ private fun RowScope.SizeCard(
 private fun RecipeIngredientRow(
     line: RecipeLineUi,
     ingredients: List<IngredientEntity>,
-    onRemove: () -> Unit,
+    onRemove: (() -> Unit)?,
     onIngredientSelected: (IngredientEntity) -> Unit,
     onQuantityChanged: (String) -> Unit
 ) {
@@ -595,23 +664,27 @@ private fun RecipeIngredientRow(
             )
 
             IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(28.dp)
+                onClick = onRemove ?: {},
+                modifier = Modifier.size(28.dp),
+                enabled = onRemove != null
             ) {
-                Icon(
-                    imageVector = Icons.Default.RemoveCircleOutline,
-                    contentDescription = "Remove",
-                    tint = Color(0xFFE57373)
-                )
+                if (onRemove != null) {
+                    Icon(
+                        imageVector = Icons.Default.RemoveCircleOutline,
+                        contentDescription = "Remove",
+                        tint = Color(0xFFE57373)
+                    )
+                }
             }
         }
 
         val unit = selectedIngredient?.unitType ?: ""
-        val isPcsCanOrPack = unit.equals("pcs", ignoreCase = true) || 
-                             unit.equals("can", ignoreCase = true) ||
-                             unit.equals("pack", ignoreCase = true)
+        val weight = selectedIngredient?.estimatedWeightPerUnit ?: 0.0
+        val isPcsCanOrPackWithWeight = (unit.equals("pcs", ignoreCase = true) || 
+                                       unit.equals("can", ignoreCase = true) ||
+                                       unit.equals("pack", ignoreCase = true)) && weight > 0.0
 
-        if (isPcsCanOrPack) {
+        if (isPcsCanOrPackWithWeight) {
             Text(
                 text = "Enter grams. Inventory deducts $unit using estimated weight per unit.",
                 fontSize = 9.sp,
@@ -623,23 +696,36 @@ private fun RecipeIngredientRow(
 }
 
 @Composable
-private fun IconCircle(
-    icon: ImageVector,
-    contentDescription: String
+private fun ProductImage(
+    imagePath: String?,
+    contentDescription: String,
+    size: androidx.compose.ui.unit.Dp = 56.dp
 ) {
+    val context = LocalContext.current
+    val imageFile = imagePath?.let { ImageStorage.getImageFile(context, it) }
+
     Surface(
         shape = CircleShape,
         color = Color(0xFFFFFDE7),
-        modifier = Modifier.size(56.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD54F))
+        modifier = Modifier.size(size),
+        border = BorderStroke(1.dp, Color(0xFFFFD54F))
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
+        if (imageFile != null && imageFile.exists()) {
+            AsyncImage(
+                model = imageFile,
                 contentDescription = contentDescription,
-                tint = RmGreen,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.RestaurantMenu,
+                    contentDescription = contentDescription,
+                    tint = RmGreen,
+                    modifier = Modifier.size(size / 2)
+                )
+            }
         }
     }
 }

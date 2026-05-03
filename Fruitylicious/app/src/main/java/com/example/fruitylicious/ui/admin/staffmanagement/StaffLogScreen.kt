@@ -225,7 +225,7 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    if (isOnline) {
+                    // if (isOnline) {
                         StaffBranchButton(
                             label = "All",
                             selected = selectedBranchId == null,
@@ -239,13 +239,13 @@ private fun Header(
                                 onClick = { onBranchSelect(branch.branchId) }
                             )
                         }
-                    } else {
+                    /* } else {
                         StaffBranchButton(
                             label = "B$localBranchId",
                             selected = true,
                             onClick = { onBranchSelect(localBranchId) }
                         )
-                    }
+                    } */
                 }
             }
         }

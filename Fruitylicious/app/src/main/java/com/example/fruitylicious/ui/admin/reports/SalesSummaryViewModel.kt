@@ -80,7 +80,7 @@ class SalesSummaryViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { state ->
-                    val canAccess = state.isAdmin && online
+                    val canAccess = state.isAdmin
 
                     val selectedBranchId = if (canAccess) {
                         state.selectedBranchId
@@ -131,6 +131,10 @@ class SalesSummaryViewModel @Inject constructor(
             val isAdmin = isAdminUser()
 
             when {
+                branchId == localBranchId -> {
+                    loadLocalSummary(localBranchId)
+                }
+
                 !isAdmin -> {
                     loadLocalSummary(localBranchId)
                 }

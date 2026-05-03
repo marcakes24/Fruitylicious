@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class NotificationRow(
@@ -27,6 +30,7 @@ data class NotificationRow(
     val branchId: Int,
     val branchName: String,
     val name: String,
+    val imageUrl: String?,
     val currentStock: Double,
     val unitType: String,
     val lowStockThreshold: Double,
@@ -40,9 +44,9 @@ data class NotificationsUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val localBranchId: Int = 1,
-    val userBranchId: String = "B1",
-    val isLoading: Boolean = true,
+    val localBranchId: Int = 0,
+    val userBranchId: String = "",
+    val isLoading: Boolean = false,
     val error: String? = null
 )
 
@@ -57,14 +61,15 @@ class NotificationsViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         NotificationsUiState(
             isAdmin = isAdminUser(),
             selectedBranchId = localBranchId,
             localBranchId = localBranchId,
-            userBranchId = "B$localBranchId"
+            userBranchId = "B$localBranchId",
+            isLoading = true
         )
     )
 
@@ -77,8 +82,28 @@ class NotificationsViewModel @Inject constructor(
     init {
         observeBranches()
         observeNetwork()
-        observeInventory()
-        observeIngredients()
+        observeDataSources()
+    }
+
+    private fun observeDataSources() {
+        viewModelScope.launch {
+            combine(
+                inventoryDao.observeInventoryByBranch(localBranchId),
+                ingredientDao.observeIngredients(),
+                networkMonitor.observeNetworkStatus(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged()
+            ) { inventory, ingredients, isOnline, selectedBranchId ->
+                localInventoryItems = inventory
+                localIngredients = ingredients
+                
+                val isAdmin = isAdminUser()
+                
+                // If we are showing local branch, refresh notifications from local data
+                if ((!isAdmin) || (!isOnline) || (selectedBranchId == localBranchId)) {
+                    loadLocalNotifications(localBranchId)
+                }
+            }.collectLatest { }
+        }
     }
 
     fun selectBranch(branchId: Int?) {
@@ -129,8 +154,10 @@ class NotificationsViewModel @Inject constructor(
     private fun observeNetwork() {
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
+                val previousOnline = _uiState.value.isOnline
+                
                 _uiState.update { current ->
-                    val forcedBranchId = if (!online || !current.isAdmin) {
+                    val forcedBranchId = if (!current.isAdmin) {
                         localBranchId
                     } else {
                         current.selectedBranchId
@@ -141,31 +168,13 @@ class NotificationsViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
-
-                loadNotifications()
-            }
-        }
-    }
-
-    private fun observeInventory() {
-        viewModelScope.launch {
-            inventoryDao.observeInventoryByBranch(localBranchId).collectLatest { items ->
-                localInventoryItems = items
-
-                if (!networkMonitor.isOnline() || !isAdminUser()) {
-                    loadLocalNotifications(localBranchId)
-                }
-            }
-        }
-    }
-
-    private fun observeIngredients() {
-        viewModelScope.launch {
-            ingredientDao.observeIngredients().collectLatest { items ->
-                localIngredients = items
-
-                if (!networkMonitor.isOnline() || !isAdminUser()) {
-                    loadLocalNotifications(localBranchId)
+                
+                // Only reload if status changed to online and we are looking at remote branch
+                if (!previousOnline && online) {
+                    val state = _uiState.value
+                    if (state.isAdmin && state.selectedBranchId != localBranchId) {
+                        loadNotifications()
+                    }
                 }
             }
         }
@@ -175,11 +184,11 @@ class NotificationsViewModel @Inject constructor(
         val state = _uiState.value
 
         when {
-            !state.isAdmin -> {
+            !state.isAdmin || !state.isOnline -> {
                 loadLocalNotifications(localBranchId)
             }
 
-            !state.isOnline -> {
+            state.selectedBranchId == localBranchId -> {
                 loadLocalNotifications(localBranchId)
             }
 
@@ -194,6 +203,14 @@ class NotificationsViewModel @Inject constructor(
     }
 
     private fun loadLocalNotifications(branchId: Int) {
+        // If we haven't loaded essentials yet, show loading if nothing is there
+        if (localInventoryItems.isEmpty() || localIngredients.isEmpty()) {
+            if (_uiState.value.notifications.isEmpty()) {
+                _uiState.update { it.copy(isLoading = true) }
+            }
+            return
+        }
+
         val ingredientMap = localIngredients.associateBy { it.ingredientId }
         val branchName = branches.firstOrNull { it.branchId == branchId }?.branchName
             ?: "Branch $branchId"
@@ -208,6 +225,7 @@ class NotificationsViewModel @Inject constructor(
                     branchId = inventory.branchId,
                     branchName = branchName,
                     name = ingredient.ingredientName,
+                    imageUrl = ingredient.image,
                     currentStock = inventory.currentStock,
                     unitType = ingredient.unitType,
                     lowStockThreshold = ingredient.lowStockThreshold
@@ -324,11 +342,14 @@ class NotificationsViewModel @Inject constructor(
         branchId: Int,
         branchName: String
     ): NotificationRow? {
+        val localImage = localIngredients.find { it.ingredientId == this.ingredientId }?.image
+        
         return buildNotificationRow(
             ingredientId = ingredientId,
             branchId = branchId,
             branchName = branchName,
             name = ingredientName,
+            imageUrl = localImage,
             currentStock = currentStock,
             unitType = unitType,
             lowStockThreshold = lowStockThreshold
@@ -340,6 +361,7 @@ class NotificationsViewModel @Inject constructor(
         branchId: Int,
         branchName: String,
         name: String,
+        imageUrl: String?,
         currentStock: Double,
         unitType: String,
         lowStockThreshold: Double
@@ -363,6 +385,7 @@ class NotificationsViewModel @Inject constructor(
             branchId = branchId,
             branchName = branchName,
             name = name,
+            imageUrl = imageUrl,
             currentStock = currentStock,
             unitType = unitType,
             lowStockThreshold = lowStockThreshold,

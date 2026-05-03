@@ -129,7 +129,7 @@ class AuditLogViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { current ->
-                    val forcedBranch = if (!online || !current.isAdmin) {
+                    val forcedBranch = if (!current.isAdmin) {
                         localBranchId
                     } else {
                         current.selectedBranchId
@@ -168,6 +168,10 @@ class AuditLogViewModel @Inject constructor(
         val state = _uiState.value
 
         when {
+            state.selectedBranchId == localBranchId -> {
+                loadLocalLogs(localBranchId)
+            }
+
             !state.isAdmin -> {
                 loadLocalLogs(localBranchId)
             }

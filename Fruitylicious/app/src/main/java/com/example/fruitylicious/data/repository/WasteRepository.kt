@@ -171,6 +171,7 @@ class WasteRepository @Inject constructor(
             }
             return Result.success(Unit)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             return Result.failure(e)
         }
     }

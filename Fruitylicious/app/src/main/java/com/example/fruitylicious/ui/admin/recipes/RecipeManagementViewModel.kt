@@ -34,6 +34,7 @@ data class RecipeManagementUiState(
     val ingredients: List<IngredientEntity> = emptyList(),
     val selectedProduct: ProductEntity? = null,
     val selectedVariant: ProductVariantEntity? = null,
+    val packagingLines: List<RecipeLineUi> = emptyList(),
     val recipeLines: List<RecipeLineUi> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
@@ -114,6 +115,7 @@ class RecipeManagementViewModel @Inject constructor(
                 selectedProduct = product,
                 selectedVariant = firstVariant,
                 recipeLines = emptyList(),
+                packagingLines = emptyList(),
                 error = null,
                 successMessage = null
             )
@@ -131,6 +133,7 @@ class RecipeManagementViewModel @Inject constructor(
             it.copy(
                 selectedVariant = variant,
                 recipeLines = emptyList(),
+                packagingLines = emptyList(),
                 error = null,
                 successMessage = null
             )
@@ -155,15 +158,34 @@ class RecipeManagementViewModel @Inject constructor(
     }
 
     private fun mapRecipesToUi(recipes: List<ProductRecipeEntity>) {
-        val ingredients = _uiState.value.ingredients.associateBy { it.ingredientId }
+        val ingredientsMap = _uiState.value.ingredients.associateBy { it.ingredientId }
+
+        val packagingEntities = recipes.filter { 
+            ingredientsMap[it.ingredientId]?.isPackaging == true 
+        }
+        val ingredientEntities = recipes.filter { 
+            ingredientsMap[it.ingredientId]?.isPackaging != true 
+        }
 
         _uiState.update {
             it.copy(
-                recipeLines = if (recipes.isEmpty()) {
+                packagingLines = if (packagingEntities.isEmpty()) {
+                    if (it.selectedProduct?.isAddon == true) emptyList() else listOf(RecipeLineUi())
+                } else {
+                    packagingEntities.map { recipe ->
+                        val ingredient = ingredientsMap[recipe.ingredientId]
+                        RecipeLineUi(
+                            ingredientId = recipe.ingredientId,
+                            quantity = recipe.quantityRequired.toString(),
+                            unit = ingredient?.let { item -> recipeInputUnitFor(item) } ?: ""
+                        )
+                    }
+                },
+                recipeLines = if (ingredientEntities.isEmpty()) {
                     listOf(RecipeLineUi())
                 } else {
-                    recipes.map { recipe ->
-                        val ingredient = ingredients[recipe.ingredientId]
+                    ingredientEntities.map { recipe ->
+                        val ingredient = ingredientsMap[recipe.ingredientId]
 
                         RecipeLineUi(
                             ingredientId = recipe.ingredientId,
@@ -193,6 +215,21 @@ class RecipeManagementViewModel @Inject constructor(
         }
     }
 
+    fun addPackagingLine() {
+        _uiState.update {
+            it.copy(packagingLines = it.packagingLines + RecipeLineUi())
+        }
+    }
+
+    fun removePackagingLine(index: Int) {
+        _uiState.update { state ->
+            state.copy(
+                packagingLines = state.packagingLines.filterIndexed { i, _ -> i != index }
+                    .ifEmpty { if (state.selectedProduct?.isAddon == true) emptyList() else listOf(RecipeLineUi()) }
+            )
+        }
+    }
+
     fun updateLineIngredient(index: Int, ingredient: IngredientEntity) {
         _uiState.update { state ->
             state.copy(
@@ -210,11 +247,37 @@ class RecipeManagementViewModel @Inject constructor(
         }
     }
 
+    fun updatePackagingIngredient(index: Int, ingredient: IngredientEntity) {
+        _uiState.update { state ->
+            state.copy(
+                packagingLines = state.packagingLines.mapIndexed { i, line ->
+                    if (i == index) {
+                        line.copy(
+                            ingredientId = ingredient.ingredientId,
+                            unit = recipeInputUnitFor(ingredient)
+                        )
+                    } else {
+                        line
+                    }
+                }
+            )
+        }
+    }
 
     fun updateLineQuantity(index: Int, quantity: String) {
         _uiState.update { state ->
             state.copy(
                 recipeLines = state.recipeLines.mapIndexed { i, line ->
+                    if (i == index) line.copy(quantity = quantity) else line
+                }
+            )
+        }
+    }
+
+    fun updatePackagingQuantity(index: Int, quantity: String) {
+        _uiState.update { state ->
+            state.copy(
+                packagingLines = state.packagingLines.mapIndexed { i, line ->
                     if (i == index) line.copy(quantity = quantity) else line
                 }
             )
@@ -238,7 +301,7 @@ class RecipeManagementViewModel @Inject constructor(
             return
         }
 
-        val validLines = state.recipeLines.mapNotNull { line ->
+        val validPackagingLines = state.packagingLines.mapNotNull { line ->
             val quantity = line.quantity.toDoubleOrNull()
             if (line.ingredientId > 0 && quantity != null && quantity > 0.0) {
                 line to quantity
@@ -247,7 +310,21 @@ class RecipeManagementViewModel @Inject constructor(
             }
         }
 
-        if (validLines.isEmpty()) {
+        if (!product.isAddon && validPackagingLines.isEmpty()) {
+            setError("At least one packaging item is required for main products.")
+            return
+        }
+
+        val validRegularLines = state.recipeLines.mapNotNull { line ->
+            val quantity = line.quantity.toDoubleOrNull()
+            if (line.ingredientId > 0 && quantity != null && quantity > 0.0) {
+                line to quantity
+            } else {
+                null
+            }
+        }
+
+        if (validRegularLines.isEmpty()) {
             setError("Add at least one valid ingredient.")
             return
         }
@@ -256,12 +333,16 @@ class RecipeManagementViewModel @Inject constructor(
             val now = System.currentTimeMillis()
 
             if (variant != null) {
-                productRecipeDao.deleteRecipesForVariant(variant.variantId)
+                productRecipeDao.softDeleteRecipesByVariant(variant.variantId, now)
             } else {
-                productRecipeDao.deleteRecipesForProduct(product.productId)
+                productRecipeDao.softDeleteRecipesByProduct(product.productId, now)
             }
 
-            val recipes = validLines.map { (line, quantity) ->
+            val allLinesToSave = mutableListOf<Pair<RecipeLineUi, Double>>()
+            allLinesToSave.addAll(validPackagingLines)
+            allLinesToSave.addAll(validRegularLines)
+
+            val recipes = allLinesToSave.map { (line, quantity) ->
                 ProductRecipeEntity(
                     recipeId = generateId(),
                     productId = product.productId,
@@ -291,6 +372,7 @@ class RecipeManagementViewModel @Inject constructor(
                 selectedProduct = null,
                 selectedVariant = null,
                 recipeLines = emptyList(),
+                packagingLines = emptyList(),
                 error = null,
                 successMessage = null
             )
@@ -308,8 +390,11 @@ class RecipeManagementViewModel @Inject constructor(
     }
 
     private fun recipeInputUnitFor(ingredient: IngredientEntity): String {
-        return when (ingredient.unitType.lowercase()) {
-            "pcs", "piece", "pieces", "can", "pack" -> "g"
+        val unitType = ingredient.unitType.lowercase()
+        val hasWeight = ingredient.estimatedWeightPerUnit > 0.0
+
+        return when (unitType) {
+            "pcs", "piece", "pieces", "can", "pack" -> if (hasWeight) "g" else ingredient.unitType
             "grams", "gram", "g" -> "g"
             "milliliters", "milliliter", "ml" -> "ml"
             else -> ingredient.unitType

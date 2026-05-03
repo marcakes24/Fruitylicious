@@ -181,10 +181,11 @@ interface TransactionDao {
         """
     SELECT * FROM transactions
     WHERE status IN ('pending', 'preparing', 'ready', 'completed')
+    AND dateTime > :since
     ORDER BY dateTime DESC
     """
     )
-    fun observeQueueTransactions(): Flow<List<TransactionEntity>>
+    fun observeQueueTransactions(since: Long): Flow<List<TransactionEntity>>
 
     @Query(
         """

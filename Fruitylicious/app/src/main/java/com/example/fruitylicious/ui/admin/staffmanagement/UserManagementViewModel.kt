@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,7 @@ import kotlin.math.absoluteValue
 
 data class UserManagementUiState(
     val users: List<UserEntity> = emptyList(),
+    val currentUserId: Int = 0,
     val isLoading: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
@@ -23,10 +25,13 @@ data class UserManagementUiState(
 
 @HiltViewModel
 class UserManagementViewModel @Inject constructor(
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(UserManagementUiState())
+    private val _uiState = MutableStateFlow(UserManagementUiState(
+        currentUserId = sessionManager.getUserId()
+    ))
     val uiState: StateFlow<UserManagementUiState> = _uiState.asStateFlow()
 
     init {
@@ -64,6 +69,11 @@ class UserManagementViewModel @Inject constructor(
 
         if (cleanUsername.isBlank()) {
             setError("Username is required.")
+            return
+        }
+
+        if (cleanRole !in listOf("admin", "staff", "owner")) {
+            setError("Invalid role selected.")
             return
         }
 
@@ -106,6 +116,11 @@ class UserManagementViewModel @Inject constructor(
     }
 
     fun deleteUser(userId: Int) {
+        if (userId == sessionManager.getUserId()) {
+            setError("You cannot delete your own account.")
+            return
+        }
+
         viewModelScope.launch {
             userDao.softDeleteUser(userId, System.currentTimeMillis())
 

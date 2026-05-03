@@ -17,7 +17,6 @@ import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.RestockRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
-import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
@@ -76,18 +75,17 @@ class RestockViewModel @Inject constructor(
     private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
-    private val networkMonitor: NetworkMonitor,
-    private val syncRepository: SyncRepository
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         RestockUiState(
             isAdmin = isAdminUser(),
-            selectedBranchId = localBranchId,
-            localBranchId = localBranchId,
-            userBranchId = "B$localBranchId"
+            selectedBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
+            localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
+            userBranchId = "B${sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId}"
         )
     )
 
@@ -158,7 +156,7 @@ class RestockViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { current ->
-                    val forcedBranchId = if (!online || !current.isAdmin) {
+                    val forcedBranchId = if (!current.isAdmin) {
                         localBranchId
                     } else {
                         current.selectedBranchId
@@ -483,8 +481,6 @@ class RestockViewModel @Inject constructor(
                 )
             }
 
-            var shouldSync = false
-
             try {
                 val userId = sessionManager.getUserId()
                 val branchId = localBranchId
@@ -498,17 +494,12 @@ class RestockViewModel @Inject constructor(
                 )
 
                 if (result.isSuccess) {
-                    shouldSync = networkMonitor.isOnline()
-
                     _uiState.update {
                         it.copy(
                             successMessage = "Restock saved.",
                             error = null
                         )
                     }
-
-                    rebuildIngredientRows()
-                    loadLocalHistory(localBranchId)
                 } else {
                     val error = result.exceptionOrNull()?.message ?: "Failed to save restock."
                     _uiState.update {
@@ -531,17 +522,6 @@ class RestockViewModel @Inject constructor(
                 // is thrown, ensuring the button never stays permanently grayed out.
                 _uiState.update {
                     it.copy(isSubmitting = false)
-                }
-            }
-
-            if (shouldSync) {
-                launch {
-                    try {
-                        syncRepository.pushUnsynced()
-                    } catch (_: Exception) {
-                        // Local save already succeeded.
-                        // Do not lock or gray out the UI if sync fails.
-                    }
                 }
             }
         }

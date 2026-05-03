@@ -62,7 +62,7 @@ class AdminDashboardViewModel @Inject constructor(
     private var salesJob: Job? = null
     private var notificationJob: Job? = null
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         AdminDashboardUiState(
@@ -153,8 +153,12 @@ class AdminDashboardViewModel @Inject constructor(
         salesJob = viewModelScope.launch {
             val state = _uiState.value
             val isOnline = networkMonitor.isOnline()
+            val selectedBranchId = selectedBranchToId(state.selectedBranch)
 
-            if (state.isAdmin && isOnline) {
+            // Prefer local data for the local branch to ensure immediate updates after transactions
+            if (selectedBranchId == localBranchId) {
+                observeLocalWeeklySales()
+            } else if (state.isAdmin && isOnline) {
                 loadRemoteWeeklySales()
             } else {
                 observeLocalWeeklySales()

@@ -137,8 +137,7 @@ class TransactionRepository @Inject constructor(
                     val deductionPerItem = computeInventoryDeduction(
                         recipeQuantity = recipe.quantityRequired,
                         unitType = ingredient.unitType,
-                        estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
-                        ingredientName = ingredient.ingredientName
+                        estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
                     )
 
                     val totalRequired = deductionPerItem * cartItem.quantity
@@ -156,11 +155,12 @@ class TransactionRepository @Inject constructor(
                                 IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
                             )
 
+                        if (ingredient.isPackaging) continue
+
                         val deductionPerAddon = computeInventoryDeduction(
                             recipeQuantity = recipe.quantityRequired,
                             unitType = ingredient.unitType,
-                            estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit,
-                            ingredientName = ingredient.ingredientName
+                            estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
                         )
 
                         val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
@@ -311,6 +311,7 @@ class TransactionRepository @Inject constructor(
 
             Result.success(transactionId)
         } catch (exception: Exception) {
+            if (exception is kotlinx.coroutines.CancellationException) throw exception
             Result.failure(exception)
         }
     }
@@ -405,8 +406,7 @@ class TransactionRepository @Inject constructor(
     private fun computeInventoryDeduction(
         recipeQuantity: Double,
         unitType: String,
-        estimatedWeightPerUnit: Double,
-        ingredientName: String
+        estimatedWeightPerUnit: Double
     ): Double {
         val isPcsCanOrPack = unitType.equals("pcs", ignoreCase = true) || 
                              unitType.equals("can", ignoreCase = true) ||
@@ -414,12 +414,11 @@ class TransactionRepository @Inject constructor(
 
         return if (isPcsCanOrPack) {
             if (estimatedWeightPerUnit <= 0.0) {
-                throw IllegalStateException(
-                    "$ingredientName uses $unitType but estimated weight per unit is not set or invalid."
-                )
+                // If weight is not set, assume recipe quantity is already in units (pcs/can/pack)
+                recipeQuantity
+            } else {
+                recipeQuantity / estimatedWeightPerUnit
             }
-
-            recipeQuantity / estimatedWeightPerUnit
         } else {
             recipeQuantity
         }

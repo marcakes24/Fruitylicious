@@ -29,7 +29,8 @@ data class InventoryMonitoringRow(
     val currentStock: Double,
     val unitType: String,
     val lowStockThreshold: Double,
-    val lastModified: Long
+    val lastModified: Long,
+    val image: String? = null
 ) {
     val status: String
         get() {
@@ -72,14 +73,14 @@ class InventoryMonitoringViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         InventoryMonitoringUiState(
             isAdmin = isAdminUser(),
-            selectedBranchId = localBranchId,
-            localBranchId = localBranchId,
-            userBranchId = "B$localBranchId"
+            selectedBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
+            localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
+            userBranchId = "B${sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId}"
         )
     )
 
@@ -149,7 +150,7 @@ class InventoryMonitoringViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { current ->
-                    val forcedBranchId = if (!online || !current.isAdmin) {
+                    val forcedBranchId = if (!current.isAdmin) {
                         localBranchId
                     } else {
                         current.selectedBranchId
@@ -238,7 +239,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                     currentStock = inventory.currentStock,
                     unitType = ingredient.unitType,
                     lowStockThreshold = ingredient.lowStockThreshold,
-                    lastModified = inventory.lastModified
+                    lastModified = inventory.lastModified,
+                    image = ingredient.image
                 )
             }
             .sortedBy {
@@ -271,6 +273,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                 onSuccess = { report ->
                     val rows = report.items
                         .map { item ->
+                            val localImage = localIngredients.find { it.ingredientId == item.ingredientId }?.image
+
                             InventoryMonitoringRow(
                                 ingredientId = item.ingredientId,
                                 branchId = report.branchId ?: branchId,
@@ -279,7 +283,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                                 currentStock = item.currentStock,
                                 unitType = item.unitType,
                                 lowStockThreshold = item.lowStockThreshold,
-                                lastModified = report.generatedAt
+                                lastModified = report.generatedAt,
+                                image = localImage
                             )
                         }
                         .sortedBy {
@@ -329,6 +334,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                 result.fold(
                     onSuccess = { report ->
                         val rows = report.items.map { item ->
+                            val localImage = localIngredients.find { it.ingredientId == item.ingredientId }?.image
+
                             InventoryMonitoringRow(
                                 ingredientId = item.ingredientId,
                                 branchId = report.branchId ?: branch.branchId,
@@ -337,7 +344,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                                 currentStock = item.currentStock,
                                 unitType = item.unitType,
                                 lowStockThreshold = item.lowStockThreshold,
-                                lastModified = report.generatedAt
+                                lastModified = report.generatedAt,
+                                image = localImage
                             )
                         }
 
@@ -387,7 +395,8 @@ class InventoryMonitoringViewModel @Inject constructor(
                     currentStock = totalStock,
                     unitType = first.unitType,
                     lowStockThreshold = first.lowStockThreshold,
-                    lastModified = latestModified
+                    lastModified = latestModified,
+                    image = first.image
                 )
             }
             .sortedBy {

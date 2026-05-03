@@ -125,7 +125,7 @@ class TransactionHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { state ->
-                    val canAccess = state.isAdmin && online
+                    val canAccess = state.isAdmin
 
                     val selected = if (!canAccess) {
                         localBranchId
@@ -180,6 +180,10 @@ class TransactionHistoryViewModel @Inject constructor(
         val state = _uiState.value
 
         when {
+            state.selectedBranchId == localBranchId -> {
+                rebuildLocalRows()
+            }
+
             !state.isAdmin -> {
                 rebuildLocalRows()
             }

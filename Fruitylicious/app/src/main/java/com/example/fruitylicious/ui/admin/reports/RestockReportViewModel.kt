@@ -61,6 +61,14 @@ class RestockReportViewModel @Inject constructor(
             val now = System.currentTimeMillis()
 
             when {
+                branchId == localBranchId -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        from = todayStart,
+                        to = now
+                    )
+                }
+
                 !isAdmin -> {
                     loadLocalReport(
                         branchId = localBranchId,

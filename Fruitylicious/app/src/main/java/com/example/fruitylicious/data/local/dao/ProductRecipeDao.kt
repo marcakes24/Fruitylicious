@@ -45,12 +45,6 @@ interface ProductRecipeDao {
     @Upsert
     suspend fun upsertRecipes(recipes: List<ProductRecipeEntity>)
 
-    @Query("DELETE FROM product_recipes WHERE variantId = :variantId")
-    suspend fun deleteRecipesForVariant(variantId: Int)
-
-    @Query("DELETE FROM product_recipes WHERE productId = :productId AND variantId IS NULL")
-    suspend fun deleteRecipesForProduct(productId: Int)
-
     @Query("SELECT * FROM product_recipes WHERE isSynced = 0")
     suspend fun getUnsyncedRecipes(): List<ProductRecipeEntity>
 

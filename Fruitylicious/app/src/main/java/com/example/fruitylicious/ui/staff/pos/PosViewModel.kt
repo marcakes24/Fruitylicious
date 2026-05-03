@@ -137,7 +137,8 @@ class PosViewModel @Inject constructor(
 
     private fun observeInventory() {
         viewModelScope.launch {
-            inventoryRepository.observeInventory(branchConfig.branchId).collectLatest { inventory ->
+            val branchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
+            inventoryRepository.observeInventory(branchId).collectLatest { inventory ->
                 _uiState.update {
                     it.copy(inventory = inventory)
                 }

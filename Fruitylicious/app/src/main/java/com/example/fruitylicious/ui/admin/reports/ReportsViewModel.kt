@@ -66,7 +66,7 @@ class ReportsViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { state ->
-                    val canAccessCrossBranch = state.isAdmin && online
+                    val canAccessCrossBranch = state.isAdmin
 
                     val selectedBranchId = if (canAccessCrossBranch) {
                         state.selectedBranchId

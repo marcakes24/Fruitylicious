@@ -57,6 +57,14 @@ class WasteReportViewModel @Inject constructor(
             val range = getCurrentWeekRange()
 
             when {
+                branchId == localBranchId -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        from = range.first,
+                        to = range.second
+                    )
+                }
+
                 !isAdmin -> {
                     loadLocalReport(
                         branchId = localBranchId,

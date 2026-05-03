@@ -371,7 +371,7 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    if (isOnline) {
+                    // if (isOnline) {
                         RestockBranchButton(
                             label = "All",
                             selected = selectedBranchId == null,
@@ -389,7 +389,7 @@ private fun Header(
                                 }
                             )
                         }
-                    } else {
+                    /* } else {
                         RestockBranchButton(
                             label = "B$localBranchId",
                             selected = true,
@@ -397,7 +397,7 @@ private fun Header(
                                 onBranchSelect(localBranchId)
                             }
                         )
-                    }
+                    } */
                 }
             }
         }

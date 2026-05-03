@@ -21,6 +21,7 @@ import com.example.fruitylicious.data.remote.api.SyncApi
 import com.example.fruitylicious.data.remote.dto.PushRequestDto
 import com.example.fruitylicious.data.remote.dto.SyncRecordResultDto
 import android.content.Context
+import android.util.Log
 import com.example.fruitylicious.util.ImageStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -83,86 +84,52 @@ class SyncRepository @Inject constructor(
 
     suspend fun pushUnsynced(): SyncResult {
         return try {
+            // Push order matters for FKs on backend
             val branches = branchDao.getUnsyncedBranches()
             val users = userDao.getUnsyncedUsers()
+            
             val products = productDao.getUnsyncedProducts()
             val productsForPush = products.map { product ->
-                val convertedImage = ImageStorage.imageFileToBase64(
-                    context = context,
-                    relativePath = product.image
-                )
-
-                product.copy(
-                    image = convertedImage ?: product.image
-                )
+                product.copy(image = ImageStorage.imageFileToBase64(context, product.image) ?: product.image)
             }
-            val productVariants = productVariantDao.getUnsyncedVariants()
+
             val ingredients = ingredientDao.getUnsyncedIngredients()
             val ingredientsForPush = ingredients.map { ingredient ->
-                val convertedImage = ImageStorage.imageFileToBase64(
-                    context = context,
-                    relativePath = ingredient.image
-                )
-
-                ingredient.copy(
-                    image = convertedImage ?: ingredient.image
-                )
+                ingredient.copy(image = ImageStorage.imageFileToBase64(context, ingredient.image) ?: ingredient.image)
             }
+
+            val productVariants = productVariantDao.getUnsyncedVariants()
             val productRecipes = productRecipeDao.getUnsyncedRecipes()
             val inventory = inventoryDao.getUnsyncedInventory()
-            val restockLogs = restockLogDao.getUnsyncedRestockLogs()
-            val inventoryAdjustments = inventoryAdjustmentDao.getUnsyncedAdjustments()
-            val wasteLogs = wasteLogDao.getUnsyncedWasteLogs()
-            val wasteLogsForPush = wasteLogs.map { wasteLog ->
-                val convertedImage = ImageStorage.imageFileToBase64(
-                    context = context,
-                    relativePath = wasteLog.image
-                )
-
-                wasteLog.copy(
-                    image = convertedImage ?: wasteLog.image
-                )
-            }
+            
             val transactions = transactionDao.getUnsyncedTransactions()
             val transactionItems = transactionItemDao.getUnsyncedTransactionItems()
             val transactionItemAddons = transactionItemAddonDao.getUnsyncedTransactionItemAddons()
+            
+            val restockLogs = restockLogDao.getUnsyncedRestockLogs()
+            val inventoryAdjustments = inventoryAdjustmentDao.getUnsyncedAdjustments()
+            
+            val wasteLogs = wasteLogDao.getUnsyncedWasteLogs()
+            val wasteLogsForPush = wasteLogs.map { wasteLog ->
+                wasteLog.copy(image = ImageStorage.imageFileToBase64(context, wasteLog.image) ?: wasteLog.image)
+            }
+
             val staffLogs = staffLogDao.getUnsyncedStaffLogs()
             val staffLogsForPush = staffLogs.map { staffLog ->
-                val convertedImage = ImageStorage.imageFileToBase64(
-                    context = context,
-                    relativePath = staffLog.image
-                )
-
-                staffLog.copy(
-                    image = convertedImage ?: staffLog.image
-                )
+                staffLog.copy(image = ImageStorage.imageFileToBase64(context, staffLog.image) ?: staffLog.image)
             }
+
             val auditLogs = auditLogDao.getUnsyncedAuditLogs()
 
             val totalCount =
-                branches.size +
-                        users.size +
-                        products.size +
-                        productVariants.size +
-                        ingredients.size +
-                        productRecipes.size +
-                        inventory.size +
-                        restockLogs.size +
-                        inventoryAdjustments.size +
-                        wasteLogs.size +
-                        transactions.size +
-                        transactionItems.size +
-                        transactionItemAddons.size +
-                        staffLogs.size +
-                        auditLogs.size
+                branches.size + users.size + products.size + ingredients.size +
+                productVariants.size + productRecipes.size + inventory.size +
+                transactions.size + transactionItems.size + transactionItemAddons.size +
+                restockLogs.size + inventoryAdjustments.size + wasteLogs.size +
+                staffLogs.size + auditLogs.size
 
             if (totalCount == 0) {
-                return SyncResult(
-                    success = true,
-                    pushedCount = 0,
-                    pulledCount = 0,
-                    message = "No local changes to push."
-                )
+                return SyncResult(true, 0, 0, "No local changes to push.")
             }
 
             val response = syncApi.push(
@@ -170,70 +137,49 @@ class SyncRepository @Inject constructor(
                     branches = branches,
                     users = users,
                     products = productsForPush,
-                    productVariants = productVariants,
                     ingredients = ingredientsForPush,
+                    productVariants = productVariants,
                     productRecipes = productRecipes,
                     inventory = inventory,
-                    restockLogs = restockLogs,
-                    inventoryAdjustments = inventoryAdjustments,
-                    wasteLogs = wasteLogsForPush,
                     transactions = transactions,
                     transactionItems = transactionItems,
                     transactionItemAddons = transactionItemAddons,
+                    restockLogs = restockLogs,
+                    inventoryAdjustments = inventoryAdjustments,
+                    wasteLogs = wasteLogsForPush,
                     staffLogs = staffLogsForPush,
                     auditLogs = auditLogs
                 )
             )
 
             if (!response.isSuccessful) {
-                return SyncResult(
-                    success = false,
-                    pushedCount = 0,
-                    pulledCount = 0,
-                    message = "Push failed: ${response.code()} ${response.message()}"
-                )
+                return SyncResult(false, 0, 0, "Push failed: ${response.code()} ${response.message()}")
             }
 
-            val body = response.body()
-                ?: return SyncResult(
-                    success = false,
-                    pushedCount = 0,
-                    pulledCount = 0,
-                    message = "Push failed: empty server response."
-                )
-
+            val body = response.body() ?: return SyncResult(false, 0, 0, "Push failed: empty server response.")
             val syncedAt = System.currentTimeMillis()
 
             val pushedCount =
                 markBranchesSynced(body.branches, syncedAt) +
-                        markUsersSynced(body.users, syncedAt) +
-                        markProductsSynced(body.products, syncedAt) +
-                        markProductVariantsSynced(body.productVariants, syncedAt) +
-                        markIngredientsSynced(body.ingredients, syncedAt) +
-                        markProductRecipesSynced(body.productRecipes, syncedAt) +
-                        markInventorySynced(body.inventory, syncedAt) +
-                        markRestockLogsSynced(body.restockLogs, syncedAt) +
-                        markInventoryAdjustmentsSynced(body.inventoryAdjustments, syncedAt) +
-                        markWasteLogsSynced(body.wasteLogs, syncedAt) +
-                        markTransactionsSynced(body.transactions, syncedAt) +
-                        markTransactionItemsSynced(body.transactionItems, syncedAt) +
-                        markTransactionItemAddonsSynced(body.transactionItemAddons, syncedAt) +
-                        markStaffLogsSynced(body.staffLogs, syncedAt) +
-                        markAuditLogsSynced(body.auditLogs, syncedAt)
+                markUsersSynced(body.users, syncedAt) +
+                markProductsSynced(body.products, syncedAt) +
+                markIngredientsSynced(body.ingredients, syncedAt) +
+                markProductVariantsSynced(body.productVariants, syncedAt) +
+                markProductRecipesSynced(body.productRecipes, syncedAt) +
+                markInventorySynced(body.inventory, syncedAt) +
+                markTransactionsSynced(body.transactions, syncedAt) +
+                markTransactionItemsSynced(body.transactionItems, syncedAt) +
+                markTransactionItemAddonsSynced(body.transactionItemAddons, syncedAt) +
+                markRestockLogsSynced(body.restockLogs, syncedAt) +
+                markInventoryAdjustmentsSynced(body.inventoryAdjustments, syncedAt) +
+                markWasteLogsSynced(body.wasteLogs, syncedAt) +
+                markStaffLogsSynced(body.staffLogs, syncedAt) +
+                markAuditLogsSynced(body.auditLogs, syncedAt)
 
-            SyncResult(
-                success = true,
-                pushedCount = pushedCount,
-                pulledCount = 0,
-                message = "Push completed. Pushed $pushedCount of $totalCount local records."
-            )
+            SyncResult(true, pushedCount, 0, "Push completed. Pushed $pushedCount of $totalCount local records.")
         } catch (exception: Exception) {
-            SyncResult(
-                success = false,
-                pushedCount = 0,
-                pulledCount = 0,
-                message = exception.message ?: "Push failed."
-            )
+            if (exception is kotlinx.coroutines.CancellationException) throw exception
+            SyncResult(false, 0, 0, exception.message ?: "Push failed.")
         }
     }
 
@@ -242,412 +188,164 @@ class SyncRepository @Inject constructor(
             val response = syncApi.pull(since)
 
             if (!response.isSuccessful) {
-                return SyncResult(
-                    success = false,
-                    pushedCount = 0,
-                    pulledCount = 0,
-                    message = "Pull failed: ${response.code()} ${response.message()}"
-                )
+                return SyncResult(false, 0, 0, "Pull failed: ${response.code()} ${response.message()}")
             }
 
-            val body = response.body()
-                ?: return SyncResult(
-                    success = false,
-                    pushedCount = 0,
-                    pulledCount = 0,
-                    message = "Pull failed: empty server response."
-                )
-
+            val body = response.body() ?: return SyncResult(false, 0, 0, "Pull failed: empty server response.")
             val pulledAt = System.currentTimeMillis()
 
             database.withTransaction {
-                branchDao.upsertBranches(
-                    body.branches.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                // Upsert in parent-first order to satisfy local Room FKs if enabled
+                branchDao.upsertBranches(body.branches.map { it.copy(isSynced = true, syncedAt = pulledAt) })
+                userDao.upsertUsers(body.users.map { it.copy(isSynced = true, syncedAt = pulledAt) })
 
-                userDao.upsertUsers(
-                    body.users.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                productDao.upsertProducts(body.products.map { product ->
+                    val localPath = ImageStorage.saveBase64Image(context, product.image, "products")
+                    product.copy(image = localPath ?: product.image, isSynced = true, syncedAt = pulledAt)
+                })
 
-                val pulledProducts = body.products.map { product ->
-                    val localImagePath = ImageStorage.saveBase64Image(
-                        context = context,
-                        base64Value = product.image,
-                        folder = "products"
-                    )
+                ingredientDao.upsertIngredients(body.ingredients.map { ingredient ->
+                    val localPath = ImageStorage.saveBase64Image(context, ingredient.image, "ingredients")
+                    ingredient.copy(image = localPath ?: ingredient.image, isSynced = true, syncedAt = pulledAt)
+                })
 
-                    product.copy(
-                        image = localImagePath ?: product.image,
-                        isSynced = true,
-                        syncedAt = pulledAt
-                    )
-                }
+                productVariantDao.upsertVariants(body.productVariants.map { it.copy(isSynced = true, syncedAt = pulledAt) })
+                productRecipeDao.upsertRecipes(body.productRecipes.map { it.copy(isSynced = true, syncedAt = pulledAt) })
+                inventoryDao.upsertInventoryItems(body.inventory.map { it.copy(isSynced = true, syncedAt = pulledAt) })
 
-                productDao.upsertProducts(pulledProducts)
+                transactionDao.upsertTransactions(body.transactions.map { it.copy(isSynced = true, syncedAt = pulledAt) })
+                body.transactionItems.forEach { transactionItemDao.upsertTransactionItem(it.copy(isSynced = true, syncedAt = pulledAt)) }
+                transactionItemAddonDao.upsertAddons(body.transactionItemAddons.map { it.copy(isSynced = true, syncedAt = pulledAt) })
 
-                productVariantDao.upsertVariants(
-                    body.productVariants.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
+                restockLogDao.upsertRestockLogs(body.restockLogs.map { it.copy(isSynced = true, syncedAt = pulledAt) })
+                body.inventoryAdjustments.forEach { inventoryAdjustmentDao.upsertAdjustment(it.copy(isSynced = true, syncedAt = pulledAt)) }
 
-                val pulledIngredients = body.ingredients.map { ingredient ->
-                    val localImagePath = ImageStorage.saveBase64Image(
-                        context = context,
-                        base64Value = ingredient.image,
-                        folder = "ingredients"
-                    )
+                wasteLogDao.upsertWasteLogs(body.wasteLogs.map { wasteLog ->
+                    val localPath = ImageStorage.saveBase64Image(context, wasteLog.image, "waste")
+                    wasteLog.copy(image = localPath ?: wasteLog.image, isSynced = true, syncedAt = pulledAt)
+                })
 
-                    ingredient.copy(
-                        image = localImagePath ?: ingredient.image,
-                        isSynced = true,
-                        syncedAt = pulledAt
-                    )
-                }
+                staffLogDao.upsertStaffLogs(body.staffLogs.map { staffLog ->
+                    val localPath = ImageStorage.saveBase64Image(context, staffLog.image, "staff_logs")
+                    staffLog.copy(image = localPath ?: staffLog.image, isSynced = true, syncedAt = pulledAt)
+                })
 
-                ingredientDao.upsertIngredients(pulledIngredients)
-
-                productRecipeDao.upsertRecipes(
-                    body.productRecipes.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
-
-                inventoryDao.upsertInventoryItems(
-                    body.inventory.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
-
-                restockLogDao.upsertRestockLogs(
-                    body.restockLogs.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
-
-                body.inventoryAdjustments.forEach {
-                    inventoryAdjustmentDao.upsertAdjustment(
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    )
-                }
-
-                val pulledWasteLogs = body.wasteLogs.map { wasteLog ->
-                    val localImagePath = ImageStorage.saveBase64Image(
-                        context = context,
-                        base64Value = wasteLog.image,
-                        folder = "waste"
-                    )
-
-                    wasteLog.copy(
-                        image = localImagePath ?: wasteLog.image,
-                        isSynced = true,
-                        syncedAt = pulledAt
-                    )
-                }
-
-                wasteLogDao.upsertWasteLogs(pulledWasteLogs)
-
-                transactionDao.upsertTransactions(
-                    body.transactions.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
-
-                body.transactionItems.forEach {
-                    transactionItemDao.upsertTransactionItem(
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    )
-                }
-
-                transactionItemAddonDao.upsertAddons(
-                    body.transactionItemAddons.map {
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    }
-                )
-
-                val pulledStaffLogs = body.staffLogs.map { staffLog ->
-                    val localImagePath = ImageStorage.saveBase64Image(
-                        context = context,
-                        base64Value = staffLog.image,
-                        folder = "staff_logs"
-                    )
-
-                    staffLog.copy(
-                        image = localImagePath ?: staffLog.image,
-                        isSynced = true,
-                        syncedAt = pulledAt
-                    )
-                }
-
-                staffLogDao.upsertStaffLogs(pulledStaffLogs)
-
-                body.auditLogs.forEach {
-                    auditLogDao.upsertAuditLog(
-                        it.copy(isSynced = true, syncedAt = pulledAt)
-                    )
-                }
+                body.auditLogs.forEach { auditLogDao.upsertAuditLog(it.copy(isSynced = true, syncedAt = pulledAt)) }
             }
 
             val pulledCount =
-                body.branches.size +
-                        body.users.size +
-                        body.products.size +
-                        body.productVariants.size +
-                        body.ingredients.size +
-                        body.productRecipes.size +
-                        body.inventory.size +
-                        body.restockLogs.size +
-                        body.inventoryAdjustments.size +
-                        body.wasteLogs.size +
-                        body.transactions.size +
-                        body.transactionItems.size +
-                        body.transactionItemAddons.size +
-                        body.staffLogs.size +
-                        body.auditLogs.size
+                body.branches.size + body.users.size + body.products.size + body.ingredients.size +
+                body.productVariants.size + body.productRecipes.size + body.inventory.size +
+                body.transactions.size + body.transactionItems.size + body.transactionItemAddons.size +
+                body.restockLogs.size + body.inventoryAdjustments.size + body.wasteLogs.size +
+                body.staffLogs.size + body.auditLogs.size
 
-            SyncResult(
-                success = true,
-                pushedCount = 0,
-                pulledCount = pulledCount,
-                message = "Pull completed. Pulled $pulledCount records."
-            )
+            SyncResult(true, 0, pulledCount, "Pull completed. Pulled $pulledCount records.")
         } catch (exception: Exception) {
-            SyncResult(
-                success = false,
-                pushedCount = 0,
-                pulledCount = 0,
-                message = exception.message ?: "Pull failed."
-            )
+            Log.e("SyncRepository", "Pull error", exception)
+            if (exception is kotlinx.coroutines.CancellationException) throw exception
+            SyncResult(false, 0, 0, exception.message ?: "Pull failed.")
         }
     }
 
-    private fun successIds(
-        results: List<SyncRecordResultDto>
-    ): Set<String> {
-        return results
-            .filter { it.success }
-            .map { it.recordId }
-            .toSet()
+    private fun successIds(results: List<SyncRecordResultDto>): Set<String> {
+        return results.filter { it.success }.map { it.recordId }.toSet()
     }
 
-    private suspend fun markBranchesSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markBranchesSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                branchDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { branchDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markUsersSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markUsersSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                userDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { userDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markProductsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markProductsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                productDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { productDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markProductVariantsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markIngredientsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                productVariantDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { ingredientDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markIngredientsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markProductVariantsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                ingredientDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { productVariantDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markProductRecipesSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markProductRecipesSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach { id ->
-            id.toIntOrNull()?.let {
-                productRecipeDao.markSynced(it, syncedAt)
-            }
-        }
-
+        ids.forEach { id -> id.toIntOrNull()?.let { productRecipeDao.markSynced(it, syncedAt) } }
         return ids.size
     }
 
-    private suspend fun markInventorySynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markInventorySynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
         ids.forEach { recordId ->
             val parts = recordId.split(":")
             val ingredientId = parts.getOrNull(0)?.toIntOrNull()
             val branchId = parts.getOrNull(1)?.toIntOrNull()
-
             if (ingredientId != null && branchId != null) {
-                inventoryDao.markSynced(
-                    ingredientId = ingredientId,
-                    branchId = branchId,
-                    syncedAt = syncedAt
-                )
+                inventoryDao.markSynced(ingredientId, branchId, syncedAt)
             }
         }
-
         return ids.size
     }
 
-    private suspend fun markRestockLogsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markTransactionsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            restockLogDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { transactionDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markInventoryAdjustmentsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markTransactionItemsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            inventoryAdjustmentDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { transactionItemDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markWasteLogsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markTransactionItemAddonsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            wasteLogDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { transactionItemAddonDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markTransactionsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markRestockLogsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            transactionDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { restockLogDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markTransactionItemsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markInventoryAdjustmentsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            transactionItemDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { inventoryAdjustmentDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markTransactionItemAddonsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markWasteLogsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            transactionItemAddonDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { wasteLogDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markStaffLogsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markStaffLogsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            staffLogDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { staffLogDao.markSynced(it, syncedAt) }
         return ids.size
     }
 
-    private suspend fun markAuditLogsSynced(
-        results: List<SyncRecordResultDto>,
-        syncedAt: Long
-    ): Int {
+    private suspend fun markAuditLogsSynced(results: List<SyncRecordResultDto>, syncedAt: Long): Int {
         val ids = successIds(results)
-
-        ids.forEach {
-            auditLogDao.markSynced(it, syncedAt)
-        }
-
+        ids.forEach { auditLogDao.markSynced(it, syncedAt) }
         return ids.size
     }
 }

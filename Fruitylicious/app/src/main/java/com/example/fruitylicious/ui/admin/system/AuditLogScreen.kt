@@ -405,7 +405,7 @@ private fun AuditHeader(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    if (isOnline) {
+                    // if (isOnline) {
                         AuditBranchButton(
                             label = "All",
                             selected = selectedBranchId == null,
@@ -419,7 +419,7 @@ private fun AuditHeader(
                                 onClick = { onBranchSelect(branch.branchId) }
                             )
                         }
-                    } else {
+                    /* } else {
                         val localBranch = branches.firstOrNull { it.branchId == localBranchId }
 
                         AuditBranchButton(
@@ -427,7 +427,7 @@ private fun AuditHeader(
                             selected = true,
                             onClick = { onBranchSelect(localBranchId) }
                         )
-                    }
+                    } */
                 }
             }
         }

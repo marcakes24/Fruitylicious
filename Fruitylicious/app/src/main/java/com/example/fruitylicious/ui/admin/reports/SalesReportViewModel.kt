@@ -72,6 +72,14 @@ class SalesReportViewModel @Inject constructor(
             val range = getRange(period)
 
             when {
+                branchId == localBranchId -> {
+                    loadLocalReport(
+                        branchId = localBranchId,
+                        period = period,
+                        range = range
+                    )
+                }
+
                 !isAdmin -> {
                     loadLocalReport(
                         branchId = localBranchId,
@@ -164,6 +172,7 @@ class SalesReportViewModel @Inject constructor(
                 )
             }
         } catch (exception: Exception) {
+            if (exception is kotlinx.coroutines.CancellationException) throw exception
             _uiState.update {
                 it.copy(
                     isLoading = false,

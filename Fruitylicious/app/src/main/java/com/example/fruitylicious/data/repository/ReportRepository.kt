@@ -182,6 +182,7 @@ class ReportRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }
@@ -212,6 +213,7 @@ class ReportRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }
@@ -228,6 +230,7 @@ class ReportRepository @Inject constructor(
                 Result.failure(IllegalStateException("Server error ${response.code()}: ${response.message()}"))
             }
         } catch (exception: Exception) {
+            if (exception is kotlinx.coroutines.CancellationException) throw exception
             Result.failure(exception)
         }
     }

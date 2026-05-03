@@ -13,7 +13,6 @@ import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
-import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.data.repository.WasteRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.ImageStorage
@@ -76,11 +75,10 @@ class WasteManagementViewModel @Inject constructor(
     private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
-    private val networkMonitor: NetworkMonitor,
-    private val syncRepository: SyncRepository
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         WasteManagementUiState(
@@ -158,7 +156,7 @@ class WasteManagementViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { online ->
                 _uiState.update { current ->
-                    val forcedBranchId = if (!online || !current.isAdmin) {
+                    val forcedBranchId = if (!current.isAdmin) {
                         localBranchId
                     } else {
                         current.selectedBranchId
@@ -260,6 +258,10 @@ class WasteManagementViewModel @Inject constructor(
         val state = _uiState.value
 
         when {
+            state.selectedBranchId == localBranchId -> {
+                loadLocalHistory(localBranchId)
+            }
+
             !state.isAdmin -> {
                 loadLocalHistory(localBranchId)
             }
@@ -492,11 +494,6 @@ class WasteManagementViewModel @Inject constructor(
                         error = null
                     )
                 }
-
-                if (_uiState.value.isOnline) {
-                    syncRepository.pushUnsynced()
-                }
-                loadHistory()
             } else {
                 _uiState.update {
                     it.copy(

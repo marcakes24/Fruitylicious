@@ -34,10 +34,8 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Modifier
@@ -46,12 +44,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.fruitylicious.ADMIN_ADJUSTMENT
-import com.example.fruitylicious.STAFF_ADJUSTMENT
+import coil.compose.AsyncImage
+import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
+import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
+import com.example.fruitylicious.util.ImageStorage
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -75,18 +77,6 @@ fun NotificationsScreen(
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    var selectedBranch by remember(uiState.isAdmin, uiState.userBranchId) { 
-        mutableStateOf(uiState.userBranchId)
-    }
-
-    val filteredNotifications = uiState.notifications.filter { item ->
-        when (selectedBranch) {
-            "B1" -> item.branchId == 1
-            "B2" -> item.branchId == 2
-            else -> true
-        }
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -113,9 +103,10 @@ fun NotificationsScreen(
                 .background(NotifPageBg)
         ) {
             Header(
-                selectedBranch = selectedBranch,
+                selectedBranchId = uiState.selectedBranchId,
+                branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
-                onBranchSelected = { selectedBranch = it },
+                onBranchSelected = { viewModel.selectBranch(it) },
                 onMenuClick = {
                     scope.launch {
                         drawerState.open()
@@ -135,19 +126,19 @@ fun NotificationsScreen(
                         EmptyNotificationText("Loading notifications...")
                     }
 
-                    filteredNotifications.isEmpty() -> {
+                    uiState.notifications.isEmpty() -> {
                         EmptyNotificationText("No low-stock notifications.")
                     }
 
                     else -> {
-                        filteredNotifications.forEach { notification ->
+                        uiState.notifications.forEach { notification ->
                             NotificationItem(
                                 notification = notification,
-                                onViewDetails = {
+                                onRestock = {
                                     val route = if (mode == SharedScreenMode.ADMIN) {
-                                        ADMIN_ADJUSTMENT
+                                        ADMIN_RESTOCK_HISTORY
                                     } else {
-                                        STAFF_ADJUSTMENT
+                                        STAFF_RESTOCK_HISTORY
                                     }
 
                                     navController.navigate(route)
@@ -165,9 +156,10 @@ fun NotificationsScreen(
 
 @Composable
 private fun Header(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<com.example.fruitylicious.data.local.entity.BranchEntity>,
     isAdmin: Boolean,
-    onBranchSelected: (String) -> Unit,
+    onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
     Box(
@@ -203,19 +195,37 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    listOf("B1", "B2", "All").forEach { branch ->
-                        val isSelected = selectedBranch == branch
+                    // "All" option
+                    val isAllSelected = selectedBranchId == null
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isAllSelected) NotifGreen else Color.Transparent)
+                            .clickable { onBranchSelected(null) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "All",
+                            color = if (isAllSelected) Color.White else Color(0xFF666E7A),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    branches.forEach { branch ->
+                        val isSelected = selectedBranchId == branch.branchId
 
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (isSelected) NotifGreen else Color.Transparent)
-                                .clickable { onBranchSelected(branch) }
+                                .clickable { onBranchSelected(branch.branchId) }
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = branch,
+                                text = "B${branch.branchId}",
                                 color = if (isSelected) Color.White else Color(0xFF666E7A),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
@@ -247,8 +257,13 @@ private fun EmptyNotificationText(text: String) {
 @Composable
 private fun NotificationItem(
     notification: NotificationRow,
-    onViewDetails: () -> Unit
+    onRestock: () -> Unit
 ) {
+    val context = LocalContext.current
+    val imageFile = notification.imageUrl?.let {
+        ImageStorage.getImageFile(context, it)
+    }
+
     val isCritical = notification.status == "Critical"
 
     val badgeColor = if (isCritical) {
@@ -278,12 +293,21 @@ private fun NotificationItem(
                         .background(Color(0xFFF5F5F5)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Inventory2,
-                        contentDescription = "Inventory",
-                        tint = NotifGreen,
-                        modifier = Modifier.size(26.dp)
-                    )
+                    if (imageFile != null && imageFile.exists()) {
+                        AsyncImage(
+                            model = imageFile,
+                            contentDescription = notification.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Inventory2,
+                            contentDescription = "Inventory",
+                            tint = NotifGreen,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -349,7 +373,7 @@ private fun NotificationItem(
             )
 
             Button(
-                onClick = onViewDetails,
+                onClick = onRestock,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -357,7 +381,7 @@ private fun NotificationItem(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = "View Details",
+                    text = "Restock",
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )

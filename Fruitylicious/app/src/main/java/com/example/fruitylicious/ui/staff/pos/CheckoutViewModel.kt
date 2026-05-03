@@ -111,7 +111,7 @@ class CheckoutViewModel @Inject constructor(
 
             val result = transactionRepository.createTransaction(
                 userId = sessionManager.getUserId(),
-                branchId = branchConfig.branchId,
+                branchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
                 cartItems = cartItems,
                 paymentType = cleanPaymentType
             )

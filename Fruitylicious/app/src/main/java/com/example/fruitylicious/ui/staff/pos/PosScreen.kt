@@ -435,7 +435,7 @@ private fun ProductCustomizeDialog(
     val availableAddons = addons.filter { it.productId != selectedFlavor?.productId }
 
     val variantRecipe = recipes.filter {
-        it.variantId == selectedVariant?.variantId
+        it.productId == product.productId && it.variantId == selectedVariant?.variantId
     }
 
     val productRecipe = recipes.filter {
@@ -449,8 +449,10 @@ private fun ProductCustomizeDialog(
     }
 
     val mixRecipe = if (mixFlavor && selectedFlavor != null) {
-        recipes.filter {
-            it.productId == selectedFlavor?.productId && it.variantId == null
+        recipes.filter { recipe ->
+            recipe.productId == selectedFlavor?.productId && 
+            recipe.variantId == null &&
+            ingredients.find { it.ingredientId == recipe.ingredientId }?.isPackaging != true
         }
     } else {
         emptyList()
@@ -459,7 +461,8 @@ private fun ProductCustomizeDialog(
     val selectedAddonRecipes = recipes.filter { recipe ->
         selectedAddOns.any {
             it.productId == recipe.productId
-        } && recipe.variantId == null
+        } && recipe.variantId == null &&
+        ingredients.find { it.ingredientId == recipe.ingredientId }?.isPackaging != true
     }
 
     val hasRecipe = activeRecipe.isNotEmpty()
@@ -503,7 +506,7 @@ private fun ProductCustomizeDialog(
             val available = if (stockItem != null && ingredient != null) {
                 val unit = ingredient.unitType.lowercase(Locale.US)
 
-                if (unit == "can" || unit == "pcs" || unit == "pack") {
+                if ((unit == "can" || unit == "pcs" || unit == "pack") && ingredient.estimatedWeightPerUnit > 0.0) {
                     stockItem.currentStock * ingredient.estimatedWeightPerUnit
                 } else {
                     stockItem.currentStock

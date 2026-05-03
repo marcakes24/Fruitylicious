@@ -76,6 +76,10 @@ class InventoryReportViewModel @Inject constructor(
             val isAdmin = isAdminUser()
 
             when {
+                branchId == localBranchId -> {
+                    loadLocalReport(localBranchId)
+                }
+
                 !isAdmin -> {
                     loadLocalReport(localBranchId)
                 }

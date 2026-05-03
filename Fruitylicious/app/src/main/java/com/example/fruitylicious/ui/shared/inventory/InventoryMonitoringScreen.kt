@@ -51,11 +51,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
+import com.example.fruitylicious.util.ImageStorage
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -316,7 +320,7 @@ private fun Header(
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
                 ) {
-                    if (isOnline) {
+                    // if (isOnline) {
                         InventoryBranchButton(
                             label = "All",
                             selected = selectedBranchId == null,
@@ -334,7 +338,7 @@ private fun Header(
                                 }
                             )
                         }
-                    } else {
+                    /* } else {
                         InventoryBranchButton(
                             label = "B$localBranchId",
                             selected = true,
@@ -342,7 +346,7 @@ private fun Header(
                                 onBranchSelect(localBranchId)
                             }
                         )
-                    }
+                    } */
                 }
             }
         }
@@ -428,7 +432,7 @@ private fun FilterCard(
                             text = "mm/dd/yyyy",
                             color = Color.LightGray,
                             fontSize = 14.sp
-                        )
+                    )
                     },
                     leadingIcon = {
                         Icon(
@@ -484,6 +488,11 @@ private fun EmptyInventoryText(
 private fun InventoryListItem(
     item: InventoryMonitoringRow
 ) {
+    val context = LocalContext.current
+    val imageFile = item.image?.let {
+        ImageStorage.getImageFile(context, it)
+    }
+
     val statusColor = when (item.status) {
         "Good" -> Color(0xFF4CAF50)
         "Normal" -> Color(0xFFFFB300)
@@ -502,15 +511,24 @@ private fun InventoryListItem(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFE8F5E9)),
+                    .background(Color(0xFFF5F5F5)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Inventory2,
-                    contentDescription = "Inventory",
-                    tint = ImGreen,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (imageFile != null && imageFile.exists()) {
+                    AsyncImage(
+                        model = imageFile,
+                        contentDescription = item.ingredientName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Inventory2,
+                        contentDescription = "Inventory",
+                        tint = ImGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.size(10.dp))

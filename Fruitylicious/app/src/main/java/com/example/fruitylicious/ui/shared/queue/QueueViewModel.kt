@@ -77,8 +77,9 @@ class QueueViewModel @Inject constructor(
     }
 
     private fun observeTransactions() {
+        val since = System.currentTimeMillis() - (24 * 60 * 60 * 1000L) // Last 24 hours
         viewModelScope.launch {
-            transactionDao.observeQueueTransactions().collectLatest { items ->
+            transactionDao.observeQueueTransactions(since).collectLatest { items ->
                 transactions = items
                 rebuildRows()
             }

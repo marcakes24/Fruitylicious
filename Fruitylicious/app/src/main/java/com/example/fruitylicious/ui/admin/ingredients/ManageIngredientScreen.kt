@@ -40,6 +40,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
@@ -175,7 +177,7 @@ fun ManageIngredientsScreen(
                         )
                     }
 
-                    SearchBar(
+                    IngredientSearchBar(
                         value = searchQuery,
                         onValueChange = { searchQuery = it }
                     )
@@ -271,44 +273,43 @@ fun ManageIngredientsScreen(
 }
 
 @Composable
-private fun SearchBar(
+private fun IngredientSearchBar(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(30.dp))
-            .background(Color.White)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 2.dp
     ) {
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(20.dp)
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = TextStyle(fontSize = 14.sp, color = MiTextMain),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (value.isEmpty()) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
                     Text(
                         text = "Search ingredient",
                         color = Color.LightGray,
                         fontSize = 14.sp
                     )
-                }
-                inner()
-            },
-            singleLine = true
-        )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color.LightGray
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = Color(0xFFEEEEEE),
+                    focusedBorderColor = MiGreen
+                ),
+                singleLine = true
+            )
+        }
     }
 }
 
@@ -359,16 +360,16 @@ private fun IngredientRow(
             )
 
             Text(
-                text = buildString {
-                    append(ingredient.unitType)
-                    append(" | Low stock: ")
-                    append(ingredient.lowStockThreshold)
-                    if (ingredient.isPackaging) {
-                        append(" | Packaging")
-                    }
-                },
+                text = if (ingredient.isPackaging) "${ingredient.unitType} | Packaging" else ingredient.unitType,
                 fontSize = 12.sp,
                 color = MiTextSub
+            )
+
+            Text(
+                text = "Low stock: ${ingredient.lowStockThreshold}",
+                fontSize = 12.sp,
+                color = MiGreen,
+                fontWeight = FontWeight.SemiBold
             )
         }
 
