@@ -2,10 +2,15 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.StaffLogDao
+import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
+import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -15,7 +20,10 @@ import javax.inject.Singleton
 class StaffLogRepository @Inject constructor(
     private val database: PosDatabase,
     private val staffLogDao: StaffLogDao,
-    private val auditLogDao: AuditLogDao
+    private val userDao: UserDao,
+    private val branchDao: BranchDao,
+    private val auditLogDao: AuditLogDao,
+    private val sessionManager: SessionManager
 ) {
 
     fun observeStaffLogs(branchId: Int): Flow<List<StaffLogEntity>> {
@@ -57,6 +65,41 @@ class StaffLogRepository @Inject constructor(
         val logId = UUID.randomUUID().toString()
 
         database.withTransaction {
+            // Ensure user exists for foreign key constraint
+            val existingUser = userDao.getUserById(userId)
+            if (existingUser == null) {
+                userDao.upsertUser(
+                    UserEntity(
+                        userId = userId,
+                        name = sessionManager.getUserName(),
+                        role = sessionManager.getRole() ?: "STAFF",
+                        username = sessionManager.getUsername(),
+                        password = "",
+                        lastModified = now,
+                        isSynced = true,
+                        syncedAt = now
+                    )
+                )
+            }
+
+            // Ensure branch exists for foreign key constraint
+            val branches = branchDao.getAllBranches()
+            if (branches.none { it.branchId == branchId }) {
+                branchDao.upsertBranches(
+                    listOf(
+                        BranchEntity(
+                            branchId = branchId,
+                            branchName = "Branch $branchId",
+                            address = "",
+                            contactNumber = "",
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                )
+            }
+
             staffLogDao.upsertStaffLog(
                 StaffLogEntity(
                     logId = logId,

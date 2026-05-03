@@ -2,28 +2,24 @@ package com.example.fruitylicious.ui.shared.inventory
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
-import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryAdjustmentDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
-import com.example.fruitylicious.data.local.db.PosDatabase
-import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryAdjustmentEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
+import com.example.fruitylicious.data.repository.AdjustmentRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
-import javax.inject.Inject
-import kotlin.math.abs
 
 data class AdjustmentIngredientRow(
     val ingredientId: Int,
@@ -53,11 +49,10 @@ data class InventoryAdjustmentUiState(
 
 @HiltViewModel
 class InventoryAdjustmentViewModel @Inject constructor(
-    private val database: PosDatabase,
+    private val adjustmentRepository: AdjustmentRepository,
     private val inventoryDao: InventoryDao,
     private val ingredientDao: IngredientDao,
     private val adjustmentDao: InventoryAdjustmentDao,
-    private val auditLogDao: AuditLogDao,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig
 ) : ViewModel() {
@@ -165,7 +160,6 @@ class InventoryAdjustmentViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
             val userId = sessionManager.getUserId()
             val branchId = ingredient.branchId.takeIf { it > 0 } ?: branchConfig.branchId
 
@@ -175,58 +169,28 @@ class InventoryAdjustmentViewModel @Inject constructor(
                 -quantity
             }
 
-            database.withTransaction {
-                if (type == "Add") {
-                    inventoryDao.addStock(
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        amount = quantity,
-                        lastModified = now
-                    )
-                } else {
-                    inventoryDao.deductStock(
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        amount = quantity,
-                        lastModified = now
+            val result = adjustmentRepository.adjustInventory(
+                ingredientId = ingredient.ingredientId,
+                branchId = branchId,
+                userId = userId,
+                adjustmentAmount = signedAdjustmentAmount,
+                reason = reason.ifBlank { "Inventory adjustment" }
+            )
+
+            if (result.isSuccess) {
+                _uiState.update {
+                    it.copy(
+                        successMessage = "Adjustment saved.",
+                        error = null
                     )
                 }
-
-                adjustmentDao.upsertAdjustment(
-                    InventoryAdjustmentEntity(
-                        adjustmentId = UUID.randomUUID().toString(),
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        userId = userId,
-                        adjustmentAmount = signedAdjustmentAmount,
-                        reason = reason.ifBlank { "Inventory adjustment" },
-                        dateTime = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
+            } else {
+                _uiState.update {
+                    it.copy(
+                        error = result.exceptionOrNull()?.message ?: "Failed to save adjustment.",
+                        successMessage = null
                     )
-                )
-
-                auditLogDao.upsertAuditLog(
-                    AuditLogEntity(
-                        logId = UUID.randomUUID().toString(),
-                        userId = userId,
-                        branchId = branchId,
-                        action = "$type stock adjustment for ${ingredient.ingredientName}: $quantity ${ingredient.unitType}.",
-                        tableAffected = "inventory_adjustments",
-                        timestamp = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    successMessage = "Adjustment saved.",
-                    error = null
-                )
+                }
             }
         }
     }

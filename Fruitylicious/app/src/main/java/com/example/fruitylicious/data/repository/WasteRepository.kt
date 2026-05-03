@@ -2,11 +2,18 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
+import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
+import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.data.local.entity.IngredientEntity
+import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
+import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -17,7 +24,11 @@ class WasteRepository @Inject constructor(
     private val database: PosDatabase,
     private val wasteLogDao: WasteLogDao,
     private val inventoryDao: InventoryDao,
-    private val auditLogDao: AuditLogDao
+    private val auditLogDao: AuditLogDao,
+    private val userDao: UserDao,
+    private val branchDao: BranchDao,
+    private val ingredientDao: IngredientDao,
+    private val sessionManager: SessionManager
 ) {
 
     fun observeWasteLogs(branchId: Int): Flow<List<WasteLogEntity>> {
@@ -33,7 +44,7 @@ class WasteRepository @Inject constructor(
         branchId: Int,
         userId: Int,
         quantity: Double,
-        image: String?,
+        image: String,
         reason: String
     ): Result<Unit> {
         if (ingredientId <= 0) {
@@ -44,60 +55,124 @@ class WasteRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Quantity must be greater than zero."))
         }
 
-        if (reason.trim().isBlank()) {
-            return Result.failure(IllegalArgumentException("Reason is required."))
+        if (image.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Image is required."))
         }
 
-        val inventory = inventoryDao.getInventoryItem(ingredientId, branchId)
-            ?: return Result.failure(IllegalStateException("Inventory item not found."))
-
-        if (inventory.currentStock < quantity) {
-            return Result.failure(IllegalStateException("Insufficient stock."))
+        if (reason.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Reason is required."))
         }
 
         val now = System.currentTimeMillis()
         val wasteId = UUID.randomUUID().toString()
 
-        database.withTransaction {
-            wasteLogDao.upsertWasteLog(
-                WasteLogEntity(
-                    wasteId = wasteId,
+        try {
+            database.withTransaction {
+                // 1. Ensure User exists
+                val existingUser = userDao.getUserById(userId)
+                if (existingUser == null) {
+                    userDao.upsertUser(
+                        UserEntity(
+                            userId = userId,
+                            name = sessionManager.getUserName(),
+                            role = sessionManager.getRole() ?: "STAFF",
+                            username = sessionManager.getUsername(),
+                            password = "",
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
+
+                // 2. Ensure Branch exists
+                val branches = branchDao.getAllBranches()
+                if (branches.none { it.branchId == branchId }) {
+                    branchDao.upsertBranches(
+                        listOf(
+                            BranchEntity(
+                                branchId = branchId,
+                                branchName = "Branch $branchId",
+                                address = "",
+                                contactNumber = "",
+                                lastModified = now,
+                                isSynced = true,
+                                syncedAt = now
+                            )
+                        )
+                    )
+                }
+
+                // 3. Ensure Ingredient exists
+                val existingIngredient = ingredientDao.getIngredientById(ingredientId)
+                if (existingIngredient == null) {
+                    ingredientDao.upsertIngredient(
+                        IngredientEntity(
+                            ingredientId = ingredientId,
+                            image = null,
+                            ingredientName = "Ingredient $ingredientId",
+                            unitType = "unit",
+                            estimatedWeightPerUnit = 1.0,
+                            isPackaging = false,
+                            lowStockThreshold = 0.0,
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
+
+                val existingInventory = inventoryDao.getInventoryItem(ingredientId, branchId)
+                val currentStock = existingInventory?.currentStock ?: 0.0
+
+                if (currentStock < quantity) {
+                    throw IllegalStateException("Insufficient stock.")
+                }
+
+                // 4. Update Inventory
+                inventoryDao.deductStock(
                     ingredientId = ingredientId,
                     branchId = branchId,
-                    userId = userId,
-                    quantity = quantity,
-                    image = image?.trim()?.ifBlank { null },
-                    reason = reason.trim(),
-                    dateTime = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
+                    amount = quantity,
+                    lastModified = now
                 )
-            )
 
-            inventoryDao.deductStock(
-                ingredientId = ingredientId,
-                branchId = branchId,
-                amount = quantity,
-                lastModified = now
-            )
-
-            auditLogDao.upsertAuditLog(
-                AuditLogEntity(
-                    logId = UUID.randomUUID().toString(),
-                    userId = userId,
-                    branchId = branchId,
-                    action = "Logged waste $wasteId for ingredient $ingredientId with quantity $quantity.",
-                    tableAffected = "waste_logs",
-                    timestamp = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
+                // 5. Insert Waste Log
+                wasteLogDao.upsertWasteLog(
+                    WasteLogEntity(
+                        wasteId = wasteId,
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        userId = userId,
+                        quantity = quantity,
+                        image = image,
+                        reason = reason.trim(),
+                        dateTime = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
                 )
-            )
+
+                // 6. Audit Log
+                auditLogDao.upsertAuditLog(
+                    AuditLogEntity(
+                        logId = UUID.randomUUID().toString(),
+                        userId = userId,
+                        branchId = branchId,
+                        action = "Logged waste for ingredient $ingredientId: quantity $quantity. Reason: ${reason.trim()}.",
+                        tableAffected = "waste_logs",
+                        timestamp = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                )
+            }
+            return Result.success(Unit)
+        } catch (e: Exception) {
+            return Result.failure(e)
         }
-
-        return Result.success(Unit)
     }
 
     suspend fun getUnsyncedWasteLogs(): List<WasteLogEntity> {

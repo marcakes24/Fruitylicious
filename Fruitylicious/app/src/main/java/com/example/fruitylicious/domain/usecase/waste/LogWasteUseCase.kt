@@ -12,7 +12,7 @@ class LogWasteUseCase @Inject constructor(
         branchId: Int,
         userId: Int,
         quantity: Double,
-        image: String?,
+        image: String,
         reason: String
     ): Result<Unit> {
         return wasteRepository.logWaste(

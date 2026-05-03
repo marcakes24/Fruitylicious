@@ -2,17 +2,22 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
+import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.TransactionEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
+import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -48,6 +53,9 @@ class TransactionRepository @Inject constructor(
     private val inventoryDao: InventoryDao,
     private val auditLogDao: AuditLogDao,
     private val ingredientDao: IngredientDao,
+    private val userDao: UserDao,
+    private val branchDao: BranchDao,
+    private val sessionManager: SessionManager
 ) {
 
     fun observeTransactions(branchId: Int): Flow<List<TransactionEntity>> {
@@ -186,6 +194,41 @@ class TransactionRepository @Inject constructor(
             }
 
             database.withTransaction {
+                // Ensure User exists for foreign key constraint
+                val existingUser = userDao.getUserById(userId)
+                if (existingUser == null) {
+                    userDao.upsertUser(
+                        UserEntity(
+                            userId = userId,
+                            name = sessionManager.getUserName(),
+                            role = sessionManager.getRole() ?: "STAFF",
+                            username = sessionManager.getUsername(),
+                            password = "",
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
+
+                // Ensure Branch exists for foreign key constraint
+                val branches = branchDao.getAllBranches()
+                if (branches.none { it.branchId == branchId }) {
+                    branchDao.upsertBranches(
+                        listOf(
+                            BranchEntity(
+                                branchId = branchId,
+                                branchName = "Branch $branchId",
+                                address = "",
+                                contactNumber = "",
+                                lastModified = now,
+                                isSynced = true,
+                                syncedAt = now
+                            )
+                        )
+                    )
+                }
+
                 transactionDao.upsertTransaction(
                     TransactionEntity(
                         transactionId = transactionId,

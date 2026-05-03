@@ -4,14 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.dao.UserDao
-import com.example.fruitylicious.data.local.entity.StaffLogEntity
+import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +37,7 @@ data class TimeLogUiState(
 
 @HiltViewModel
 class TimeLogViewModel @Inject constructor(
+    private val staffLogRepository: StaffLogRepository,
     private val staffLogDao: StaffLogDao,
     private val userDao: UserDao,
     private val sessionManager: SessionManager,
@@ -118,42 +118,28 @@ class TimeLogViewModel @Inject constructor(
         imagePath: String?
     ) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-
-            staffLogDao.upsertStaffLog(
-                StaffLogEntity(
-                    logId = UUID.randomUUID().toString(),
-                    userId = userId,
-                    branchId = branchId,
-                    clockIn = now,
-                    clockOut = null,
-                    image = imagePath,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
+            val result = staffLogRepository.clockIn(
+                userId = userId,
+                branchId = branchId,
+                image = imagePath
             )
+
+            result.onFailure { e ->
+                _uiState.update { it.copy(error = e.message ?: "Failed to clock in") }
+            }
         }
     }
 
     fun clockOut() {
         viewModelScope.launch {
-            val activeLogId = _uiState.value.activeLogId
-
-            if (activeLogId.isNullOrBlank()) {
-                _uiState.update {
-                    it.copy(error = "No active clock-in record found.")
-                }
-                return@launch
-            }
-
-            val now = System.currentTimeMillis()
-
-            staffLogDao.clockOut(
-                logId = activeLogId,
-                clockOut = now,
-                lastModified = now
+            val result = staffLogRepository.clockOut(
+                userId = userId,
+                branchId = branchId
             )
+
+            result.onFailure { e ->
+                _uiState.update { it.copy(error = e.message ?: "Failed to clock out") }
+            }
         }
     }
 

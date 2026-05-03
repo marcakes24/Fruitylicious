@@ -63,6 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -195,9 +197,7 @@ fun RestockScreen(
                 isOnline = uiState.isOnline,
                 localBranchId = uiState.localBranchId,
                 onBranchSelect = { branchId ->
-                    if (!uiState.isSubmitting) {
-                        viewModel.selectBranch(branchId)
-                    }
+                    viewModel.selectBranch(branchId)
                 },
                 onMenuClick = {
                     scope.launch {
@@ -223,16 +223,13 @@ fun RestockScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    val canOpenEntry = uiState.isClockedIn && !uiState.isSubmitting
-
                     Button(
                         onClick = {
-                            if (canOpenEntry) {
-                                showRestockEntry = true
+                            if (uiState.isClockedIn) {
                                 viewModel.clearMessages()
+                                showRestockEntry = true
                             }
                         },
-                        enabled = !uiState.isSubmitting,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
@@ -243,8 +240,7 @@ fun RestockScreen(
                                 RsGreen
                             } else {
                                 Color.LightGray
-                            },
-                            disabledContainerColor = Color.LightGray
+                            }
                         )
                     ) {
                         Icon(
@@ -260,10 +256,10 @@ fun RestockScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = when {
-                                uiState.isSubmitting -> "Saving..."
-                                uiState.isClockedIn -> "Restock Entry"
-                                else -> "Clock in required"
+                            text = if (uiState.isClockedIn) {
+                                "Restock Entry"
+                            } else {
+                                "Clock in required"
                             },
                             color = Color.White,
                             fontSize = 16.sp,
@@ -317,11 +313,8 @@ fun RestockScreen(
     if (showRestockEntry) {
         RestockEntryDialog(
             ingredients = uiState.ingredients,
-            isSubmitting = uiState.isSubmitting,
             onDismiss = {
-                if (!uiState.isSubmitting) {
-                    showRestockEntry = false
-                }
+                showRestockEntry = false
             },
             onSubmit = { ingredient, quantity, supplier ->
                 viewModel.submitRestock(
@@ -665,7 +658,6 @@ private fun RestockRecordRow(entry: RestockHistoryRow) {
 @Composable
 private fun RestockEntryDialog(
     ingredients: List<RestockIngredientRow>,
-    isSubmitting: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (RestockIngredientRow, String, String) -> Unit
 ) {
@@ -673,7 +665,9 @@ private fun RestockEntryDialog(
     var quantity by remember { mutableStateOf("") }
     var supplier by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var dropdownWidth by remember { mutableStateOf(0.dp) }
 
+    val density = LocalDensity.current
     val isFormValid = selectedIngredient != null && quantity.isNotBlank()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -709,10 +703,7 @@ private fun RestockEntryDialog(
                         )
                     }
 
-                    IconButton(
-                        onClick = onDismiss,
-                        enabled = !isSubmitting
-                    ) {
+                    IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
@@ -737,8 +728,11 @@ private fun RestockEntryDialog(
                         value = selectedIngredient?.ingredientName ?: "",
                         onValueChange = {},
                         readOnly = true,
-                        enabled = !isSubmitting,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                dropdownWidth = with(density) { coordinates.size.width.toDp() }
+                            },
                         placeholder = {
                             Text(
                                 text = "Choose an ingredient",
@@ -758,15 +752,13 @@ private fun RestockEntryDialog(
                         )
                     )
 
-                    if (!isSubmitting) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clickable {
-                                    dropdownExpanded = true
-                                }
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable {
+                                dropdownExpanded = true
+                            }
+                    )
 
                     DropdownMenu(
                         expanded = dropdownExpanded,
@@ -774,7 +766,7 @@ private fun RestockEntryDialog(
                             dropdownExpanded = false
                         },
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
+                            .width(dropdownWidth)
                             .background(Color.White)
                             .heightIn(max = 400.dp)
                     ) {
@@ -821,11 +813,10 @@ private fun RestockEntryDialog(
                 OutlinedTextField(
                     value = quantity,
                     onValueChange = {
-                        if (!isSubmitting && it.all { char -> char.isDigit() || char == '.' }) {
+                        if (it.all { char -> char.isDigit() || char == '.' }) {
                             quantity = it
                         }
                     },
-                    enabled = !isSubmitting,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
@@ -855,11 +846,8 @@ private fun RestockEntryDialog(
                 OutlinedTextField(
                     value = supplier,
                     onValueChange = {
-                        if (!isSubmitting) {
-                            supplier = it
-                        }
+                        supplier = it
                     },
-                    enabled = !isSubmitting,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
                         Text(
@@ -881,15 +869,19 @@ private fun RestockEntryDialog(
                     onClick = {
                         val ingredient = selectedIngredient
 
-                        if (ingredient != null && !isSubmitting) {
-                            onSubmit(ingredient, quantity, supplier)
+                        if (ingredient != null) {
+                            onSubmit(
+                                ingredient,
+                                quantity,
+                                supplier
+                            )
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
                         .shadow(2.dp, RoundedCornerShape(12.dp)),
-                    enabled = isFormValid && !isSubmitting,
+                    enabled = isFormValid,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RsGreen,
@@ -899,7 +891,7 @@ private fun RestockEntryDialog(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = if (isFormValid && !isSubmitting) {
+                        tint = if (isFormValid) {
                             Color.White
                         } else {
                             Color(0xFF94A3B8)
@@ -909,12 +901,8 @@ private fun RestockEntryDialog(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = if (isSubmitting) {
-                            "Saving..."
-                        } else {
-                            "Add Stock"
-                        },
-                        color = if (isFormValid && !isSubmitting) {
+                        text = "Add Stock",
+                        color = if (isFormValid) {
                             Color.White
                         } else {
                             Color(0xFF94A3B8)

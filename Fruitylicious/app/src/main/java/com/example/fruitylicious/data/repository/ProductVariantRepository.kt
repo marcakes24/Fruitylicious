@@ -1,6 +1,9 @@
 package com.example.fruitylicious.data.repository
 
+import androidx.room.withTransaction
+import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.ProductVariantDao
+import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -9,7 +12,9 @@ import kotlin.math.absoluteValue
 
 @Singleton
 class ProductVariantRepository @Inject constructor(
-    private val productVariantDao: ProductVariantDao
+    private val database: PosDatabase,
+    private val productVariantDao: ProductVariantDao,
+    private val productRecipeDao: ProductRecipeDao
 ) {
 
     fun observeAllVariants(): Flow<List<ProductVariantEntity>> {
@@ -66,12 +71,17 @@ class ProductVariantRepository @Inject constructor(
     }
 
     suspend fun deleteVariant(variantId: Int): Result<Unit> {
-        productVariantDao.deleteVariant(variantId)
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            productVariantDao.softDeleteVariant(variantId, now)
+            productRecipeDao.softDeleteRecipesByVariant(variantId, now)
+        }
         return Result.success(Unit)
     }
 
     suspend fun deleteVariantsForProduct(productId: Int): Result<Unit> {
-        productVariantDao.deleteVariantsForProduct(productId)
+        val now = System.currentTimeMillis()
+        productVariantDao.softDeleteVariantsByProduct(productId, now)
         return Result.success(Unit)
     }
 

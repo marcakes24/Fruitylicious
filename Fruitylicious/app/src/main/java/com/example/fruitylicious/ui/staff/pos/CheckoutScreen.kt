@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CreditCard
@@ -64,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fruitylicious.R
 import com.example.fruitylicious.STAFF_POS
+import com.example.fruitylicious.STAFF_QUEUE
 import com.example.fruitylicious.data.repository.CartItem
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -198,6 +201,9 @@ fun CheckoutScreen(
                             completedAt = uiState.completedAt,
                             onNewOrder = {
                                 onNavigate(STAFF_POS)
+                            },
+                            onViewQueue = {
+                                onNavigate(STAFF_QUEUE)
                             }
                         )
                     }
@@ -689,7 +695,8 @@ fun PaymentSuccessView(
     paymentMethod: String,
     transactionId: String,
     completedAt: Long,
-    onNewOrder: () -> Unit
+    onNewOrder: () -> Unit,
+    onViewQueue: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -845,27 +852,58 @@ fun PaymentSuccessView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = onNewOrder,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = GreenHeader),
-            shape = RoundedCornerShape(12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            Button(
+                onClick = onNewOrder,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenHeader),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-            Text(
-                text = "New Order",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
+                Text(
+                    text = "New Order",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+
+            Button(
+                onClick = onViewQueue,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, GreenHeader),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                    contentDescription = null,
+                    tint = GreenHeader,
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Order Queue",
+                    color = GreenHeader,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
         }
     }
 }
@@ -926,7 +964,7 @@ fun PaymentMethodButton(
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         color = if (isSelected) RptGreenLight else Color.White,
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             width = if (isSelected) 1.5.dp else 1.dp,
             color = if (isSelected) GreenHeader else Color(0xFFEEEEEE)
         )
@@ -970,7 +1008,7 @@ fun AmountPresetButton(
             .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = if (isExact) RptGreenLight else Color.White,
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             width = 1.dp,
             color = if (isExact) GreenHeader else Color(0xFFEEEEEE)
         )

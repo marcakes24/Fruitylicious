@@ -52,7 +52,7 @@ import com.example.fruitylicious.data.local.entity.ProductVariantEntity
         AuditLogEntity::class,
         StaffLogEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = true
 )
 abstract class PosDatabase : RoomDatabase() {

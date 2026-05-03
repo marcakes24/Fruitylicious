@@ -59,6 +59,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -397,7 +399,9 @@ private fun IngredientEditDialog(
     var imagePath by remember { mutableStateOf(ingredient?.image) }
     var packagingChecked by remember { mutableStateOf(ingredient?.isPackaging ?: false) }
     var unitDropdownExpanded by remember { mutableStateOf(false) }
+    var dropdownWidth by remember { mutableStateOf(0.dp) }
 
+    val density = LocalDensity.current
     val context = LocalContext.current
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -458,6 +462,9 @@ private fun IngredientEditDialog(
                                     color = if (unitDropdownExpanded) MiGreen else Color.Transparent,
                                     shape = RoundedCornerShape(8.dp)
                                 )
+                                .onGloballyPositioned { coordinates ->
+                                    dropdownWidth = with(density) { coordinates.size.width.toDp() }
+                                }
                                 .clickable { unitDropdownExpanded = !unitDropdownExpanded }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -480,7 +487,7 @@ private fun IngredientEditDialog(
                             expanded = unitDropdownExpanded,
                             onDismissRequest = { unitDropdownExpanded = false },
                             modifier = Modifier
-                                .fillMaxWidth(0.85f)
+                                .width(dropdownWidth)
                                 .background(Color.White)
                         ) {
                             units.forEach { unit ->

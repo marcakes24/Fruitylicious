@@ -3,14 +3,10 @@ package com.example.fruitylicious.ui.shared.waste
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
-import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
-import com.example.fruitylicious.data.local.db.PosDatabase
-import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
@@ -18,13 +14,13 @@ import com.example.fruitylicious.data.local.entity.WasteLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.data.repository.SyncRepository
+import com.example.fruitylicious.data.repository.WasteRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.ImageStorage
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,11 +67,10 @@ data class WasteManagementUiState(
 @HiltViewModel
 class WasteManagementViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: PosDatabase,
+    private val wasteRepository: WasteRepository,
     private val inventoryDao: InventoryDao,
     private val ingredientDao: IngredientDao,
     private val wasteLogDao: WasteLogDao,
-    private val auditLogDao: AuditLogDao,
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val staffLogRepository: StaffLogRepository,
@@ -448,7 +443,7 @@ class WasteManagementViewModel @Inject constructor(
         ingredient: WasteIngredientRow?,
         quantityText: String,
         reason: String,
-        imagePath: String?
+        imagePath: String
     ) {
         if (!_uiState.value.isClockedIn) {
             setError("You must be clocked in to perform this action.")
@@ -478,59 +473,37 @@ class WasteManagementViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
             val userId = sessionManager.getUserId()
             val branchId = localBranchId
 
-            database.withTransaction {
-                inventoryDao.deductStock(
-                    ingredientId = ingredient.ingredientId,
-                    branchId = branchId,
-                    amount = quantity,
-                    lastModified = now
-                )
+            val result = wasteRepository.logWaste(
+                ingredientId = ingredient.ingredientId,
+                branchId = branchId,
+                userId = userId,
+                quantity = quantity,
+                image = imagePath,
+                reason = reason.ifBlank { "Waste entry" }
+            )
 
-                wasteLogDao.upsertWasteLog(
-                    WasteLogEntity(
-                        wasteId = UUID.randomUUID().toString(),
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId,
-                        userId = userId,
-                        quantity = quantity,
-                        reason = reason.ifBlank { "Waste entry" },
-                        image = imagePath,
-                        dateTime = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
+            if (result.isSuccess) {
+                _uiState.update {
+                    it.copy(
+                        successMessage = "Waste entry saved.",
+                        error = null
                     )
-                )
+                }
 
-                auditLogDao.upsertAuditLog(
-                    AuditLogEntity(
-                        logId = UUID.randomUUID().toString(),
-                        userId = userId,
-                        branchId = branchId,
-                        action = "Recorded waste for ${ingredient.ingredientName}: $quantity ${ingredient.unitType}.",
-                        tableAffected = "waste_logs",
-                        timestamp = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    successMessage = "Waste entry saved.",
-                    error = null
-                )
-            }
-
-            if (_uiState.value.isOnline) {
-                syncRepository.pushUnsynced()
+                if (_uiState.value.isOnline) {
+                    syncRepository.pushUnsynced()
+                }
                 loadHistory()
+            } else {
+                _uiState.update {
+                    it.copy(
+                        error = result.exceptionOrNull()?.message ?: "Failed to save waste entry.",
+                        successMessage = null
+                    )
+                }
             }
         }
     }

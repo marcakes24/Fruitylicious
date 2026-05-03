@@ -66,6 +66,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,6 +78,7 @@ import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.DateTimeUtil
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -112,6 +115,7 @@ fun WasteManagementScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
+    var expandedImageFile by remember { mutableStateOf<File?>(null) }
 
     val datePickerState = rememberDatePickerState()
 
@@ -301,8 +305,47 @@ fun WasteManagementScreen(
 
                 item {
                     WasteHistoryCard(
-                        items = filteredHistory
+                        items = filteredHistory,
+                        onImageClick = { file -> expandedImageFile = file }
                     )
+                }
+            }
+        }
+    }
+
+    if (expandedImageFile != null) {
+        Dialog(onDismissRequest = { expandedImageFile = null }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Black
+            ) {
+                Box(contentAlignment = Alignment.TopEnd) {
+                    AsyncImage(
+                        model = expandedImageFile,
+                        contentDescription = "Expanded waste image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 600.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                    )
+                    
+                    IconButton(
+                        onClick = { expandedImageFile = null },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.background(
+                                Color.Black.copy(alpha = 0.4f),
+                                RoundedCornerShape(20.dp)
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -519,7 +562,8 @@ private fun FilterCard(
 
 @Composable
 private fun WasteHistoryCard(
-    items: List<WasteHistoryRow>
+    items: List<WasteHistoryRow>,
+    onImageClick: (File) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -574,7 +618,10 @@ private fun WasteHistoryCard(
             } else {
                 items.forEachIndexed { index, entry ->
                     key(entry.wasteId) {
-                        WasteRecordRow(entry)
+                        WasteRecordRow(
+                            entry = entry,
+                            onImageClick = onImageClick
+                        )
 
                         if (index < items.size - 1) {
                             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
@@ -588,7 +635,8 @@ private fun WasteHistoryCard(
 
 @Composable
 private fun WasteRecordRow(
-    entry: WasteHistoryRow
+    entry: WasteHistoryRow,
+    onImageClick: (File) -> Unit
 ) {
     val context = LocalContext.current
     val imageFile = entry.imagePath?.let {
@@ -602,7 +650,11 @@ private fun WasteRecordRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            modifier = Modifier.size(52.dp),
+            modifier = Modifier
+                .size(52.dp)
+                .clickable(enabled = imageFile != null && imageFile.exists()) {
+                    imageFile?.let { onImageClick(it) }
+                },
             shape = RoundedCornerShape(10.dp),
             color = Color(0xFFF8FAFC)
         ) {
@@ -683,13 +735,15 @@ private fun WasteRecordRow(
 private fun WasteEntryDialog(
     ingredients: List<WasteIngredientRow>,
     onDismiss: () -> Unit,
-    onSubmit: (WasteIngredientRow, String, String, String?) -> Unit
+    onSubmit: (WasteIngredientRow, String, String, String) -> Unit
 ) {
     var selectedIngredient by remember { mutableStateOf<WasteIngredientRow?>(null) }
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var dropdownWidth by remember { mutableStateOf(0.dp) }
     val context = LocalContext.current
+    val density = LocalDensity.current
 
     var selectedImageUri by remember {
         mutableStateOf<Uri?>(null)
@@ -701,7 +755,13 @@ private fun WasteEntryDialog(
         selectedImageUri = uri
     }
 
-    val isFormValid by remember { derivedStateOf { selectedIngredient != null && quantity.isNotBlank() } }
+    val isFormValid by remember { 
+        derivedStateOf { 
+            selectedIngredient != null && 
+            quantity.isNotBlank() && 
+            selectedImageUri != null 
+        } 
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -761,7 +821,11 @@ private fun WasteEntryDialog(
                         value = selectedIngredient?.ingredientName ?: "",
                         onValueChange = {},
                         readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                dropdownWidth = with(density) { coordinates.size.width.toDp() }
+                            },
                         placeholder = {
                             Text(
                                 text = "Choose an ingredient",
@@ -795,7 +859,7 @@ private fun WasteEntryDialog(
                             dropdownExpanded = false
                         },
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
+                            .width(dropdownWidth)
                             .background(Color.White)
                             .heightIn(max = 400.dp)
                     ) {
@@ -950,15 +1014,14 @@ private fun WasteEntryDialog(
                 Button(
                     onClick = {
                         val ingredient = selectedIngredient
+                        val imageUri = selectedImageUri
 
-                        if (ingredient != null) {
-                            val imagePath = selectedImageUri?.let { uri ->
-                                ImageStorage.saveImageFromUri(
-                                    context = context,
-                                    sourceUri = uri,
-                                    folder = "waste"
-                                )
-                            }
+                        if (ingredient != null && imageUri != null) {
+                            val imagePath = ImageStorage.saveImageFromUri(
+                                context = context,
+                                sourceUri = imageUri,
+                                folder = "waste"
+                            )
 
                             onSubmit(
                                 ingredient,

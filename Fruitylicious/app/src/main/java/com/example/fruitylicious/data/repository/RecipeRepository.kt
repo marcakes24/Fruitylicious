@@ -81,17 +81,20 @@ class RecipeRepository @Inject constructor(
     }
 
     suspend fun deleteRecipe(recipeId: Int): Result<Unit> {
-        productRecipeDao.deleteRecipe(recipeId)
+        val now = System.currentTimeMillis()
+        productRecipeDao.softDeleteRecipe(recipeId, now)
         return Result.success(Unit)
     }
 
     suspend fun deleteRecipesForProduct(productId: Int): Result<Unit> {
-        productRecipeDao.deleteRecipesForProduct(productId)
+        val now = System.currentTimeMillis()
+        productRecipeDao.softDeleteRecipesByProduct(productId, now)
         return Result.success(Unit)
     }
 
     suspend fun deleteRecipesForVariant(variantId: Int): Result<Unit> {
-        productRecipeDao.deleteRecipesForVariant(variantId)
+        val now = System.currentTimeMillis()
+        productRecipeDao.softDeleteRecipesByVariant(variantId, now)
         return Result.success(Unit)
     }
 

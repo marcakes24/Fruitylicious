@@ -2,11 +2,18 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
+import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryAdjustmentDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
+import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryAdjustmentEntity
+import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -17,7 +24,11 @@ class AdjustmentRepository @Inject constructor(
     private val database: PosDatabase,
     private val inventoryAdjustmentDao: InventoryAdjustmentDao,
     private val inventoryDao: InventoryDao,
-    private val auditLogDao: AuditLogDao
+    private val auditLogDao: AuditLogDao,
+    private val userDao: UserDao,
+    private val branchDao: BranchDao,
+    private val ingredientDao: IngredientDao,
+    private val sessionManager: SessionManager
 ) {
 
     fun observeAdjustments(branchId: Int): Flow<List<InventoryAdjustmentEntity>> {
@@ -51,57 +62,129 @@ class AdjustmentRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Reason is required."))
         }
 
-        val inventory = inventoryDao.getInventoryItem(ingredientId, branchId)
-            ?: return Result.failure(IllegalStateException("Inventory item not found."))
-
-        val newStock = inventory.currentStock + adjustmentAmount
-
-        if (newStock < 0.0) {
-            return Result.failure(IllegalStateException("Adjustment would result in negative stock."))
-        }
-
         val now = System.currentTimeMillis()
         val adjustmentId = UUID.randomUUID().toString()
 
-        database.withTransaction {
-            inventoryAdjustmentDao.upsertAdjustment(
-                InventoryAdjustmentEntity(
-                    adjustmentId = adjustmentId,
-                    ingredientId = ingredientId,
-                    branchId = branchId,
-                    userId = userId,
-                    adjustmentAmount = adjustmentAmount,
-                    reason = reason.trim(),
-                    dateTime = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
-            )
+        try {
+            database.withTransaction {
+                // 1. Ensure User exists
+                val existingUser = userDao.getUserById(userId)
+                if (existingUser == null) {
+                    userDao.upsertUser(
+                        UserEntity(
+                            userId = userId,
+                            name = sessionManager.getUserName(),
+                            role = sessionManager.getRole() ?: "STAFF",
+                            username = sessionManager.getUsername(),
+                            password = "",
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
 
-            inventoryDao.setStock(
-                ingredientId = ingredientId,
-                branchId = branchId,
-                currentStock = newStock,
-                lastModified = now
-            )
+                // 2. Ensure Branch exists
+                val branches = branchDao.getAllBranches()
+                if (branches.none { it.branchId == branchId }) {
+                    branchDao.upsertBranches(
+                        listOf(
+                            BranchEntity(
+                                branchId = branchId,
+                                branchName = "Branch $branchId",
+                                address = "",
+                                contactNumber = "",
+                                lastModified = now,
+                                isSynced = true,
+                                syncedAt = now
+                            )
+                        )
+                    )
+                }
 
-            auditLogDao.upsertAuditLog(
-                AuditLogEntity(
-                    logId = UUID.randomUUID().toString(),
-                    userId = userId,
-                    branchId = branchId,
-                    action = "Adjusted ingredient $ingredientId by $adjustmentAmount. Reason: ${reason.trim()}.",
-                    tableAffected = "inventory_adjustments",
-                    timestamp = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
+                // 3. Ensure Ingredient exists
+                val existingIngredient = ingredientDao.getIngredientById(ingredientId)
+                if (existingIngredient == null) {
+                    ingredientDao.upsertIngredient(
+                        IngredientEntity(
+                            ingredientId = ingredientId,
+                            image = null,
+                            ingredientName = "Ingredient $ingredientId",
+                            unitType = "unit",
+                            estimatedWeightPerUnit = 1.0,
+                            isPackaging = false,
+                            lowStockThreshold = 0.0,
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
+
+                val existingInventory = inventoryDao.getInventoryItem(ingredientId, branchId)
+                val currentStock = existingInventory?.currentStock ?: 0.0
+                val newStock = currentStock + adjustmentAmount
+
+                if (newStock < 0.0) {
+                    throw IllegalStateException("Adjustment would result in negative stock.")
+                }
+
+                // 4. Update Inventory
+                if (existingInventory == null) {
+                    inventoryDao.upsertInventoryItem(
+                        com.example.fruitylicious.data.local.entity.InventoryEntity(
+                            ingredientId = ingredientId,
+                            branchId = branchId,
+                            currentStock = newStock,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
+                    )
+                } else {
+                    inventoryDao.setStock(
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        currentStock = newStock,
+                        lastModified = now
+                    )
+                }
+
+                // 5. Insert Adjustment Log
+                inventoryAdjustmentDao.upsertAdjustment(
+                    InventoryAdjustmentEntity(
+                        adjustmentId = adjustmentId,
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        userId = userId,
+                        adjustmentAmount = adjustmentAmount,
+                        reason = reason.trim(),
+                        dateTime = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
                 )
-            )
+
+                // 6. Audit Log
+                auditLogDao.upsertAuditLog(
+                    AuditLogEntity(
+                        logId = UUID.randomUUID().toString(),
+                        userId = userId,
+                        branchId = branchId,
+                        action = "Adjusted ingredient $ingredientId by $adjustmentAmount. Reason: ${reason.trim()}.",
+                        tableAffected = "inventory_adjustments",
+                        timestamp = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                )
+            }
+            return Result.success(Unit)
+        } catch (e: Exception) {
+            return Result.failure(e)
         }
-
-        return Result.success(Unit)
     }
 
     suspend fun getUnsyncedAdjustments(): List<InventoryAdjustmentEntity> {

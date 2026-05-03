@@ -600,7 +600,7 @@ private fun StaffSalesChartSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 46.dp),
+                        .padding(start = 50.dp), // Matched 44.dp (Y-axis) + 6.dp (Spacer)
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     days.forEach { day ->

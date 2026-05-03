@@ -51,6 +51,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -89,6 +91,7 @@ fun InventoryAdjustmentScreen(
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var dropdownWidth by remember { mutableStateOf(0.dp) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -137,7 +140,9 @@ fun InventoryAdjustmentScreen(
                         quantity = quantity,
                         reason = reason,
                         dropdownExpanded = dropdownExpanded,
+                        dropdownWidth = dropdownWidth,
                         onDropdownExpandedChange = { dropdownExpanded = it },
+                        onDropdownWidthChange = { dropdownWidth = it },
                         onIngredientSelected = {
                             selectedIngredient = it
                             dropdownExpanded = false
@@ -240,7 +245,9 @@ private fun NewAdjustmentCard(
     quantity: String,
     reason: String,
     dropdownExpanded: Boolean,
+    dropdownWidth: androidx.compose.ui.unit.Dp,
     onDropdownExpandedChange: (Boolean) -> Unit,
+    onDropdownWidthChange: (androidx.compose.ui.unit.Dp) -> Unit,
     onIngredientSelected: (AdjustmentIngredientRow) -> Unit,
     onTypeSelected: (String) -> Unit,
     onQuantityChange: (String) -> Unit,
@@ -248,6 +255,7 @@ private fun NewAdjustmentCard(
     onSubmit: () -> Unit
 ) {
     val isFormValid = selectedIngredient != null && quantity.isNotBlank()
+    val density = LocalDensity.current
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -276,7 +284,11 @@ private fun NewAdjustmentCard(
                         value = selectedIngredient?.ingredientName ?: "",
                         onValueChange = {},
                         readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                onDropdownWidthChange(with(density) { coordinates.size.width.toDp() })
+                            },
                         placeholder = {
                             Text("Choose an ingredient", color = Color.LightGray)
                         },
@@ -300,7 +312,7 @@ private fun NewAdjustmentCard(
                         expanded = dropdownExpanded,
                         onDismissRequest = { onDropdownExpandedChange(false) },
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
+                            .width(dropdownWidth)
                             .background(Color.White)
                             .heightIn(max = 400.dp)
                     ) {

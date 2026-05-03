@@ -3,6 +3,7 @@ package com.example.fruitylicious.ui.admin.reports
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -334,16 +336,19 @@ private fun Header(
                 text = "SALES SUMMARY",
                 color = Color.White,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
+                fontWeight = FontWeight.Bold
             )
+
+            Spacer(modifier = Modifier.width(16.dp))
 
             if (canAccessCrossBranch) {
                 Row(
                     modifier = Modifier
+                        .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFF5F5F5))
                         .padding(4.dp)
+                        .horizontalScroll(rememberScrollState())
                 ) {
                     // "All" option
                     val isAllSelected = selectedBranchId == null
@@ -412,7 +417,7 @@ private fun WeeklyBarChart(weekData: List<Double>) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(bottom = 28.dp),
+                .padding(bottom = 24.dp), // Space for labels
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End
         ) {
@@ -431,30 +436,40 @@ private fun WeeklyBarChart(weekData: List<Double>) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom
         ) {
             weekData.forEachIndexed { index, value ->
                 Column(
-                    modifier = Modifier.fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .width(28.dp)
-                            .fillMaxHeight((value / maxValue).toFloat().coerceIn(0.05f, 1f))
-                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                            .background(SsRed)
-                    )
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        val fraction = (value / maxValue).toFloat().coerceIn(0.01f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .width(20.dp)
+                                .fillMaxHeight(fraction)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(SsRed)
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = days[index],
                         fontSize = 10.sp,
                         color = SsTextSub,
-                        maxLines = 1
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

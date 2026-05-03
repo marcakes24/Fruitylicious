@@ -61,7 +61,7 @@ import com.example.fruitylicious.STAFF_WASTE_HISTORY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-private val StaffSidebarBg = Color(0xFF2E7D32)
+private val StaffSidebarBg = Color(0xFF2C8C44)
 private val StaffSidebarDarkBg = Color(0xFF1B5E20)
 private val StaffActiveItemBg = Color(0xFF43A047)
 

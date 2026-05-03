@@ -17,6 +17,8 @@ import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.fruitylicious.data.local.dao.ProductVariantDao
 import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import dagger.Module
@@ -35,11 +37,36 @@ object DatabaseModule {
     fun providePosDatabase(
         @ApplicationContext context: Context
     ): PosDatabase {
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add columns to products
+                db.execSQL("ALTER TABLE products ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE products ADD COLUMN deletedAt INTEGER")
+
+                // Add columns to product_variants
+                db.execSQL("ALTER TABLE product_variants ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE product_variants ADD COLUMN deletedAt INTEGER")
+
+                // Add columns to ingredients
+                db.execSQL("ALTER TABLE ingredients ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE ingredients ADD COLUMN deletedAt INTEGER")
+
+                // Add columns to product_recipes
+                db.execSQL("ALTER TABLE product_recipes ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE product_recipes ADD COLUMN deletedAt INTEGER")
+
+                // Add columns to users
+                db.execSQL("ALTER TABLE users ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE users ADD COLUMN deletedAt INTEGER")
+            }
+        }
+
         return Room.databaseBuilder(
             context,
             PosDatabase::class.java,
             "fruitylicious_pos.db"
         )
+            .addMigrations(MIGRATION_5_6)
             .fallbackToDestructiveMigration(false)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -87,7 +114,9 @@ object DatabaseModule {
                         password,
                         lastModified,
                         isSynced,
-                        syncedAt
+                        syncedAt,
+                        isDeleted,
+                        deletedAt
                     ) VALUES (
                         1,
                         'Default Admin',
@@ -96,7 +125,9 @@ object DatabaseModule {
                         'admin123',
                         $now,
                         1,
-                        $now
+                        $now,
+                        0,
+                        NULL
                     )
                     """.trimIndent()
                     )
@@ -111,7 +142,9 @@ object DatabaseModule {
                         password,
                         lastModified,
                         isSynced,
-                        syncedAt
+                        syncedAt,
+                        isDeleted,
+                        deletedAt
                     ) VALUES (
                         2,
                         'Default Staff',
@@ -120,7 +153,9 @@ object DatabaseModule {
                         'staff123',
                         $now,
                         1,
-                        $now
+                        $now,
+                        0,
+                        NULL
                     )
                     """.trimIndent()
                     )

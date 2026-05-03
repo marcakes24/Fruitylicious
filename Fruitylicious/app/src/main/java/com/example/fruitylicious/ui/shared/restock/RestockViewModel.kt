@@ -15,13 +15,13 @@ import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.data.repository.RestockRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,11 +67,10 @@ data class RestockUiState(
 
 @HiltViewModel
 class RestockViewModel @Inject constructor(
-    private val database: PosDatabase,
+    private val restockRepository: RestockRepository,
     private val ingredientDao: IngredientDao,
     private val inventoryDao: InventoryDao,
     private val restockLogDao: RestockLogDao,
-    private val auditLogDao: AuditLogDao,
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val staffLogRepository: StaffLogRepository,
@@ -487,79 +486,38 @@ class RestockViewModel @Inject constructor(
             var shouldSync = false
 
             try {
-                val now = System.currentTimeMillis()
                 val userId = sessionManager.getUserId()
                 val branchId = localBranchId
-                val restockId = UUID.randomUUID().toString()
-                val auditLogId = UUID.randomUUID().toString()
 
-                database.withTransaction {
-                    val existingInventory = inventoryDao.getInventoryItem(
-                        ingredientId = ingredient.ingredientId,
-                        branchId = branchId
-                    )
+                val result = restockRepository.restock(
+                    ingredientId = ingredient.ingredientId,
+                    branchId = branchId,
+                    userId = userId,
+                    quantityAdded = quantity,
+                    supplier = supplier.ifBlank { "N/A" }
+                )
 
-                    if (existingInventory == null) {
-                        inventoryDao.upsertInventoryItem(
-                            InventoryEntity(
-                                ingredientId = ingredient.ingredientId,
-                                branchId = branchId,
-                                currentStock = quantity,
-                                lastModified = now,
-                                isSynced = false,
-                                syncedAt = null
-                            )
-                        )
-                    } else {
-                        inventoryDao.addStock(
-                            ingredientId = ingredient.ingredientId,
-                            branchId = branchId,
-                            amount = quantity,
-                            lastModified = now
+                if (result.isSuccess) {
+                    shouldSync = networkMonitor.isOnline()
+
+                    _uiState.update {
+                        it.copy(
+                            successMessage = "Restock saved.",
+                            error = null
                         )
                     }
 
-                    restockLogDao.upsertRestockLog(
-                        RestockLogEntity(
-                            restockId = restockId,
-                            ingredientId = ingredient.ingredientId,
-                            branchId = branchId,
-                            userId = userId,
-                            quantityAdded = quantity,
-                            supplier = supplier.ifBlank { "N/A" },
-                            dateTime = now,
-                            lastModified = now,
-                            isSynced = false,
-                            syncedAt = null
+                    rebuildIngredientRows()
+                    loadLocalHistory(localBranchId)
+                } else {
+                    val error = result.exceptionOrNull()?.message ?: "Failed to save restock."
+                    _uiState.update {
+                        it.copy(
+                            error = error,
+                            successMessage = null
                         )
-                    )
-
-                    auditLogDao.upsertAuditLog(
-                        AuditLogEntity(
-                            logId = auditLogId,
-                            userId = userId,
-                            branchId = branchId,
-                            action = "Restocked ${ingredient.ingredientName}: $quantity ${ingredient.unitType}.",
-                            tableAffected = "restock_logs",
-                            timestamp = now,
-                            lastModified = now,
-                            isSynced = false,
-                            syncedAt = null
-                        )
-                    )
+                    }
                 }
-
-                shouldSync = networkMonitor.isOnline()
-
-                _uiState.update {
-                    it.copy(
-                        successMessage = "Restock saved.",
-                        error = null
-                    )
-                }
-
-                rebuildIngredientRows()
-                loadLocalHistory(localBranchId)
 
             } catch (e: Exception) {
                 _uiState.update {
@@ -594,9 +552,6 @@ class RestockViewModel @Inject constructor(
             it.copy(
                 error = null,
                 successMessage = null
-                // ✅ Removed isSubmitting = false — submitRestock owns that flag
-                // via its finally block. Resetting it here could cause a race condition
-                // if clearMessages() is called while a submission is still in flight.
             )
         }
     }

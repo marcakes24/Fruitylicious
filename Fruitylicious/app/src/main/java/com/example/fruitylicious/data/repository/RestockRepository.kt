@@ -2,11 +2,19 @@ package com.example.fruitylicious.data.repository
 
 import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
+import com.example.fruitylicious.data.local.dao.BranchDao
+import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.RestockLogDao
+import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.data.local.entity.IngredientEntity
+import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
+import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -17,7 +25,11 @@ class RestockRepository @Inject constructor(
     private val database: PosDatabase,
     private val restockLogDao: RestockLogDao,
     private val inventoryDao: InventoryDao,
-    private val auditLogDao: AuditLogDao
+    private val auditLogDao: AuditLogDao,
+    private val userDao: UserDao,
+    private val branchDao: BranchDao,
+    private val ingredientDao: IngredientDao,
+    private val sessionManager: SessionManager
 ) {
 
     fun observeRestockLogs(branchId: Int): Flow<List<RestockLogEntity>> {
@@ -51,51 +63,122 @@ class RestockRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Supplier is required."))
         }
 
-        val inventory = inventoryDao.getInventoryItem(ingredientId, branchId)
-            ?: return Result.failure(IllegalStateException("Inventory item not found."))
-
         val now = System.currentTimeMillis()
         val restockId = UUID.randomUUID().toString()
 
-        database.withTransaction {
-            restockLogDao.upsertRestockLog(
-                RestockLogEntity(
-                    restockId = restockId,
-                    ingredientId = ingredientId,
-                    branchId = branchId,
-                    userId = userId,
-                    quantityAdded = quantityAdded,
-                    supplier = supplier.trim(),
-                    dateTime = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
-            )
+        try {
+            database.withTransaction {
+                // 1. Ensure User exists
+                val existingUser = userDao.getUserById(userId)
+                if (existingUser == null) {
+                    userDao.upsertUser(
+                        UserEntity(
+                            userId = userId,
+                            name = sessionManager.getUserName(),
+                            role = sessionManager.getRole() ?: "STAFF",
+                            username = sessionManager.getUsername(),
+                            password = "",
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
 
-            inventoryDao.addStock(
-                ingredientId = inventory.ingredientId,
-                branchId = inventory.branchId,
-                amount = quantityAdded,
-                lastModified = now
-            )
+                // 2. Ensure Branch exists
+                val branches = branchDao.getAllBranches()
+                if (branches.none { it.branchId == branchId }) {
+                    branchDao.upsertBranches(
+                        listOf(
+                            BranchEntity(
+                                branchId = branchId,
+                                branchName = "Branch $branchId",
+                                address = "",
+                                contactNumber = "",
+                                lastModified = now,
+                                isSynced = true,
+                                syncedAt = now
+                            )
+                        )
+                    )
+                }
 
-            auditLogDao.upsertAuditLog(
-                AuditLogEntity(
-                    logId = UUID.randomUUID().toString(),
-                    userId = userId,
-                    branchId = branchId,
-                    action = "Restocked ingredient $ingredientId with quantity $quantityAdded from ${supplier.trim()}.",
-                    tableAffected = "restock_logs",
-                    timestamp = now,
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
+                // 3. Ensure Ingredient exists (crucial for restock)
+                val existingIngredient = ingredientDao.getIngredientById(ingredientId)
+                if (existingIngredient == null) {
+                    ingredientDao.upsertIngredient(
+                        IngredientEntity(
+                            ingredientId = ingredientId,
+                            image = null,
+                            ingredientName = "Ingredient $ingredientId",
+                            unitType = "unit",
+                            estimatedWeightPerUnit = 1.0,
+                            isPackaging = false,
+                            lowStockThreshold = 0.0,
+                            lastModified = now,
+                            isSynced = true,
+                            syncedAt = now
+                        )
+                    )
+                }
+
+                // 4. Ensure Inventory record exists
+                val existingInventory = inventoryDao.getInventoryItem(ingredientId, branchId)
+                if (existingInventory == null) {
+                    inventoryDao.upsertInventoryItem(
+                        InventoryEntity(
+                            ingredientId = ingredientId,
+                            branchId = branchId,
+                            currentStock = quantityAdded,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
+                    )
+                } else {
+                    inventoryDao.addStock(
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        amount = quantityAdded,
+                        lastModified = now
+                    )
+                }
+
+                // 5. Insert Restock Log
+                restockLogDao.upsertRestockLog(
+                    RestockLogEntity(
+                        restockId = restockId,
+                        ingredientId = ingredientId,
+                        branchId = branchId,
+                        userId = userId,
+                        quantityAdded = quantityAdded,
+                        supplier = supplier.trim(),
+                        dateTime = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
                 )
-            )
+
+                // 6. Audit Log
+                auditLogDao.upsertAuditLog(
+                    AuditLogEntity(
+                        logId = UUID.randomUUID().toString(),
+                        userId = userId,
+                        branchId = branchId,
+                        action = "Restocked ingredient $ingredientId with quantity $quantityAdded from ${supplier.trim()}.",
+                        tableAffected = "restock_logs",
+                        timestamp = now,
+                        lastModified = now,
+                        isSynced = false,
+                        syncedAt = null
+                    )
+                )
+            }
+            return Result.success(Unit)
+        } catch (e: Exception) {
+            return Result.failure(e)
         }
-
-        return Result.success(Unit)
     }
 
     suspend fun getUnsyncedRestockLogs(): List<RestockLogEntity> {

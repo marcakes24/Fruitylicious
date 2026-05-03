@@ -1,6 +1,10 @@
 package com.example.fruitylicious.data.repository
 
+import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.ProductDao
+import com.example.fruitylicious.data.local.dao.ProductRecipeDao
+import com.example.fruitylicious.data.local.dao.ProductVariantDao
+import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -8,7 +12,10 @@ import javax.inject.Singleton
 
 @Singleton
 class ProductRepository @Inject constructor(
-    private val productDao: ProductDao
+    private val database: PosDatabase,
+    private val productDao: ProductDao,
+    private val productVariantDao: ProductVariantDao,
+    private val productRecipeDao: ProductRecipeDao
 ) {
 
     fun observeProducts(): Flow<List<ProductEntity>> {
@@ -75,7 +82,12 @@ class ProductRepository @Inject constructor(
     }
 
     suspend fun deleteProduct(productId: Int): Result<Unit> {
-        productDao.deleteProduct(productId)
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            productDao.softDeleteProduct(productId, now)
+            productVariantDao.softDeleteVariantsByProduct(productId, now)
+            productRecipeDao.softDeleteRecipesByProduct(productId, now)
+        }
         return Result.success(Unit)
     }
 

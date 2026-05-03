@@ -91,7 +91,8 @@ class UserRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Invalid user."))
         }
 
-        userDao.deleteUser(userId)
+        val now = System.currentTimeMillis()
+        userDao.softDeleteUser(userId, now)
         return Result.success(Unit)
     }
 

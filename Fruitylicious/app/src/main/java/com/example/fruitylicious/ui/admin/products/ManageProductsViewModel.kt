@@ -19,7 +19,7 @@ import kotlin.math.absoluteValue
 
 data class ProductVariantRow(
     val product: ProductEntity,
-    val variant: ProductVariantEntity
+    val variants: List<ProductVariantEntity>
 )
 
 data class ManageProductsUiState(
@@ -86,28 +86,21 @@ class ManageProductsViewModel @Inject constructor(
         }
     }
 
-    fun saveProductWithVariant(
+    fun saveFullProduct(
         existingProductId: Int?,
-        existingVariantId: Int?,
         name: String,
         image: String?,
-        sizeName: String,
-        price: Double
+        mediumPrice: Double,
+        largePrice: Double
     ) {
         val cleanName = name.trim()
-        val cleanSize = sizeName.trim()
 
         if (cleanName.isBlank()) {
             setError("Product name is required.")
             return
         }
 
-        if (cleanSize.isBlank()) {
-            setError("Size is required.")
-            return
-        }
-
-        if (price < 0.0) {
+        if (mediumPrice < 0.0 || largePrice < 0.0) {
             setError("Price cannot be negative.")
             return
         }
@@ -128,23 +121,36 @@ class ManageProductsViewModel @Inject constructor(
                 return@launch
             }
 
-            val variantResult = productVariantRepository.saveVariant(
-                variantId = existingVariantId ?: generateId(),
+            // For variants, we need to check if they exist or create new ones
+            val existingVariants = productVariantRepository.getVariantsForProduct(productId)
+            val mediumVariant = existingVariants.find { it.sizeName.equals("Medium", ignoreCase = true) }
+            val largeVariant = existingVariants.find { it.sizeName.equals("Large", ignoreCase = true) }
+
+            val mediumResult = productVariantRepository.saveVariant(
+                variantId = mediumVariant?.variantId ?: generateId(),
                 productId = productId,
-                sizeName = cleanSize,
-                price = price
+                sizeName = "Medium",
+                price = mediumPrice
+            )
+
+            val largeResult = productVariantRepository.saveVariant(
+                variantId = largeVariant?.variantId ?: generateId(),
+                productId = productId,
+                sizeName = "Large",
+                price = largePrice
             )
 
             _uiState.update {
-                if (variantResult.isSuccess) {
+                if (mediumResult.isSuccess && largeResult.isSuccess) {
                     it.copy(
-                        successMessage = "Product saved.",
+                        successMessage = "Product saved with Medium and Large sizes.",
                         error = null
                     )
                 } else {
-                    it.copy(
-                        error = variantResult.exceptionOrNull()?.message ?: "Failed to save variant."
-                    )
+                    val error = mediumResult.exceptionOrNull()?.message 
+                        ?: largeResult.exceptionOrNull()?.message 
+                        ?: "Failed to save variants."
+                    it.copy(error = error)
                 }
             }
         }
@@ -182,20 +188,6 @@ class ManageProductsViewModel @Inject constructor(
                     it.copy(successMessage = "Add-on saved.", error = null)
                 } else {
                     it.copy(error = result.exceptionOrNull()?.message ?: "Failed to save add-on.")
-                }
-            }
-        }
-    }
-
-    fun deleteProductVariant(variantId: Int) {
-        viewModelScope.launch {
-            val result = productVariantRepository.deleteVariant(variantId)
-
-            _uiState.update {
-                if (result.isSuccess) {
-                    it.copy(successMessage = "Product size deleted.", error = null)
-                } else {
-                    it.copy(error = result.exceptionOrNull()?.message ?: "Failed to delete product size.")
                 }
             }
         }
@@ -253,15 +245,14 @@ class ManageProductsViewModel @Inject constructor(
         products: List<ProductEntity>,
         variants: List<ProductVariantEntity>
     ): List<ProductVariantRow> {
-        val productMap = products.associateBy { it.productId }
+        val variantsByProduct = variants.groupBy { it.productId }
 
-        return variants.mapNotNull { variant ->
-            val product = productMap[variant.productId] ?: return@mapNotNull null
-            ProductVariantRow(product = product, variant = variant)
-        }.sortedWith(
-            compareBy<ProductVariantRow> { it.product.productName.lowercase() }
-                .thenBy { it.variant.price }
-        )
+        return products.map { product ->
+            ProductVariantRow(
+                product = product,
+                variants = variantsByProduct[product.productId] ?: emptyList()
+            )
+        }.sortedBy { it.product.productName.lowercase() }
     }
 
     private fun setError(message: String) {

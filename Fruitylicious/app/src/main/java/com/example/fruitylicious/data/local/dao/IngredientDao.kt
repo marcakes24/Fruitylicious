@@ -9,22 +9,23 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface IngredientDao {
 
-    @Query("SELECT * FROM ingredients ORDER BY ingredientName ASC")
+    @Query("SELECT * FROM ingredients WHERE isDeleted = 0 ORDER BY ingredientName ASC")
     fun observeAllIngredients(): Flow<List<IngredientEntity>>
 
-    @Query("SELECT * FROM ingredients ORDER BY ingredientName ASC")
+    @Query("SELECT * FROM ingredients WHERE isDeleted = 0 ORDER BY ingredientName ASC")
     suspend fun getAllIngredients(): List<IngredientEntity>
 
-    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId LIMIT 1")
+
+    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId AND isDeleted = 0 LIMIT 1")
     fun observeIngredient(ingredientId: Int): Flow<IngredientEntity?>
 
-    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId")
+    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId AND isDeleted = 0")
     suspend fun getIngredientById(ingredientId: Int): IngredientEntity?
 
-    @Query("SELECT * FROM ingredients WHERE isPackaging = :isPackaging ORDER BY ingredientName ASC")
+    @Query("SELECT * FROM ingredients WHERE isPackaging = :isPackaging AND isDeleted = 0 ORDER BY ingredientName ASC")
     fun observeIngredientsByPackaging(isPackaging: Boolean): Flow<List<IngredientEntity>>
 
-    @Query("SELECT * FROM ingredients WHERE ingredientName LIKE '%' || :query || '%' ORDER BY ingredientName ASC")
+    @Query("SELECT * FROM ingredients WHERE ingredientName LIKE '%' || :query || '%' AND isDeleted = 0 ORDER BY ingredientName ASC")
     fun searchIngredients(query: String): Flow<List<IngredientEntity>>
 
     @Query("SELECT * FROM ingredients WHERE isSynced = 0")
@@ -55,11 +56,22 @@ interface IngredientDao {
         lastModified: Long
     )
 
-    @Query("DELETE FROM ingredients WHERE ingredientId = :ingredientId")
-    suspend fun deleteIngredient(ingredientId: Int)
-
-    @Query("SELECT * FROM ingredients ORDER BY ingredientName ASC")
+    @Query("SELECT * FROM ingredients WHERE isDeleted = 0 ORDER BY ingredientName ASC")
     fun observeIngredients(): Flow<List<IngredientEntity>>
 
-
+    @Query(
+        """
+    UPDATE ingredients
+    SET isDeleted = 1,
+        deletedAt = :now,
+        lastModified = :now,
+        isSynced = 0,
+        syncedAt = NULL
+    WHERE ingredientId = :ingredientId
+    """
+    )
+    suspend fun softDeleteIngredient(
+        ingredientId: Int,
+        now: Long
+    )
 }

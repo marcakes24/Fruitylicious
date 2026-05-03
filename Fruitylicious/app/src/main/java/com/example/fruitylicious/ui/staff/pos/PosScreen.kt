@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
@@ -62,12 +63,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.example.fruitylicious.STAFF_CHECKOUT
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
@@ -75,8 +81,9 @@ import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductRecipeEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.data.repository.CartItem
-import kotlinx.coroutines.delay
+import com.example.fruitylicious.util.ImageStorage
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 private val GreenPrimary = Color(0xFF2E7D32)
 private val AmberAccent = Color(0xFFFFC107)
@@ -111,7 +118,9 @@ fun PosScreen(
             recipes = uiState.recipes,
             inventory = uiState.inventory,
             ingredients = uiState.ingredients,
-            onDismiss = { selectedProduct = null },
+            onDismiss = {
+                selectedProduct = null
+            },
             onAddToCart = { variant, mixAddon, selectedAddons, quantity ->
                 viewModel.addCustomizedItem(
                     product = product,
@@ -140,16 +149,19 @@ fun PosScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(text = "🕒", fontSize = 48.sp)
+
                     Text(
                         text = "Not Clocked In",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
+
                     Text(
                         text = uiState.error ?: "You must clock in before using the POS.",
                         textAlign = TextAlign.Center,
                         color = Color.Gray
                     )
+
                     Button(
                         onClick = { onBack() },
                         modifier = Modifier.fillMaxWidth(),
@@ -231,8 +243,9 @@ fun PosScreen(
                         ) { product ->
                             ProductGridItem(
                                 product = product,
-                                variants = uiState.variantsByProductId[product.productId].orEmpty(),
-                                onClick = { selectedProduct = product }
+                                onClick = {
+                                    selectedProduct = product
+                                }
                             )
                         }
                     }
@@ -241,9 +254,13 @@ fun PosScreen(
 
             CartBottomSection(
                 addedToCartMsg = addedToCartMsg,
-                onAddedMessageConsumed = { addedToCartMsg = false },
+                onAddedMessageConsumed = {
+                    addedToCartMsg = false
+                },
                 cartExpanded = cartExpanded,
-                onCartToggle = { cartExpanded = !cartExpanded },
+                onCartToggle = {
+                    cartExpanded = !cartExpanded
+                },
                 cartCount = cartCount,
                 cartTotal = cartTotal,
                 cartItems = cartItems,
@@ -298,23 +315,14 @@ private fun PosHeader(
 @Composable
 private fun ProductGridItem(
     product: ProductEntity,
-    variants: List<ProductVariantEntity>,
     onClick: () -> Unit
 ) {
-    val priceText = when {
-        variants.isEmpty() -> "No sizes"
-        variants.size == 1 -> "₱${String.format(Locale.US, "%,.2f", variants.first().price)}"
-        else -> {
-            val min = variants.minOf { it.price }
-            val max = variants.maxOf { it.price }
-            "₱${String.format(Locale.US, "%,.2f", min)} - ₱${String.format(Locale.US, "%,.2f", max)}"
-        }
-    }
-
     Surface(
         modifier = Modifier
             .aspectRatio(1f)
-            .clickable { onClick() },
+            .clickable {
+                onClick()
+            },
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
         shadowElevation = 2.dp
@@ -326,7 +334,12 @@ private fun ProductGridItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = "🥤", fontSize = 36.sp)
+            ProductIconImage(
+                product = product,
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+            )
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -335,17 +348,46 @@ private fun ProductGridItem(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF1B1B1B),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 2
             )
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(3.dp))
+@Composable
+private fun ProductIconImage(
+    product: ProductEntity,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
 
-            Text(
-                text = priceText,
-                fontSize = 11.sp,
-                color = GreenPrimary,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+    val imageFile = product.image
+        ?.takeIf { it.isNotBlank() }
+        ?.let { imagePath ->
+            ImageStorage.getImageFile(
+                context = context,
+                relativePath = imagePath
+            )
+        }
+
+    Box(
+        modifier = modifier.background(Color(0xFFE8F5E9)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageFile != null && imageFile.exists()) {
+            AsyncImage(
+                model = imageFile,
+                contentDescription = product.productName,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Image,
+                contentDescription = product.productName,
+                tint = GreenPrimary,
+                modifier = Modifier.size(28.dp)
             )
         }
     }
@@ -375,8 +417,11 @@ private fun ProductCustomizeDialog(
     var mixFlavor by remember { mutableStateOf(false) }
     var selectedFlavor by remember { mutableStateOf<ProductEntity?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var dropdownWidth by remember { mutableStateOf(0.dp) }
     var selectedAddOns by remember { mutableStateOf(setOf<ProductEntity>()) }
     var quantity by remember { mutableStateOf(1) }
+
+    val density = LocalDensity.current
 
     val variant = selectedVariant
 
@@ -389,53 +434,85 @@ private fun ProductCustomizeDialog(
     val availableMixFlavors = mainProducts.filter { it.productId != product.productId }
     val availableAddons = addons.filter { it.productId != selectedFlavor?.productId }
 
-    // Validation Logic
-    val variantRecipe = recipes.filter { it.variantId == selectedVariant?.variantId }
-    val productRecipe = recipes.filter { it.productId == product.productId && it.variantId == null }
-    val activeRecipe = if (variantRecipe.isNotEmpty()) variantRecipe else productRecipe
+    val variantRecipe = recipes.filter {
+        it.variantId == selectedVariant?.variantId
+    }
+
+    val productRecipe = recipes.filter {
+        it.productId == product.productId && it.variantId == null
+    }
+
+    val activeRecipe = if (variantRecipe.isNotEmpty()) {
+        variantRecipe
+    } else {
+        productRecipe
+    }
 
     val mixRecipe = if (mixFlavor && selectedFlavor != null) {
-        recipes.filter { it.productId == selectedFlavor?.productId && it.variantId == null }
-    } else emptyList()
+        recipes.filter {
+            it.productId == selectedFlavor?.productId && it.variantId == null
+        }
+    } else {
+        emptyList()
+    }
 
-    val selectedAddonRecipes = recipes.filter { r ->
-        selectedAddOns.any { it.productId == r.productId } && r.variantId == null
+    val selectedAddonRecipes = recipes.filter { recipe ->
+        selectedAddOns.any {
+            it.productId == recipe.productId
+        } && recipe.variantId == null
     }
 
     val hasRecipe = activeRecipe.isNotEmpty()
 
-    val insufficientIngredients = remember(selectedVariant, selectedFlavor, mixFlavor, selectedAddOns, quantity, recipes, inventory, ingredients) {
+    val insufficientIngredients = remember(
+        selectedVariant,
+        selectedFlavor,
+        mixFlavor,
+        selectedAddOns,
+        quantity,
+        recipes,
+        inventory,
+        ingredients
+    ) {
         val requirements = mutableMapOf<Int, Double>()
 
-        // Add main product requirements
         activeRecipe.forEach { line ->
-            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+            requirements[line.ingredientId] =
+                (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
-        // Add mix flavor requirements
         mixRecipe.forEach { line ->
-            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+            requirements[line.ingredientId] =
+                (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
-        // Add selected add-ons requirements
         selectedAddonRecipes.forEach { line ->
-            requirements[line.ingredientId] = (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+            requirements[line.ingredientId] =
+                (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
-        requirements.filter { (ingredientId, req) ->
-            val stockItem = inventory.find { it.ingredientId == ingredientId }
-            val ingredient = ingredients.find { it.ingredientId == ingredientId }
+        requirements.filter { (ingredientId, required) ->
+            val stockItem = inventory.find {
+                it.ingredientId == ingredientId
+            }
+
+            val ingredient = ingredients.find {
+                it.ingredientId == ingredientId
+            }
 
             val available = if (stockItem != null && ingredient != null) {
                 val unit = ingredient.unitType.lowercase(Locale.US)
+
                 if (unit == "can" || unit == "pcs" || unit == "pack") {
                     stockItem.currentStock * ingredient.estimatedWeightPerUnit
                 } else {
                     stockItem.currentStock
                 }
-            } else 0.0
+            } else {
+                0.0
+            }
 
-            available < req
+            available < required
         }
     }
 
@@ -516,7 +593,9 @@ private fun ProductCustomizeDialog(
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .background(Color.White)
-                                    .clickable { selectedVariant = item }
+                                    .clickable {
+                                        selectedVariant = item
+                                    }
                                     .padding(vertical = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -577,7 +656,9 @@ private fun ProductCustomizeDialog(
                         .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(12.dp))
                         .clickable {
                             mixFlavor = !mixFlavor
-                            if (!mixFlavor) selectedFlavor = null
+                            if (!mixFlavor) {
+                                selectedFlavor = null
+                            }
                         }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -586,7 +667,9 @@ private fun ProductCustomizeDialog(
                         checked = mixFlavor,
                         onCheckedChange = {
                             mixFlavor = it
-                            if (!it) selectedFlavor = null
+                            if (!it) {
+                                selectedFlavor = null
+                            }
                         },
                         colors = CheckboxDefaults.colors(checkedColor = CheckboxBlue)
                     )
@@ -607,7 +690,12 @@ private fun ProductCustomizeDialog(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { dropdownExpanded = true },
+                                .onGloballyPositioned { coordinates ->
+                                    dropdownWidth = with(density) { coordinates.size.width.toDp() }
+                                }
+                                .clickable {
+                                    dropdownExpanded = true
+                                },
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, Color(0xFFEEEEEE)),
                             colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -622,7 +710,11 @@ private fun ProductCustomizeDialog(
                                 Text(
                                     text = selectedFlavor?.productName ?: "Select fruit add-on",
                                     fontSize = 14.sp,
-                                    color = if (selectedFlavor != null) Color.Black else Color.Gray
+                                    color = if (selectedFlavor != null) {
+                                        Color.Black
+                                    } else {
+                                        Color.Gray
+                                    }
                                 )
 
                                 Icon(
@@ -635,15 +727,24 @@ private fun ProductCustomizeDialog(
 
                         DropdownMenu(
                             expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
+                            onDismissRequest = {
+                                dropdownExpanded = false
+                            },
                             modifier = Modifier
-                                .fillMaxWidth(0.8f)
+                                .width(dropdownWidth)
                                 .background(Color.White)
                         ) {
                             if (availableMixFlavors.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text("No other fruits available", color = Color.Gray) },
-                                    onClick = { dropdownExpanded = false }
+                                    text = {
+                                        Text(
+                                            text = "No other fruits available",
+                                            color = Color.Gray
+                                        )
+                                    },
+                                    onClick = {
+                                        dropdownExpanded = false
+                                    }
                                 )
                             } else {
                                 availableMixFlavors.forEach { addon ->
@@ -654,7 +755,9 @@ private fun ProductCustomizeDialog(
                                         onClick = {
                                             selectedFlavor = addon
                                             selectedAddOns = selectedAddOns
-                                                .filterNot { it.productId == addon.productId }
+                                                .filterNot {
+                                                    it.productId == addon.productId
+                                                }
                                                 .toSet()
                                             dropdownExpanded = false
                                         }
@@ -689,28 +792,47 @@ private fun ProductCustomizeDialog(
                                 rowItems.forEach { addon ->
                                     val isSelected = addon in selectedAddOns
 
-                                    // Individual addon validation
-                                    val addonRecipe = recipes.filter { it.productId == addon.productId && it.variantId == null }
+                                    val addonRecipe = recipes.filter {
+                                        it.productId == addon.productId && it.variantId == null
+                                    }
+
                                     val hasAddonRecipe = addonRecipe.isNotEmpty()
 
-                                    val isAddonStockAvailable = remember(addon, quantity, recipes, inventory, ingredients) {
-                                        if (!hasAddonRecipe) return@remember false
+                                    val isAddonStockAvailable = remember(
+                                        addon,
+                                        quantity,
+                                        recipes,
+                                        inventory,
+                                        ingredients
+                                    ) {
+                                        if (!hasAddonRecipe) {
+                                            return@remember false
+                                        }
 
                                         addonRecipe.all { line ->
-                                            val req = line.quantityRequired * quantity
-                                            val stockItem = inventory.find { it.ingredientId == line.ingredientId }
-                                            val ingredient = ingredients.find { it.ingredientId == line.ingredientId }
+                                            val required = line.quantityRequired * quantity
+
+                                            val stockItem = inventory.find {
+                                                it.ingredientId == line.ingredientId
+                                            }
+
+                                            val ingredient = ingredients.find {
+                                                it.ingredientId == line.ingredientId
+                                            }
 
                                             val available = if (stockItem != null && ingredient != null) {
                                                 val unit = ingredient.unitType.lowercase(Locale.US)
+
                                                 if (unit == "can" || unit == "pcs" || unit == "pack") {
                                                     stockItem.currentStock * ingredient.estimatedWeightPerUnit
                                                 } else {
                                                     stockItem.currentStock
                                                 }
-                                            } else 0.0
+                                            } else {
+                                                0.0
+                                            }
 
-                                            available >= req
+                                            available >= required
                                         }
                                     }
 
@@ -755,7 +877,11 @@ private fun ProductCustomizeDialog(
                                                     !isAddonSelectable -> Color.LightGray
                                                     else -> Color(0xFF1B1B1B)
                                                 },
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontWeight = if (isSelected) {
+                                                    FontWeight.Bold
+                                                } else {
+                                                    FontWeight.Medium
+                                                },
                                                 textAlign = TextAlign.Center
                                             )
 
@@ -812,7 +938,9 @@ private fun ProductCustomizeDialog(
                     ) {
                         IconButton(
                             onClick = {
-                                if (quantity > 1) quantity--
+                                if (quantity > 1) {
+                                    quantity--
+                                }
                             },
                             modifier = Modifier
                                 .size(36.dp)
@@ -834,7 +962,9 @@ private fun ProductCustomizeDialog(
                         )
 
                         IconButton(
-                            onClick = { quantity++ },
+                            onClick = {
+                                quantity++
+                            },
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
@@ -860,11 +990,16 @@ private fun ProductCustomizeDialog(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
                 } else if (!isStockAvailable) {
-                    val ingredientNames = insufficientIngredients.keys.map { id ->
-                        ingredients.find { it.ingredientId == id }?.ingredientName ?: "ID: $id"
-                    }.joinToString(", ")
+                    val ingredientNames = insufficientIngredients.keys
+                        .map { id ->
+                            ingredients.find {
+                                it.ingredientId == id
+                            }?.ingredientName ?: "ID: $id"
+                        }
+                        .joinToString(", ")
 
                     Text(
                         text = "⚠️ Insufficient stock for: $ingredientNames",
@@ -874,6 +1009,7 @@ private fun ProductCustomizeDialog(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
@@ -893,7 +1029,11 @@ private fun ProductCustomizeDialog(
                             text = "₱${String.format(Locale.US, "%,.2f", itemTotal)}",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (hasRecipe && isStockAvailable) GreenPrimary else Color.Gray
+                            color = if (hasRecipe && isStockAvailable) {
+                                GreenPrimary
+                            } else {
+                                Color.Gray
+                            }
                         )
                     }
 
@@ -902,7 +1042,11 @@ private fun ProductCustomizeDialog(
                             if (variant != null) {
                                 onAddToCart(
                                     variant,
-                                    if (mixFlavor) selectedFlavor else null,
+                                    if (mixFlavor) {
+                                        selectedFlavor
+                                    } else {
+                                        null
+                                    },
                                     selectedAddOns.toList(),
                                     quantity
                                 )
@@ -914,7 +1058,11 @@ private fun ProductCustomizeDialog(
                             .weight(1f)
                             .padding(start = 24.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasRecipe && isStockAvailable) GreenPrimary else Color.LightGray
+                            containerColor = if (hasRecipe && isStockAvailable) {
+                                GreenPrimary
+                            } else {
+                                Color.LightGray
+                            }
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -977,7 +1125,9 @@ private fun CartBottomSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(GreenPrimary)
-                .clickable { onCartToggle() }
+                .clickable {
+                    onCartToggle()
+                }
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Row(
@@ -1131,7 +1281,9 @@ private fun CartPanel(
                                     .size(26.dp)
                                     .clip(CircleShape)
                                     .border(1.dp, Color(0xFFDDDDDD), CircleShape)
-                                    .clickable { onQuantityChange(item, -1) },
+                                    .clickable {
+                                        onQuantityChange(item, -1)
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -1152,7 +1304,9 @@ private fun CartPanel(
                                     .size(26.dp)
                                     .clip(CircleShape)
                                     .border(1.dp, Color(0xFFDDDDDD), CircleShape)
-                                    .clickable { onQuantityChange(item, 1) },
+                                    .clickable {
+                                        onQuantityChange(item, 1)
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -1174,7 +1328,9 @@ private fun CartPanel(
                             )
 
                             TextButton(
-                                onClick = { onRemove(item) },
+                                onClick = {
+                                    onRemove(item)
+                                },
                                 contentPadding = PaddingValues(0.dp)
                             ) {
                                 Text(

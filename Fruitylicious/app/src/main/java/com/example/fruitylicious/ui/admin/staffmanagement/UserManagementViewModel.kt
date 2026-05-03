@@ -107,7 +107,7 @@ class UserManagementViewModel @Inject constructor(
 
     fun deleteUser(userId: Int) {
         viewModelScope.launch {
-            userDao.deleteUser(userId)
+            userDao.softDeleteUser(userId, System.currentTimeMillis())
 
             _uiState.update {
                 it.copy(

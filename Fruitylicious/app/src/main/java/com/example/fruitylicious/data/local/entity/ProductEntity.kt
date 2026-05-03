@@ -20,5 +20,7 @@ data class ProductEntity(
     val price: Double,
     val lastModified: Long,
     val isSynced: Boolean,
-    val syncedAt: Long?
+    val syncedAt: Long?,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null
 )
