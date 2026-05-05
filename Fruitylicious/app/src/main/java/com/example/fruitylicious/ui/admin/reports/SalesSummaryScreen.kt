@@ -9,17 +9,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +51,7 @@ private val SsCardBg = Color.White
 private val SsTextMain = Color(0xFF1A1A1A)
 private val SsTextSub = Color(0xFF757575)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SalesSummaryScreen(
     navController: NavController,
@@ -68,7 +71,23 @@ fun SalesSummaryScreen(
     }
 
     val isUp = pctChange >= 0.0
-    val todayText = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US).format(Date())
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = uiState.selectedDate)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { viewModel.setSelectedDate(it) }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -111,6 +130,70 @@ fun SalesSummaryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Period Picker Card
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    shadowElevation = 2.dp
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF5F5F5))
+                                .padding(4.dp)
+                        ) {
+                            listOf("daily", "weekly", "monthly").forEach { p ->
+                                val isSelected = uiState.period == p
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Color.White else Color.Transparent)
+                                        .clickable { viewModel.setPeriod(p) }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = p.replaceFirstChar { it.uppercase() },
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) SsGreen else SsTextSub
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            IconButton(onClick = { viewModel.navigatePeriod(-1) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Prev", tint = SsGreen)
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showDatePicker = true }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp), tint = SsGreen)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(uiState.rangeText, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SsTextMain)
+                            }
+
+                            IconButton(onClick = { viewModel.navigatePeriod(1) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Next", tint = SsGreen)
+                            }
+                        }
+                    }
+                }
+
                 uiState.error?.let {
                     Text(
                         text = it,
@@ -126,7 +209,7 @@ fun SalesSummaryScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Today's Sales",
+                                text = "${uiState.period.replaceFirstChar { it.uppercase() }} Sales",
                                 fontSize = 14.sp,
                                 color = SsTextSub,
                                 fontWeight = FontWeight.Medium
@@ -166,19 +249,11 @@ fun SalesSummaryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = todayText,
-                                fontSize = 12.sp,
-                                color = SsTextSub
-                            )
                         }
                     }
 
                     Text(
-                        text = "vs yesterday (₱${String.format(Locale.US, "%,.2f", uiState.yesterdaySales)})",
+                        text = "vs previous period (₱${String.format(Locale.US, "%,.2f", uiState.yesterdaySales)})",
                         fontSize = 13.sp,
                         color = SsTextSub,
                         modifier = Modifier.padding(top = 8.dp)
@@ -201,7 +276,7 @@ fun SalesSummaryScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Text(
-                            text = "This Month",
+                            text = if (uiState.period == "monthly") "This Month" else "Period Context",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = SsTextMain
@@ -241,7 +316,7 @@ fun SalesSummaryScreen(
 
                 SummaryCard {
                     Text(
-                        text = "Today's Payment Breakdown",
+                        text = "${uiState.period.replaceFirstChar { it.uppercase() }} Payment Breakdown",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = SsTextMain

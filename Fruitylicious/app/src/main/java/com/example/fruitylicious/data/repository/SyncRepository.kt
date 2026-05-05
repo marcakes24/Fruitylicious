@@ -20,10 +20,13 @@ import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.remote.api.SyncApi
 import com.example.fruitylicious.data.remote.dto.PushRequestDto
 import com.example.fruitylicious.data.remote.dto.SyncRecordResultDto
+import com.example.fruitylicious.data.remote.dto.HasUpdatesResponseDto
+import com.example.fruitylicious.util.SessionManager
 import android.content.Context
 import android.util.Log
 import com.example.fruitylicious.util.ImageStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,33 +56,85 @@ class SyncRepository @Inject constructor(
     private val transactionItemDao: TransactionItemDao,
     private val transactionItemAddonDao: TransactionItemAddonDao,
     private val staffLogDao: StaffLogDao,
-    private val auditLogDao: AuditLogDao
+    private val auditLogDao: AuditLogDao,
+    private val sessionManager: SessionManager
 ) {
 
     suspend fun sync(lastPulledAt: Long): SyncResult {
-        val pushResult = pushUnsynced()
+        return smartSync(lastPulledAt)
+    }
 
-        if (!pushResult.success) {
-            return pushResult
+    suspend fun smartSync(lastPulledAt: Long): SyncResult {
+        return try {
+            val localCount = getUnsyncedCount()
+            val hasRemote = hasRemoteUpdates(lastPulledAt)
+
+            Log.d("SyncRepository", "smartSync: localCount=$localCount, hasRemote=$hasRemote")
+
+            if (localCount == 0 && !hasRemote) {
+                return SyncResult(true, 0, 0, "No changes to sync.")
+            }
+
+            if (localCount > 0 && hasRemote) {
+                val pushResult = pushUnsynced()
+                if (!pushResult.success) return pushResult
+                
+                val pullResult = pullUpdates(lastPulledAt)
+                return SyncResult(
+                    success = pullResult.success,
+                    pushedCount = pushResult.pushedCount,
+                    pulledCount = pullResult.pulledCount,
+                    message = if (pullResult.success)
+                        "Smart sync: pushed ${pushResult.pushedCount}, pulled ${pullResult.pulledCount}."
+                    else "Push ok, pull failed: ${pullResult.message}"
+                )
+            }
+
+            if (localCount > 0) {
+                return pushUnsynced()
+            }
+
+            if (hasRemote) {
+                return pullUpdates(lastPulledAt)
+            }
+
+            SyncResult(true, 0, 0, "No changes to sync.")
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            SyncResult(false, 0, 0, e.message ?: "Smart sync failed.")
         }
+    }
 
-        val pullResult = pullUpdates(lastPulledAt)
+    suspend fun getUnsyncedCount(): Int {
+        return branchDao.getUnsyncedBranches().size +
+                userDao.getUnsyncedUsers().size +
+                productDao.getUnsyncedProducts().size +
+                productVariantDao.getUnsyncedVariants().size +
+                ingredientDao.getUnsyncedIngredients().size +
+                productRecipeDao.getUnsyncedRecipes().size +
+                inventoryDao.getUnsyncedInventory().size +
+                restockLogDao.getUnsyncedRestockLogs().size +
+                inventoryAdjustmentDao.getUnsyncedAdjustments().size +
+                wasteLogDao.getUnsyncedWasteLogs().size +
+                transactionDao.getUnsyncedTransactions().size +
+                transactionItemDao.getUnsyncedTransactionItems().size +
+                transactionItemAddonDao.getUnsyncedTransactionItemAddons().size +
+                staffLogDao.getUnsyncedStaffLogs().size +
+                auditLogDao.getUnsyncedAuditLogs().size
+    }
 
-        if (!pullResult.success) {
-            return SyncResult(
-                success = false,
-                pushedCount = pushResult.pushedCount,
-                pulledCount = 0,
-                message = "Push succeeded, but pull failed: ${pullResult.message}"
-            )
+    suspend fun hasRemoteUpdates(since: Long): Boolean {
+        return try {
+            val response = syncApi.hasUpdates(since)
+            if (response.isSuccessful) {
+                response.body()?.hasUpdates ?: true
+            } else {
+                // Endpoint might not exist yet, fallback to true to pull normally
+                true
+            }
+        } catch (e: Exception) {
+            true // Fallback to true on network error/timeout
         }
-
-        return SyncResult(
-            success = true,
-            pushedCount = pushResult.pushedCount,
-            pulledCount = pullResult.pulledCount,
-            message = "Sync completed. Pushed ${pushResult.pushedCount}, pulled ${pullResult.pulledCount}."
-        )
     }
 
     suspend fun pushUnsynced(): SyncResult {
@@ -232,6 +287,8 @@ class SyncRepository @Inject constructor(
 
                 body.auditLogs.forEach { auditLogDao.upsertAuditLog(it.copy(isSynced = true, syncedAt = pulledAt)) }
             }
+
+            sessionManager.saveLastPulledAt(body.serverTime)
 
             val pulledCount =
                 body.branches.size + body.users.size + body.products.size + body.ingredients.size +

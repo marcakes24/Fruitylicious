@@ -22,6 +22,14 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId AND isDeleted = 0")
     suspend fun getIngredientById(ingredientId: Int): IngredientEntity?
 
+    @Query("""
+        SELECT * FROM ingredients
+        WHERE ingredientName = :ingredientName
+        AND isDeleted = 0
+        LIMIT 1
+    """)
+    suspend fun getIngredientByName(ingredientName: String): IngredientEntity?
+
     @Query("SELECT * FROM ingredients WHERE isPackaging = :isPackaging AND isDeleted = 0 ORDER BY ingredientName ASC")
     fun observeIngredientsByPackaging(isPackaging: Boolean): Flow<List<IngredientEntity>>
 

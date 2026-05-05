@@ -17,8 +17,10 @@ import com.example.fruitylicious.data.local.entity.TransactionEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
 import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,7 +30,8 @@ data class CartAddon(
     val addonName: String,
     val quantity: Int,
     val unitPrice: Double,
-    val subtotal: Double
+    val subtotal: Double,
+    val addonType: String = "ADDON"
 )
 
 data class CartItem(
@@ -55,7 +58,8 @@ class TransactionRepository @Inject constructor(
     private val ingredientDao: IngredientDao,
     private val userDao: UserDao,
     private val branchDao: BranchDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeTransactions(branchId: Int): Flow<List<TransactionEntity>> {
@@ -126,7 +130,10 @@ class TransactionRepository @Inject constructor(
                     )
                 }
 
-                val baseRecipes = productRecipeDao.getRecipesForVariant(cartItem.variantId)
+                var baseRecipes = productRecipeDao.getRecipesForVariant(cartItem.variantId)
+                if (baseRecipes.isEmpty()) {
+                    baseRecipes = productRecipeDao.getRecipesForProduct(cartItem.productId)
+                }
 
                 for (recipe in baseRecipes) {
                     val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
@@ -147,26 +154,45 @@ class TransactionRepository @Inject constructor(
                 }
 
                 for (addon in cartItem.addons) {
-                    val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
-
-                    for (recipe in addonRecipes) {
-                        val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
+                    if (addon.addonType == "MIX") {
+                        val ingredientName = getMixIngredientName(addon.addonName)
+                        val ingredient = ingredientDao.getIngredientByName(ingredientName)
                             ?: return Result.failure(
-                                IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+                                IllegalStateException("Mix ingredient not found: $ingredientName")
                             )
 
-                        if (ingredient.isPackaging) continue
-
-                        val deductionPerAddon = computeInventoryDeduction(
-                            recipeQuantity = recipe.quantityRequired,
+                        val deductionPerMixItem = computeInventoryDeduction(
+                            recipeQuantity = getMixIngredientQuantity(cartItem.sizeName),
                             unitType = ingredient.unitType,
                             estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
                         )
 
-                        val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
+                        val totalRequired = deductionPerMixItem * cartItem.quantity
 
-                        requiredByIngredient[recipe.ingredientId] =
-                            (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
+                        requiredByIngredient[ingredient.ingredientId] =
+                            (requiredByIngredient[ingredient.ingredientId] ?: 0.0) + totalRequired
+                    } else {
+                        val addonRecipes = productRecipeDao.getRecipesForProduct(addon.addonProductId)
+
+                        for (recipe in addonRecipes) {
+                            val ingredient = ingredientDao.getIngredientById(recipe.ingredientId)
+                                ?: return Result.failure(
+                                    IllegalStateException("Ingredient ${recipe.ingredientId} not found.")
+                                )
+
+                            if (ingredient.isPackaging) continue
+
+                            val deductionPerAddon = computeInventoryDeduction(
+                                recipeQuantity = recipe.quantityRequired,
+                                unitType = ingredient.unitType,
+                                estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
+                            )
+
+                            val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
+
+                            requiredByIngredient[recipe.ingredientId] =
+                                (requiredByIngredient[recipe.ingredientId] ?: 0.0) + totalRequired
+                        }
                     }
                 }
             }
@@ -309,6 +335,7 @@ class TransactionRepository @Inject constructor(
                 )
             }
 
+            autoSyncManager.requestSync("transaction_created")
             Result.success(transactionId)
         } catch (exception: Exception) {
             if (exception is kotlinx.coroutines.CancellationException) throw exception
@@ -348,6 +375,7 @@ class TransactionRepository @Inject constructor(
             )
         }
 
+        autoSyncManager.requestSync("transaction_voided")
         return Result.success(Unit)
     }
 
@@ -408,19 +436,39 @@ class TransactionRepository @Inject constructor(
         unitType: String,
         estimatedWeightPerUnit: Double
     ): Double {
-        val isPcsCanOrPack = unitType.equals("pcs", ignoreCase = true) || 
-                             unitType.equals("can", ignoreCase = true) ||
-                             unitType.equals("pack", ignoreCase = true)
+        val unit = unitType.lowercase(Locale.US)
+        
+        // Units that typically represent more than 1 gram and need conversion from recipe grams
+        val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
+                             unit == "kg" || unit == "unit" || unit == "units" ||
+                             unit == "bottle" || unit == "tub"
 
-        return if (isPcsCanOrPack) {
-            if (estimatedWeightPerUnit <= 0.0) {
-                // If weight is not set, assume recipe quantity is already in units (pcs/can/pack)
-                recipeQuantity
-            } else {
+        return if (needsConversion) {
+            if (estimatedWeightPerUnit > 0.0) {
                 recipeQuantity / estimatedWeightPerUnit
+            } else if (unit == "kg") {
+                recipeQuantity / 1000.0
+            } else {
+                recipeQuantity
             }
         } else {
             recipeQuantity
+        }
+    }
+
+    private fun getMixIngredientName(productName: String): String {
+        return when (productName) {
+            "Cheesecake Shake" -> "Lemon Square Cheesecake"
+            "Oreo Shake" -> "Oreo"
+            else -> productName.removeSuffix(" Shake")
+        }
+    }
+
+    private fun getMixIngredientQuantity(sizeName: String): Double {
+        return if (sizeName.equals("Large", ignoreCase = true)) {
+            220.0
+        } else {
+            150.0
         }
     }
 }

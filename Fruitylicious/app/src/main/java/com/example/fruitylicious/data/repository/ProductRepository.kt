@@ -6,6 +6,7 @@ import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.ProductVariantDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.ProductEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,7 +16,8 @@ class ProductRepository @Inject constructor(
     private val database: PosDatabase,
     private val productDao: ProductDao,
     private val productVariantDao: ProductVariantDao,
-    private val productRecipeDao: ProductRecipeDao
+    private val productRecipeDao: ProductRecipeDao,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeProducts(): Flow<List<ProductEntity>> {
@@ -78,6 +80,7 @@ class ProductRepository @Inject constructor(
             )
         )
 
+        autoSyncManager.requestSync("product_changed")
         return Result.success(Unit)
     }
 
@@ -88,6 +91,7 @@ class ProductRepository @Inject constructor(
             productVariantDao.softDeleteVariantsByProduct(productId, now)
             productRecipeDao.softDeleteRecipesByProduct(productId, now)
         }
+        autoSyncManager.requestSync("product_deleted")
         return Result.success(Unit)
     }
 

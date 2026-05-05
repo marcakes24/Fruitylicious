@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 
 data class SalesReportUiState(
     val period: String = "daily",
+    val selectedDate: Long = System.currentTimeMillis(),
+    val rangeText: String = "",
     val totalSales: Double = 0.0,
     val previousSales: Double = 0.0,
     val cashTotal: Double = 0.0,
@@ -45,13 +47,46 @@ class SalesReportViewModel @Inject constructor(
         branchId: Int?
     ) {
         _uiState.update {
-            it.copy(period = period)
+            it.copy(
+                period = period,
+                selectedDate = System.currentTimeMillis()
+            )
         }
 
         loadReport(
             branchId = branchId,
             period = period
         )
+    }
+
+    fun setSelectedDate(
+        date: Long,
+        branchId: Int?
+    ) {
+        _uiState.update {
+            it.copy(selectedDate = date)
+        }
+
+        loadReport(
+            branchId = branchId
+        )
+    }
+
+    fun navigatePeriod(
+        delta: Int,
+        branchId: Int?
+    ) {
+        val current = Calendar.getInstance().apply {
+            timeInMillis = _uiState.value.selectedDate
+        }
+
+        when (_uiState.value.period) {
+            "daily" -> current.add(Calendar.DAY_OF_YEAR, delta)
+            "weekly" -> current.add(Calendar.WEEK_OF_YEAR, delta)
+            "monthly" -> current.add(Calendar.MONTH, delta)
+        }
+
+        setSelectedDate(current.timeInMillis, branchId)
     }
 
     fun loadReport(
@@ -69,7 +104,11 @@ class SalesReportViewModel @Inject constructor(
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
-            val range = getRange(period)
+            val range = getRange(period, _uiState.value.selectedDate)
+
+            _uiState.update {
+                it.copy(rangeText = formatRangeText(period, range))
+            }
 
             when {
                 branchId == localBranchId -> {
@@ -291,60 +330,118 @@ class SalesReportViewModel @Inject constructor(
         val previousEnd: Long
     )
 
-    private fun getRange(period: String): Range {
-        val now = Calendar.getInstance()
-        val currentEnd = now.timeInMillis
+    private fun getRange(period: String, baseDate: Long): Range {
+        val base = Calendar.getInstance().apply {
+            timeInMillis = baseDate
+        }
+        
+        val isCurrentPeriod = isSamePeriod(period, base, Calendar.getInstance())
 
         return when (period) {
             "weekly" -> {
-                val start = Calendar.getInstance()
-
+                val start = base.clone() as Calendar
                 while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
                     start.add(Calendar.DAY_OF_YEAR, -1)
                 }
-
                 start.setStartOfDay()
 
-                val previousEnd = start.timeInMillis - 1
-                val previousStart = start.timeInMillis - 7L * 24L * 60L * 60L * 1000L
+                val end = if (isCurrentPeriod) {
+                    Calendar.getInstance()
+                } else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.DAY_OF_YEAR, 7)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
+
+                val previousStart = start.clone() as Calendar
+                previousStart.add(Calendar.DAY_OF_YEAR, -7)
+
+                val previousEnd = start.clone() as Calendar
+                previousEnd.add(Calendar.MILLISECOND, -1)
 
                 Range(
                     currentStart = start.timeInMillis,
-                    currentEnd = currentEnd,
-                    previousStart = previousStart,
-                    previousEnd = previousEnd
+                    currentEnd = end.timeInMillis,
+                    previousStart = previousStart.timeInMillis,
+                    previousEnd = previousEnd.timeInMillis
                 )
             }
 
             "monthly" -> {
-                val start = Calendar.getInstance()
+                val start = base.clone() as Calendar
                 start.set(Calendar.DAY_OF_MONTH, 1)
                 start.setStartOfDay()
 
-                val previousEnd = start.timeInMillis - 1
+                val end = if (isCurrentPeriod) {
+                    Calendar.getInstance()
+                } else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.MONTH, 1)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
 
-                val previousStartCalendar = start.clone() as Calendar
-                previousStartCalendar.add(Calendar.MONTH, -1)
+                val previousStart = start.clone() as Calendar
+                previousStart.add(Calendar.MONTH, -1)
+
+                val previousEnd = start.clone() as Calendar
+                previousEnd.add(Calendar.MILLISECOND, -1)
 
                 Range(
                     currentStart = start.timeInMillis,
-                    currentEnd = currentEnd,
-                    previousStart = previousStartCalendar.timeInMillis,
-                    previousEnd = previousEnd
+                    currentEnd = end.timeInMillis,
+                    previousStart = previousStart.timeInMillis,
+                    previousEnd = previousEnd.timeInMillis
                 )
             }
 
             else -> {
-                val start = Calendar.getInstance()
+                val start = base.clone() as Calendar
                 start.setStartOfDay()
+
+                val end = if (isCurrentPeriod) {
+                    Calendar.getInstance()
+                } else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.DAY_OF_YEAR, 1)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
+
+                val previousStart = start.clone() as Calendar
+                previousStart.add(Calendar.DAY_OF_YEAR, -1)
+
+                val previousEnd = start.clone() as Calendar
+                previousEnd.add(Calendar.MILLISECOND, -1)
 
                 Range(
                     currentStart = start.timeInMillis,
-                    currentEnd = currentEnd,
-                    previousStart = start.timeInMillis - 24L * 60L * 60L * 1000L,
-                    previousEnd = start.timeInMillis - 1
+                    currentEnd = end.timeInMillis,
+                    previousStart = previousStart.timeInMillis,
+                    previousEnd = previousEnd.timeInMillis
                 )
             }
+        }
+    }
+
+    private fun isSamePeriod(period: String, c1: Calendar, c2: Calendar): Boolean {
+        return when (period) {
+            "daily" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) &&
+                    c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR)
+            "weekly" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) &&
+                    c1.get(Calendar.WEEK_OF_YEAR) == c2.get(Calendar.WEEK_OF_YEAR)
+            "monthly" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) &&
+                    c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH)
+            else -> false
+        }
+    }
+
+    private fun formatRangeText(period: String, range: Range): String {
+        val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.US)
+        return when (period) {
+            "daily" -> sdf.format(java.util.Date(range.currentStart))
+            else -> "${sdf.format(java.util.Date(range.currentStart))} - ${sdf.format(java.util.Date(range.currentEnd))}"
         }
     }
 

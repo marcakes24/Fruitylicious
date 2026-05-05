@@ -10,6 +10,7 @@ import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -23,7 +24,8 @@ class StaffLogRepository @Inject constructor(
     private val userDao: UserDao,
     private val branchDao: BranchDao,
     private val auditLogDao: AuditLogDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeStaffLogs(branchId: Int): Flow<List<StaffLogEntity>> {
@@ -129,6 +131,7 @@ class StaffLogRepository @Inject constructor(
             )
         }
 
+        autoSyncManager.requestSync("clock_out")
         return Result.success(Unit)
     }
 
@@ -160,6 +163,7 @@ class StaffLogRepository @Inject constructor(
             )
         }
 
+        autoSyncManager.requestSync("clock_out")
         return Result.success(Unit)
     }
 

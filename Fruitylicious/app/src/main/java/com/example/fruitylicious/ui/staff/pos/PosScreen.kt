@@ -448,16 +448,6 @@ private fun ProductCustomizeDialog(
         productRecipe
     }
 
-    val mixRecipe = if (mixFlavor && selectedFlavor != null) {
-        recipes.filter { recipe ->
-            recipe.productId == selectedFlavor?.productId && 
-            recipe.variantId == null &&
-            ingredients.find { it.ingredientId == recipe.ingredientId }?.isPackaging != true
-        }
-    } else {
-        emptyList()
-    }
-
     val selectedAddonRecipes = recipes.filter { recipe ->
         selectedAddOns.any {
             it.productId == recipe.productId
@@ -484,9 +474,14 @@ private fun ProductCustomizeDialog(
                 (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
         }
 
-        mixRecipe.forEach { line ->
-            requirements[line.ingredientId] =
-                (requirements[line.ingredientId] ?: 0.0) + (line.quantityRequired * quantity)
+        if (mixFlavor && selectedFlavor != null) {
+            val ingredientName = getMixIngredientName(selectedFlavor!!.productName)
+            val ingredient = ingredients.find { it.ingredientName == ingredientName }
+            if (ingredient != null) {
+                val amount = getMixIngredientQuantity(selectedVariant?.sizeName ?: "Medium") * quantity
+                requirements[ingredient.ingredientId] =
+                    (requirements[ingredient.ingredientId] ?: 0.0) + amount
+            }
         }
 
         selectedAddonRecipes.forEach { line ->
@@ -505,9 +500,20 @@ private fun ProductCustomizeDialog(
 
             val available = if (stockItem != null && ingredient != null) {
                 val unit = ingredient.unitType.lowercase(Locale.US)
+                val weight = ingredient.estimatedWeightPerUnit
+                
+                val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
+                                     unit == "kg" || unit == "unit" || unit == "units" ||
+                                     unit == "bottle" || unit == "tub"
 
-                if ((unit == "can" || unit == "pcs" || unit == "pack") && ingredient.estimatedWeightPerUnit > 0.0) {
-                    stockItem.currentStock * ingredient.estimatedWeightPerUnit
+                if (needsConversion) {
+                    if (weight > 0.0) {
+                        stockItem.currentStock * weight
+                    } else if (unit == "kg") {
+                        stockItem.currentStock * 1000.0
+                    } else {
+                        stockItem.currentStock
+                    }
                 } else {
                     stockItem.currentStock
                 }
@@ -825,9 +831,20 @@ private fun ProductCustomizeDialog(
 
                                             val available = if (stockItem != null && ingredient != null) {
                                                 val unit = ingredient.unitType.lowercase(Locale.US)
+                                                val weight = ingredient.estimatedWeightPerUnit
 
-                                                if (unit == "can" || unit == "pcs" || unit == "pack") {
-                                                    stockItem.currentStock * ingredient.estimatedWeightPerUnit
+                                                val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
+                                                                     unit == "kg" || unit == "unit" || unit == "units" ||
+                                                                     unit == "bottle" || unit == "tub"
+
+                                                if (needsConversion) {
+                                                    if (weight > 0.0) {
+                                                        stockItem.currentStock * weight
+                                                    } else if (unit == "kg") {
+                                                        stockItem.currentStock * 1000.0
+                                                    } else {
+                                                        stockItem.currentStock
+                                                    }
                                                 } else {
                                                     stockItem.currentStock
                                                 }
@@ -1203,6 +1220,22 @@ private fun CartBottomSection(
                 onCheckout = onCheckout
             )
         }
+    }
+}
+
+private fun getMixIngredientName(productName: String): String {
+    return when (productName) {
+        "Cheesecake Shake" -> "Lemon Square Cheesecake"
+        "Oreo Shake" -> "Oreo"
+        else -> productName.removeSuffix(" Shake")
+    }
+}
+
+private fun getMixIngredientQuantity(sizeName: String): Double {
+    return if (sizeName.equals("Large", ignoreCase = true)) {
+        220.0
+    } else {
+        150.0
     }
 }
 

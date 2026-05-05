@@ -405,10 +405,6 @@ class AdminDashboardViewModel @Inject constructor(
                 message = result.message
             )
 
-            if (result.success) {
-                sessionManager.saveLastPulledAt(completedAt)
-            }
-
             _uiState.update {
                 it.copy(
                     isSyncing = false,

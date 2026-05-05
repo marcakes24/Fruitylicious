@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.repository.CartItem
 import com.example.fruitylicious.data.repository.CartRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,7 +43,8 @@ class CheckoutViewModel @Inject constructor(
     private val cartRepository: CartRepository,
     private val transactionRepository: TransactionRepository,
     private val sessionManager: SessionManager,
-    private val branchConfig: BranchConfig
+    private val branchConfig: BranchConfig,
+    private val autoSyncManager: AutoSyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CheckoutUiState())
@@ -133,6 +135,8 @@ class CheckoutViewModel @Inject constructor(
                     )
 
                     cartRepository.clearCart()
+
+                    autoSyncManager.requestSync("transaction_completed")
 
                     _uiState.update {
                         it.copy(

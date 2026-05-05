@@ -3,6 +3,7 @@ package com.example.fruitylicious.data.remote.api
 import com.example.fruitylicious.data.remote.dto.PullResponseDto
 import com.example.fruitylicious.data.remote.dto.PushRequestDto
 import com.example.fruitylicious.data.remote.dto.PushResponseDto
+import com.example.fruitylicious.data.remote.dto.HasUpdatesResponseDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -20,4 +21,9 @@ interface SyncApi {
     suspend fun pull(
         @Query("since") since: Long
     ): Response<PullResponseDto>
+
+    @GET("api/sync/has-updates")
+    suspend fun hasUpdates(
+        @Query("since") since: Long
+    ): Response<HasUpdatesResponseDto>
 }

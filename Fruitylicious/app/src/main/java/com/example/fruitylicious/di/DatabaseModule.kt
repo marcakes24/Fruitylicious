@@ -2,6 +2,8 @@ package com.example.fruitylicious.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.IngredientDao
@@ -16,9 +18,7 @@ import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.db.PosDatabase
-import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.fruitylicious.data.local.dao.ProductVariantDao
 import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import dagger.Module
@@ -67,100 +67,23 @@ object DatabaseModule {
             "fruitylicious_pos.db"
         )
             .addMigrations(MIGRATION_5_6)
-            .fallbackToDestructiveMigration(false)
             .addCallback(object : RoomDatabase.Callback() {
-                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
-                    seedDatabase(db)
-                }
-
-                override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                    super.onOpen(db)
-                    seedDatabase(db)
-                }
-
-                private fun seedDatabase(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    // We can't use userDao directly here easily without circular dependency if not careful,
+                    // but we can execute raw SQL for initial seed.
                     val now = System.currentTimeMillis()
-
                     db.execSQL(
-                        """
-                    INSERT OR IGNORE INTO branches (
-                        branchId,
-                        branchName,
-                        address,
-                        contactNumber,
-                        lastModified,
-                        isSynced,
-                        syncedAt
-                    ) VALUES (
-                        1,
-                        'Branch 1',
-                        'Default Branch Address',
-                        'N/A',
-                        $now,
-                        1,
-                        $now
+                        "INSERT OR IGNORE INTO users (userId, name, role, username, password, lastModified, isSynced, isDeleted) " +
+                                "VALUES (1, 'Default Admin', 'admin', '1', '1', $now, 0, 0)"
                     )
-                    """.trimIndent()
-                    )
-
                     db.execSQL(
-                        """
-                    INSERT OR IGNORE INTO users (
-                        userId,
-                        name,
-                        role,
-                        username,
-                        password,
-                        lastModified,
-                        isSynced,
-                        syncedAt,
-                        isDeleted,
-                        deletedAt
-                    ) VALUES (
-                        1,
-                        'Default Admin',
-                        'admin',
-                        'admin',
-                        'admin123',
-                        $now,
-                        1,
-                        $now,
-                        0,
-                        NULL
-                    )
-                    """.trimIndent()
-                    )
-
-                    db.execSQL(
-                        """
-                    INSERT OR IGNORE INTO users (
-                        userId,
-                        name,
-                        role,
-                        username,
-                        password,
-                        lastModified,
-                        isSynced,
-                        syncedAt,
-                        isDeleted,
-                        deletedAt
-                    ) VALUES (
-                        2,
-                        'Default Staff',
-                        'staff',
-                        'staff',
-                        'staff123',
-                        $now,
-                        1,
-                        $now,
-                        0,
-                        NULL
-                    )
-                    """.trimIndent()
+                        "INSERT OR IGNORE INTO users (userId, name, role, username, password, lastModified, isSynced, isDeleted) " +
+                                "VALUES (2, 'Default Staff', 'staff', 'staff', 'staff', $now, 0, 0)"
                     )
                 }
             })
+            .fallbackToDestructiveMigration(false)
             .build()
     }
 

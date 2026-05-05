@@ -146,6 +146,16 @@ class SessionManager @Inject constructor(
         return preferences.getString(KEY_LAST_SYNC_MESSAGE, "Not synced yet.") ?: "Not synced yet."
     }
 
+    fun setPendingSync(pending: Boolean) {
+        preferences.edit()
+            .putBoolean(KEY_PENDING_SYNC, pending)
+            .apply()
+    }
+
+    fun isPendingSync(): Boolean {
+        return preferences.getBoolean(KEY_PENDING_SYNC, false)
+    }
+
     companion object {
         private const val PREF_NAME = "fruitylicious_session"
 
@@ -162,6 +172,7 @@ class SessionManager @Inject constructor(
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
         private const val KEY_LAST_SYNC_SUCCESSFUL = "last_sync_successful"
         private const val KEY_LAST_SYNC_MESSAGE = "last_sync_message"
+        private const val KEY_PENDING_SYNC = "pending_sync"
 
         private const val SESSION_TIMEOUT_MILLIS = 1L * 60L * 60L * 1000L
     }

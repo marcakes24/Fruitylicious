@@ -35,10 +35,6 @@ class SyncWorker @AssistedInject constructor(
             message = syncResult.message
         )
 
-        if (syncResult.success) {
-            sessionManager.saveLastPulledAt(completedAt)
-        }
-
         SyncManager.scheduleNextSync(applicationContext)
 
         return if (syncResult.success) {

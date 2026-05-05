@@ -2,13 +2,15 @@ package com.example.fruitylicious.data.repository
 
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.entity.ProductRecipeEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class RecipeRepository @Inject constructor(
-    private val productRecipeDao: ProductRecipeDao
+    private val productRecipeDao: ProductRecipeDao,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeRecipes(): Flow<List<ProductRecipeEntity>> {
@@ -77,24 +79,28 @@ class RecipeRepository @Inject constructor(
             )
         )
 
+        autoSyncManager.requestSync("recipe_changed")
         return Result.success(Unit)
     }
 
     suspend fun deleteRecipe(recipeId: Int): Result<Unit> {
         val now = System.currentTimeMillis()
         productRecipeDao.softDeleteRecipe(recipeId, now)
+        autoSyncManager.requestSync("recipe_deleted")
         return Result.success(Unit)
     }
 
     suspend fun deleteRecipesForProduct(productId: Int): Result<Unit> {
         val now = System.currentTimeMillis()
         productRecipeDao.softDeleteRecipesByProduct(productId, now)
+        autoSyncManager.requestSync("recipe_deleted")
         return Result.success(Unit)
     }
 
     suspend fun deleteRecipesForVariant(variantId: Int): Result<Unit> {
         val now = System.currentTimeMillis()
         productRecipeDao.softDeleteRecipesByVariant(variantId, now)
+        autoSyncManager.requestSync("recipe_deleted")
         return Result.success(Unit)
     }
 

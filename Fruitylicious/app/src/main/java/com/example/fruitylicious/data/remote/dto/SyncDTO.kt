@@ -77,3 +77,9 @@ data class PullResponseDto(
     val staffLogs: List<StaffLogEntity> = emptyList(),
     val auditLogs: List<AuditLogEntity> = emptyList()
 )
+
+data class HasUpdatesResponseDto(
+    val hasUpdates: Boolean,
+    val changedCount: Int = 0,
+    val serverTime: Long
+)

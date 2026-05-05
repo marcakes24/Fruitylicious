@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Color
 import com.example.fruitylicious.sync.SyncManager
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -19,6 +20,9 @@ class MainActivity : ComponentActivity() {
     lateinit var syncManager: SyncManager
 
     @Inject
+    lateinit var autoSyncManager: AutoSyncManager
+
+    @Inject
     lateinit var sessionManager: SessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,6 +30,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         syncManager.start(applicationContext)
         syncManager.syncNow(applicationContext)
+        autoSyncManager.startNetworkObserver()
 
         setContent {
             MaterialTheme {

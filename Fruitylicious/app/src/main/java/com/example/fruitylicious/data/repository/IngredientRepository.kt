@@ -5,6 +5,7 @@ import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.IngredientEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,7 +14,8 @@ import javax.inject.Singleton
 class IngredientRepository @Inject constructor(
     private val database: PosDatabase,
     private val ingredientDao: IngredientDao,
-    private val productRecipeDao: ProductRecipeDao
+    private val productRecipeDao: ProductRecipeDao,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeIngredients(): Flow<List<IngredientEntity>> {
@@ -85,6 +87,7 @@ class IngredientRepository @Inject constructor(
             )
         )
 
+        autoSyncManager.requestSync("ingredient_changed")
         return Result.success(Unit)
     }
 
@@ -94,6 +97,7 @@ class IngredientRepository @Inject constructor(
             ingredientDao.softDeleteIngredient(ingredientId, now)
             productRecipeDao.softDeleteRecipesByIngredient(ingredientId, now)
         }
+        autoSyncManager.requestSync("ingredient_deleted")
         return Result.success(Unit)
     }
 

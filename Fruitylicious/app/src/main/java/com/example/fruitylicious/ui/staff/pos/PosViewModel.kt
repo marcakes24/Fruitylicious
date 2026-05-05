@@ -183,8 +183,9 @@ class PosViewModel @Inject constructor(
                         addonProductId = it.productId,
                         addonName = it.productName,
                         quantity = 1,
-                        unitPrice = it.price,
-                        subtotal = it.price
+                        unitPrice = 15.0,
+                        subtotal = 15.0,
+                        addonType = "MIX"
                     )
                 )
             }
@@ -196,7 +197,8 @@ class PosViewModel @Inject constructor(
                         addonName = addon.productName,
                         quantity = 1,
                         unitPrice = addon.price,
-                        subtotal = addon.price
+                        subtotal = addon.price,
+                        addonType = "ADDON"
                     )
                 )
             }

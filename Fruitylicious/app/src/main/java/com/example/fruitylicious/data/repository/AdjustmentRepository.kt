@@ -13,6 +13,7 @@ import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryAdjustmentEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -28,7 +29,8 @@ class AdjustmentRepository @Inject constructor(
     private val userDao: UserDao,
     private val branchDao: BranchDao,
     private val ingredientDao: IngredientDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeAdjustments(branchId: Int): Flow<List<InventoryAdjustmentEntity>> {
@@ -181,6 +183,7 @@ class AdjustmentRepository @Inject constructor(
                     )
                 )
             }
+            autoSyncManager.requestSync("inventory_adjustment_saved")
             return Result.success(Unit)
         } catch (e: Exception) {
             return Result.failure(e)

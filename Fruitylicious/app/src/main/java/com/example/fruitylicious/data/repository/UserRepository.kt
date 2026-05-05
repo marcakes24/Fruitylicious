@@ -2,13 +2,15 @@ package com.example.fruitylicious.data.repository
 
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class UserRepository @Inject constructor(
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeUsers(): Flow<List<UserEntity>> {
@@ -83,6 +85,7 @@ class UserRepository @Inject constructor(
             )
         )
 
+        autoSyncManager.requestSync("user_changed")
         return Result.success(Unit)
     }
 
@@ -93,6 +96,7 @@ class UserRepository @Inject constructor(
 
         val now = System.currentTimeMillis()
         userDao.softDeleteUser(userId, now)
+        autoSyncManager.requestSync("user_deleted")
         return Result.success(Unit)
     }
 

@@ -21,6 +21,9 @@ import com.example.fruitylicious.data.local.dao.BranchDao
 
 data class SalesSummaryUiState(
     val selectedBranchId: Int? = 1,
+    val period: String = "daily",
+    val selectedDate: Long = System.currentTimeMillis(),
+    val rangeText: String = "",
     val isAdmin: Boolean = false,
     val localBranchId: Int = 1,
     val branches: List<BranchEntity> = emptyList(),
@@ -116,6 +119,28 @@ class SalesSummaryViewModel @Inject constructor(
         loadSummary(finalBranchId)
     }
 
+    fun setPeriod(period: String) {
+        _uiState.update { it.copy(period = period) }
+        loadSummary()
+    }
+
+    fun setSelectedDate(date: Long) {
+        _uiState.update { it.copy(selectedDate = date) }
+        loadSummary()
+    }
+
+    fun navigatePeriod(delta: Int) {
+        val current = Calendar.getInstance().apply {
+            timeInMillis = _uiState.value.selectedDate
+        }
+        when (_uiState.value.period) {
+            "daily" -> current.add(Calendar.DAY_OF_YEAR, delta)
+            "weekly" -> current.add(Calendar.WEEK_OF_YEAR, delta)
+            "monthly" -> current.add(Calendar.MONTH, delta)
+        }
+        setSelectedDate(current.timeInMillis)
+    }
+
     fun loadSummary(
         branchId: Int? = _uiState.value.selectedBranchId
     ) {
@@ -129,141 +154,119 @@ class SalesSummaryViewModel @Inject constructor(
 
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
+            val range = getRange(_uiState.value.period, _uiState.value.selectedDate)
+
+            _uiState.update {
+                it.copy(rangeText = formatRangeText(_uiState.value.period, range))
+            }
 
             when {
                 branchId == localBranchId -> {
-                    loadLocalSummary(localBranchId)
+                    loadLocalSummary(localBranchId, range)
                 }
 
                 !isAdmin -> {
-                    loadLocalSummary(localBranchId)
+                    loadLocalSummary(localBranchId, range)
                 }
 
                 !isOnline -> {
-                    loadLocalSummary(localBranchId)
+                    loadLocalSummary(localBranchId, range)
                 }
 
                 branchId == null -> {
-                    loadRemoteSummary(null)
+                    loadRemoteSummary(null, range)
                 }
 
                 else -> {
-                    loadRemoteSummary(branchId)
+                    loadRemoteSummary(branchId, range)
                 }
             }
         }
     }
 
     private suspend fun loadLocalSummary(
-        branchId: Int
+        branchId: Int,
+        range: Range
     ) {
         try {
-            val now = Calendar.getInstance()
-
-            val todayStart = Calendar.getInstance().apply {
-                setStartOfDay()
-            }
-
-            val yesterdayStart = Calendar.getInstance().apply {
-                setStartOfDay()
-                add(Calendar.DAY_OF_YEAR, -1)
-            }
-
-            val yesterdayEnd = todayStart.timeInMillis - 1
-
-            val todaySales = transactionDao.getSalesTotal(
+            val totalSales = transactionDao.getSalesTotal(
                 branchId = branchId,
-                from = todayStart.timeInMillis,
-                to = now.timeInMillis
+                from = range.currentStart,
+                to = range.currentEnd
             )
 
-            val yesterdaySales = transactionDao.getSalesTotal(
+            val previousSales = transactionDao.getSalesTotal(
                 branchId = branchId,
-                from = yesterdayStart.timeInMillis,
-                to = yesterdayEnd
+                from = range.previousStart,
+                to = range.previousEnd
             )
 
-            val todayCash = transactionDao.getPaymentTotal(
+            val cashTotal = transactionDao.getPaymentTotal(
                 branchId = branchId,
                 paymentType = "Cash",
-                from = todayStart.timeInMillis,
-                to = now.timeInMillis
+                from = range.currentStart,
+                to = range.currentEnd
             )
 
-            val todayGcash = transactionDao.getPaymentTotal(
+            val gcashTotal = transactionDao.getPaymentTotal(
                 branchId = branchId,
                 paymentType = "Gcash",
-                from = todayStart.timeInMillis,
-                to = now.timeInMillis
+                from = range.currentStart,
+                to = range.currentEnd
             )
 
+            // For charts, we still want to show the context of the week/month
             val weekStart = Calendar.getInstance().apply {
-                setStartOfDay()
-
+                timeInMillis = range.currentStart
                 while (get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
                     add(Calendar.DAY_OF_YEAR, -1)
                 }
-            }
-
-            val weekData = MutableList(7) { 0.0 }
-
-            repeat(7) { index ->
-                val dayStart = weekStart.clone() as Calendar
-                dayStart.add(Calendar.DAY_OF_YEAR, index)
-
-                val dayEnd = dayStart.clone() as Calendar
-                dayEnd.add(Calendar.DAY_OF_YEAR, 1)
-
-                weekData[index] = transactionDao.getSalesTotal(
-                    branchId = branchId,
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
-            }
-
-            val monthStart = Calendar.getInstance().apply {
-                set(Calendar.DAY_OF_MONTH, 1)
                 setStartOfDay()
             }
 
-            val monthTotal = transactionDao.getSalesTotal(
-                branchId = branchId,
-                from = monthStart.timeInMillis,
-                to = now.timeInMillis
-            )
+            val weekData = MutableList(7) { 0.0 }
+            repeat(7) { index ->
+                val ds = weekStart.clone() as Calendar
+                ds.add(Calendar.DAY_OF_YEAR, index)
+                val de = ds.clone() as Calendar
+                de.add(Calendar.DAY_OF_YEAR, 1)
+                weekData[index] = transactionDao.getSalesTotal(branchId, ds.timeInMillis, de.timeInMillis - 1)
+            }
 
-            val monthTransactions = transactionDao.getTransactionCount(
-                branchId = branchId,
-                from = monthStart.timeInMillis,
-                to = now.timeInMillis
-            )
+            val monthStart = Calendar.getInstance().apply {
+                timeInMillis = range.currentStart
+                set(Calendar.DAY_OF_MONTH, 1)
+                setStartOfDay()
+            }
+            
+            val monthTotal = transactionDao.getSalesTotal(branchId, monthStart.timeInMillis, range.currentEnd)
+            val monthTransactions = transactionDao.getTransactionCount(branchId, monthStart.timeInMillis, range.currentEnd)
 
-            val daysInMonthSoFar = now.get(Calendar.DAY_OF_MONTH)
-            val monthLineData = MutableList(daysInMonthSoFar) { 0.0 }
+            val cal = Calendar.getInstance().apply { timeInMillis = range.currentEnd }
+            val daysCount = if (isSameMonth(monthStart, Calendar.getInstance())) {
+                Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+            } else {
+                monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
+            }
 
-            repeat(daysInMonthSoFar) { index ->
-                val dayStart = monthStart.clone() as Calendar
-                dayStart.add(Calendar.DAY_OF_MONTH, index)
-
-                val dayEnd = dayStart.clone() as Calendar
-                dayEnd.add(Calendar.DAY_OF_MONTH, 1)
-
-                monthLineData[index] = transactionDao.getSalesTotal(
-                    branchId = branchId,
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
+            val monthLineData = MutableList(daysCount) { 0.0 }
+            repeat(daysCount) { index ->
+                val ds = monthStart.clone() as Calendar
+                ds.add(Calendar.DAY_OF_MONTH, index)
+                val de = ds.clone() as Calendar
+                de.add(Calendar.DAY_OF_MONTH, 1)
+                monthLineData[index] = transactionDao.getSalesTotal(branchId, ds.timeInMillis, de.timeInMillis - 1)
             }
 
             _uiState.update {
                 it.copy(
-                    todaySales = todaySales,
-                    yesterdaySales = yesterdaySales,
+                    todaySales = totalSales,
+                    yesterdaySales = previousSales,
                     weekData = weekData,
                     monthTotal = monthTotal,
                     monthTransactions = monthTransactions,
-                    todayCash = todayCash,
-                    todayGcash = todayGcash,
+                    todayCash = cashTotal,
+                    todayGcash = gcashTotal,
                     monthLineData = monthLineData,
                     isLoading = false,
                     error = null
@@ -280,94 +283,53 @@ class SalesSummaryViewModel @Inject constructor(
     }
 
     private suspend fun loadRemoteSummary(
-        branchId: Int?
+        branchId: Int?,
+        range: Range
     ) {
         try {
-            val nowCalendar = Calendar.getInstance()
+            val todayReport = getRemoteSalesReport(branchId, range.currentStart, range.currentEnd)
+            val previousReport = getRemoteSalesReport(branchId, range.previousStart, range.previousEnd)
 
-            val todayStart = Calendar.getInstance().apply {
+            // Context for charts
+            val weekStart = Calendar.getInstance().apply {
+                timeInMillis = range.currentStart
+                while (get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) { add(Calendar.DAY_OF_YEAR, -1) }
                 setStartOfDay()
             }
-
-            val yesterdayStart = Calendar.getInstance().apply {
-                setStartOfDay()
-                add(Calendar.DAY_OF_YEAR, -1)
+            val weekData = MutableList(7) { 0.0 }
+            repeat(7) { index ->
+                val ds = weekStart.clone() as Calendar
+                ds.add(Calendar.DAY_OF_YEAR, index)
+                val de = ds.clone() as Calendar
+                de.add(Calendar.DAY_OF_YEAR, 1)
+                weekData[index] = getRemoteSalesReport(branchId, ds.timeInMillis, de.timeInMillis - 1).totalSales
             }
-
-            val yesterdayEnd = todayStart.timeInMillis - 1
 
             val monthStart = Calendar.getInstance().apply {
+                timeInMillis = range.currentStart
                 set(Calendar.DAY_OF_MONTH, 1)
                 setStartOfDay()
             }
+            val monthReport = getRemoteSalesReport(branchId, monthStart.timeInMillis, range.currentEnd)
 
-            val todayReport = getRemoteSalesReport(
-                branchId = branchId,
-                from = todayStart.timeInMillis,
-                to = nowCalendar.timeInMillis
-            )
-
-            val yesterdayReport = getRemoteSalesReport(
-                branchId = branchId,
-                from = yesterdayStart.timeInMillis,
-                to = yesterdayEnd
-            )
-
-            val monthReport = getRemoteSalesReport(
-                branchId = branchId,
-                from = monthStart.timeInMillis,
-                to = nowCalendar.timeInMillis
-            )
-
-            val weekStart = Calendar.getInstance().apply {
-                setStartOfDay()
-
-                while (get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                }
+            val daysCount = if (isSameMonth(monthStart, Calendar.getInstance())) {
+                Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+            } else {
+                monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
             }
-
-            val weekData = MutableList(7) { 0.0 }
-
-            repeat(7) { index ->
-                val dayStart = weekStart.clone() as Calendar
-                dayStart.add(Calendar.DAY_OF_YEAR, index)
-
-                val dayEnd = dayStart.clone() as Calendar
-                dayEnd.add(Calendar.DAY_OF_YEAR, 1)
-
-                val report = getRemoteSalesReport(
-                    branchId = branchId,
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
-
-                weekData[index] = report.totalSales
-            }
-
-            val daysInMonthSoFar = nowCalendar.get(Calendar.DAY_OF_MONTH)
-            val monthLineData = MutableList(daysInMonthSoFar) { 0.0 }
-
-            repeat(daysInMonthSoFar) { index ->
-                val dayStart = monthStart.clone() as Calendar
-                dayStart.add(Calendar.DAY_OF_MONTH, index)
-
-                val dayEnd = dayStart.clone() as Calendar
-                dayEnd.add(Calendar.DAY_OF_MONTH, 1)
-
-                val report = getRemoteSalesReport(
-                    branchId = branchId,
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
-
-                monthLineData[index] = report.totalSales
+            val monthLineData = MutableList(daysCount) { 0.0 }
+            repeat(daysCount) { index ->
+                val ds = monthStart.clone() as Calendar
+                ds.add(Calendar.DAY_OF_MONTH, index)
+                val de = ds.clone() as Calendar
+                de.add(Calendar.DAY_OF_MONTH, 1)
+                monthLineData[index] = getRemoteSalesReport(branchId, ds.timeInMillis, de.timeInMillis - 1).totalSales
             }
 
             _uiState.update {
                 it.copy(
                     todaySales = todayReport.totalSales,
-                    yesterdaySales = yesterdayReport.totalSales,
+                    yesterdaySales = previousReport.totalSales,
                     weekData = weekData,
                     monthTotal = monthReport.totalSales,
                     monthTransactions = monthReport.totalTransactions,
@@ -387,6 +349,83 @@ class SalesSummaryViewModel @Inject constructor(
             }
         }
     }
+
+    private data class Range(
+        val currentStart: Long,
+        val currentEnd: Long,
+        val previousStart: Long,
+        val previousEnd: Long
+    )
+
+    private fun getRange(period: String, baseDate: Long): Range {
+        val base = Calendar.getInstance().apply { timeInMillis = baseDate }
+        val isCurrentPeriod = isSamePeriod(period, base, Calendar.getInstance())
+
+        return when (period) {
+            "weekly" -> {
+                val start = base.clone() as Calendar
+                while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) { start.add(Calendar.DAY_OF_YEAR, -1) }
+                start.setStartOfDay()
+                val end = if (isCurrentPeriod) Calendar.getInstance() else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.DAY_OF_YEAR, 7)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
+                val ps = start.clone() as Calendar; ps.add(Calendar.DAY_OF_YEAR, -7)
+                val pe = start.clone() as Calendar; pe.add(Calendar.MILLISECOND, -1)
+                Range(start.timeInMillis, end.timeInMillis, ps.timeInMillis, pe.timeInMillis)
+            }
+            "monthly" -> {
+                val start = base.clone() as Calendar
+                start.set(Calendar.DAY_OF_MONTH, 1)
+                start.setStartOfDay()
+                val end = if (isCurrentPeriod) Calendar.getInstance() else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.MONTH, 1)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
+                val ps = start.clone() as Calendar; ps.add(Calendar.MONTH, -1)
+                val pe = start.clone() as Calendar; pe.add(Calendar.MILLISECOND, -1)
+                Range(start.timeInMillis, end.timeInMillis, ps.timeInMillis, pe.timeInMillis)
+            }
+            else -> {
+                val start = base.clone() as Calendar
+                start.setStartOfDay()
+                val end = if (isCurrentPeriod) Calendar.getInstance() else {
+                    val e = start.clone() as Calendar
+                    e.add(Calendar.DAY_OF_YEAR, 1)
+                    e.add(Calendar.MILLISECOND, -1)
+                    e
+                }
+                val ps = start.clone() as Calendar; ps.add(Calendar.DAY_OF_YEAR, -1)
+                val pe = start.clone() as Calendar; pe.add(Calendar.MILLISECOND, -1)
+                Range(start.timeInMillis, end.timeInMillis, ps.timeInMillis, pe.timeInMillis)
+            }
+        }
+    }
+
+    private fun isSamePeriod(period: String, c1: Calendar, c2: Calendar): Boolean {
+        return when (period) {
+            "daily" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR)
+            "weekly" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.WEEK_OF_YEAR) == c2.get(Calendar.WEEK_OF_YEAR)
+            "monthly" -> c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH)
+            else -> false
+        }
+    }
+
+    private fun isSameMonth(c1: Calendar, c2: Calendar) =
+        c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) && c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH)
+
+    private fun formatRangeText(period: String, range: Range): String {
+        val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.US)
+        return when (period) {
+            "daily" -> sdf.format(java.util.Date(range.currentStart))
+            else -> "${sdf.format(java.util.Date(range.currentStart))} - ${sdf.format(java.util.Date(range.currentEnd))}"
+        }
+    }
+
 
     private suspend fun getRemoteSalesReport(
         branchId: Int?,

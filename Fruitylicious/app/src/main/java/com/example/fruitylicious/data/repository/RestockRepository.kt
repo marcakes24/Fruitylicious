@@ -14,6 +14,7 @@ import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -29,7 +30,8 @@ class RestockRepository @Inject constructor(
     private val userDao: UserDao,
     private val branchDao: BranchDao,
     private val ingredientDao: IngredientDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeRestockLogs(branchId: Int): Flow<List<RestockLogEntity>> {
@@ -175,6 +177,7 @@ class RestockRepository @Inject constructor(
                     )
                 )
             }
+            autoSyncManager.requestSync("restock_saved")
             return Result.success(Unit)
         } catch (e: Exception) {
             return Result.failure(e)

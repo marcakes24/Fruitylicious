@@ -7,14 +7,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +35,7 @@ import com.example.fruitylicious.ADMIN_SALES_SUMMARY
 import java.util.Locale
 import kotlin.math.abs
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SalesTabContent(
     branchId: Int?,
@@ -36,6 +43,8 @@ fun SalesTabContent(
     viewModel: SalesReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(branchId) {
         viewModel.loadReport(branchId)
@@ -49,6 +58,33 @@ fun SalesTabContent(
 
     val isUp = pctChange >= 0.0
 
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = uiState.selectedDate
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        viewModel.setSelectedDate(it, branchId)
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -56,32 +92,85 @@ fun SalesTabContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(Color.White)
-                .padding(4.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            listOf("daily", "weekly", "monthly").forEach { period ->
-                val isSelected = uiState.period == period
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .padding(4.dp)
+            ) {
+                listOf("daily", "weekly", "monthly").forEach { period ->
+                    val isSelected = uiState.period == period
 
-                Box(
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color.Transparent)
+                            .clickable {
+                                viewModel.setPeriod(period, branchId)
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = period.replaceFirstChar { it.uppercase() },
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) RptGreen else RptTextSub
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { viewModel.navigatePeriod(-1, branchId) }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Previous",
+                        tint = RptGreen
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFFE8F5E9) else Color.Transparent)
-                        .clickable {
-                            viewModel.setPeriod(period, branchId)
-                        }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
+                        .clickable { showDatePicker = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = RptGreen
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = period,
+                        text = uiState.rangeText,
                         fontSize = 14.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) RptGreen else RptTextSub
+                        fontWeight = FontWeight.Bold,
+                        color = RptTextMain
+                    )
+                }
+
+                IconButton(onClick = { viewModel.navigatePeriod(1, branchId) }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Next",
+                        tint = RptGreen
                     )
                 }
             }

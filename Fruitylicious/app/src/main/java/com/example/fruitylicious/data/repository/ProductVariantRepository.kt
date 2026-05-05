@@ -5,6 +5,7 @@ import com.example.fruitylicious.data.local.dao.ProductRecipeDao
 import com.example.fruitylicious.data.local.dao.ProductVariantDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
+import com.example.fruitylicious.sync.AutoSyncManager
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,7 +15,8 @@ import kotlin.math.absoluteValue
 class ProductVariantRepository @Inject constructor(
     private val database: PosDatabase,
     private val productVariantDao: ProductVariantDao,
-    private val productRecipeDao: ProductRecipeDao
+    private val productRecipeDao: ProductRecipeDao,
+    private val autoSyncManager: AutoSyncManager
 ) {
 
     fun observeAllVariants(): Flow<List<ProductVariantEntity>> {
@@ -67,6 +69,7 @@ class ProductVariantRepository @Inject constructor(
             )
         )
 
+        autoSyncManager.requestSync("product_variant_changed")
         return Result.success(Unit)
     }
 
@@ -76,12 +79,14 @@ class ProductVariantRepository @Inject constructor(
             productVariantDao.softDeleteVariant(variantId, now)
             productRecipeDao.softDeleteRecipesByVariant(variantId, now)
         }
+        autoSyncManager.requestSync("product_variant_deleted")
         return Result.success(Unit)
     }
 
     suspend fun deleteVariantsForProduct(productId: Int): Result<Unit> {
         val now = System.currentTimeMillis()
         productVariantDao.softDeleteVariantsByProduct(productId, now)
+        autoSyncManager.requestSync("product_variant_deleted")
         return Result.success(Unit)
     }
 
