@@ -306,7 +306,10 @@ fun WasteManagementScreen(
                 item {
                     WasteHistoryCard(
                         items = filteredHistory,
-                        onImageClick = { file -> expandedImageFile = file }
+                        isLoadingMore = uiState.isLoadingMore,
+                        hasMore = uiState.hasMore,
+                        onImageClick = { file -> expandedImageFile = file },
+                        onLoadMore = { viewModel.loadMore() }
                     )
                 }
             }
@@ -563,7 +566,10 @@ private fun FilterCard(
 @Composable
 private fun WasteHistoryCard(
     items: List<WasteHistoryRow>,
-    onImageClick: (File) -> Unit
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onImageClick: (File) -> Unit,
+    onLoadMore: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -626,6 +632,18 @@ private fun WasteHistoryCard(
                         if (index < items.size - 1) {
                             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
                         }
+                    }
+                }
+
+                if (hasMore) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onLoadMore,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoadingMore,
+                        colors = ButtonDefaults.buttonColors(containerColor = WsGreen)
+                    ) {
+                        Text(if (isLoadingMore) "Loading..." else "Load More")
                     }
                 }
             }

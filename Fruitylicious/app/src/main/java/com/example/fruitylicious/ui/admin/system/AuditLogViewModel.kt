@@ -42,6 +42,9 @@ data class AuditLogUiState(
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = true,
+    val currentPage: Int = 0,
     val error: String? = null
 )
 
@@ -68,6 +71,8 @@ class AuditLogViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<AuditLogUiState> = _uiState.asStateFlow()
+
+    private val PAGE_SIZE = 20
 
     private var localAuditLogs: List<AuditLogEntity> = emptyList()
     private var localUsers: List<UserEntity> = emptyList()
@@ -164,6 +169,59 @@ class AuditLogViewModel @Inject constructor(
         }
     }
 
+    fun loadMore() {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+        
+        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
+
+        _uiState.update { it.copy(isLoadingMore = true) }
+
+        viewModelScope.launch {
+            val nextPage = state.currentPage + 1
+            val offset = nextPage * PAGE_SIZE
+            
+            val newEntities = if (state.selectedBranchId == null) {
+                auditLogDao.getAuditLogsPaged(PAGE_SIZE, offset)
+            } else {
+                auditLogDao.getAuditLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
+            }
+            
+            if (newEntities.isEmpty()) {
+                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
+                return@launch
+            }
+            
+            val userMap = localUsers.associateBy { it.userId }
+            val newRows = newEntities.map { log ->
+                val user = userMap[log.userId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                AuditLogRow(
+                    logId = log.logId,
+                    action = extractActionTitle(log.action),
+                    description = log.action,
+                    userName = user?.name ?: "Unknown User",
+                    username = user?.username ?: "unknown",
+                    tableAffected = log.tableAffected,
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    timestamp = log.timestamp
+                )
+            }
+
+            _uiState.update { 
+                it.copy(
+                    logs = it.logs + newRows,
+                    currentPage = nextPage,
+                    isLoadingMore = false,
+                    hasMore = newRows.size == PAGE_SIZE
+                )
+            }
+        }
+    }
+
     private fun loadLogs() {
         val state = _uiState.value
 
@@ -196,6 +254,7 @@ class AuditLogViewModel @Inject constructor(
 
         val rows = localAuditLogs
             .filter { it.branchId == branchId }
+            .take(PAGE_SIZE)
             .map { log ->
                 val user = userMap[log.userId]
 
@@ -216,6 +275,8 @@ class AuditLogViewModel @Inject constructor(
             it.copy(
                 logs = rows,
                 isLoading = false,
+                hasMore = rows.size >= PAGE_SIZE,
+                currentPage = 0,
                 error = null
             )
         }

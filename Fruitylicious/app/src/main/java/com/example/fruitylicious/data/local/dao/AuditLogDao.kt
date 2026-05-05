@@ -12,6 +12,12 @@ interface AuditLogDao {
     @Query("SELECT * FROM audit_logs ORDER BY timestamp DESC")
     fun observeAllAuditLogs(): Flow<List<AuditLogEntity>>
 
+    @Query("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getAuditLogsPaged(limit: Int, offset: Int): List<AuditLogEntity>
+
+    @Query("SELECT * FROM audit_logs WHERE branchId = :branchId ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getAuditLogsByBranchPaged(branchId: Int, limit: Int, offset: Int): List<AuditLogEntity>
+
     @Query("SELECT * FROM audit_logs WHERE branchId = :branchId ORDER BY timestamp DESC")
     fun observeAuditLogsByBranch(branchId: Int): Flow<List<AuditLogEntity>>
 

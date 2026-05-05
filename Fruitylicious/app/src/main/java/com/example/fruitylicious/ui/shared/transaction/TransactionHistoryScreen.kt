@@ -238,9 +238,12 @@ fun TransactionHistoryScreen(
                     TransactionHistoryCard(
                         transactions = filteredTransactions,
                         isLoading = uiState.isLoading,
+                        isLoadingMore = uiState.isLoadingMore,
+                        hasMore = uiState.hasMore,
                         isAdmin = uiState.isAdmin,
                         onTransactionClick = { selectedTransaction = it },
-                        onVoidClick = { transactionToVoid = it }
+                        onVoidClick = { transactionToVoid = it },
+                        onLoadMore = { viewModel.loadMore() }
                     )
                 }
             }
@@ -443,9 +446,12 @@ private fun FilterCard(
 private fun TransactionHistoryCard(
     transactions: List<TransactionHistoryRow>,
     isLoading: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
     isAdmin: Boolean,
     onTransactionClick: (TransactionHistoryRow) -> Unit,
-    onVoidClick: (TransactionHistoryRow) -> Unit
+    onVoidClick: (TransactionHistoryRow) -> Unit,
+    onLoadMore: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -485,7 +491,7 @@ private fun TransactionHistoryCard(
             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
             when {
-                isLoading -> {
+                isLoading && transactions.isEmpty() -> {
                     EmptyText("Loading transactions...")
                 }
 
@@ -504,6 +510,18 @@ private fun TransactionHistoryCard(
 
                         if (index < transactions.size - 1) {
                             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                        }
+                    }
+
+                    if (hasMore) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onLoadMore,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoadingMore,
+                            colors = ButtonDefaults.buttonColors(containerColor = ThGreen)
+                        ) {
+                            Text(if (isLoadingMore) "Loading..." else "Load More")
                         }
                     }
                 }

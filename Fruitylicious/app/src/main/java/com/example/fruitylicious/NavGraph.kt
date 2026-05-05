@@ -187,7 +187,9 @@ fun FruityliciousNavGraph(
                     }
                 },
                 onBack = {
-                    safeBack(STAFF_DASHBOARD)
+                    val role = sessionManager.getRole()
+                    val fallback = if (role.equals("admin", ignoreCase = true)) ADMIN_DASHBOARD else STAFF_DASHBOARD
+                    safeBack(fallback)
                 }
             )
         }
@@ -224,55 +226,102 @@ fun FruityliciousNavGraph(
         composable(STAFF_INVENTORY) {
             InventoryMonitoringScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_ADJUSTMENT) {
             InventoryAdjustmentScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_RESTOCK_HISTORY) {
             RestockScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_WASTE_HISTORY) {
             WasteManagementScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_SALES_SUMMARY) {
             StaffSalesSummaryScreen(
-                navController = navController
+                navController = navController,
+                staffName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_TRANSACTION_HISTORY) {
             SharedTransactionHistoryScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_QUEUE) {
             QueueScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(STAFF_NOTIFICATIONS) {
             SharedNotificationsScreen(
                 navController = navController,
-                mode = SharedScreenMode.STAFF
+                mode = SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
@@ -284,98 +333,179 @@ fun FruityliciousNavGraph(
 
         composable(ADMIN_PRODUCTS) {
             ManageProductsScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_INGREDIENTS) {
             ManageIngredientsScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_RECIPES) {
             RecipeManagementScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_INVENTORY) {
             InventoryMonitoringScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_ADJUSTMENT) {
             InventoryAdjustmentScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_WASTE_HISTORY) {
             WasteManagementScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_RESTOCK_HISTORY) {
             RestockScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_USERS) {
             UserManagementScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_STAFF_LOGS) {
             AdminStaffLogScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_REPORTS_DASHBOARD) {
             ReportsScreen(
-                navController = navController
+                navController = navController,
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_AUDIT_LOGS) {
             AuditLogScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_SALES_SUMMARY) {
             AdminSalesSummaryScreen(
-                navController = navController
+                navController = navController,
+                adminName = sessionManager.getUserName(),
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_QUEUE) {
             QueueScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(ADMIN_NOTIFICATIONS) {
             SharedNotificationsScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
 
         composable(TRANSACTION_HISTORY) {
             SharedTransactionHistoryScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN
+                mode = SharedScreenMode.ADMIN,
+                userName = sessionManager.getUserName(),
+                branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
             )
         }
         }

@@ -43,6 +43,12 @@ interface RestockLogDao {
     @Query("SELECT * FROM restock_logs ORDER BY dateTime DESC")
     fun observeAllRestockLogs(): Flow<List<RestockLogEntity>>
 
+    @Query("SELECT * FROM restock_logs ORDER BY dateTime DESC LIMIT :limit OFFSET :offset")
+    suspend fun getAllRestockLogsPaged(limit: Int, offset: Int): List<RestockLogEntity>
+
+    @Query("SELECT * FROM restock_logs WHERE branchId = :branchId ORDER BY dateTime DESC LIMIT :limit OFFSET :offset")
+    suspend fun getRestockLogsByBranchPaged(branchId: Int, limit: Int, offset: Int): List<RestockLogEntity>
+
     @Query(
         """
     SELECT COALESCE(SUM(quantityAdded), 0)

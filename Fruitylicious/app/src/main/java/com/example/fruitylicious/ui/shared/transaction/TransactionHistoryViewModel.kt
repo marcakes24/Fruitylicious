@@ -63,6 +63,9 @@ data class TransactionHistoryUiState(
     val isOnline: Boolean = false,
     val canAccessCrossBranch: Boolean = false,
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = true,
+    val currentPage: Int = 0,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -94,6 +97,8 @@ class TransactionHistoryViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
+
+    private val PAGE_SIZE = 20
 
     private var localTransactions: List<TransactionEntity> = emptyList()
     private var localTransactionItems: List<TransactionItemEntity> = emptyList()
@@ -174,6 +179,73 @@ class TransactionHistoryViewModel @Inject constructor(
         }
 
         loadTransactions()
+    }
+
+    fun loadMore() {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+
+        _uiState.update { it.copy(isLoadingMore = true) }
+        
+        viewModelScope.launch {
+            val nextPage = state.currentPage + 1
+            val offset = nextPage * PAGE_SIZE
+            
+            val newEntities = if (state.selectedBranchId == null) {
+                transactionDao.getTransactionsPaged(PAGE_SIZE, offset)
+            } else {
+                transactionDao.getTransactionsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
+            }
+            
+            if (newEntities.isEmpty()) {
+                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
+                return@launch
+            }
+            
+            val userMap = users.associateBy { it.userId }
+            val productMap = products.associateBy { it.productId }
+            val itemsByTransaction = localTransactionItems.groupBy { it.transactionId }
+            val addonsByItem = localTransactionAddons.groupBy { it.transactionItemId }
+
+            val newRows = newEntities.map { transaction ->
+                val user = userMap[transaction.userId]
+                val itemRows = itemsByTransaction[transaction.transactionId].orEmpty().map { item ->
+                    val product = productMap[item.productId]
+                    val addonNames = addonsByItem[item.transactionItemId].orEmpty().mapNotNull { addon ->
+                        productMap[addon.addonProductId]?.productName
+                    }
+                    TransactionHistoryItemRow(
+                        transactionItemId = item.transactionItemId,
+                        productName = product?.productName ?: "Unknown Product",
+                        sizeName = item.sizeName ?: "",
+                        quantity = item.quantity,
+                        subtotal = item.subtotal,
+                        addons = addonNames
+                    )
+                }
+                TransactionHistoryRow(
+                    transactionId = transaction.transactionId,
+                    displayId = buildDisplayId(transaction.transactionId),
+                    staffName = user?.name ?: "Unknown Staff",
+                    username = user?.username ?: "unknown",
+                    branchId = transaction.branchId,
+                    totalAmount = transaction.totalAmount,
+                    paymentType = transaction.paymentType,
+                    status = transaction.status,
+                    dateTime = transaction.dateTime,
+                    items = itemRows
+                )
+            }
+
+            _uiState.update { 
+                it.copy(
+                    transactions = it.transactions + newRows,
+                    currentPage = nextPage,
+                    isLoadingMore = false,
+                    hasMore = newRows.size == PAGE_SIZE
+                )
+            }
+        }
     }
 
     private fun loadTransactions() {
@@ -333,7 +405,10 @@ class TransactionHistoryViewModel @Inject constructor(
         val addonsByItem = localTransactionAddons.groupBy { it.transactionItemId }
 
         val rows = localTransactions
-            .filter { it.branchId == localBranchId }
+            .filter { transaction -> 
+                _uiState.value.selectedBranchId == null || transaction.branchId == _uiState.value.selectedBranchId 
+            }
+            .take(PAGE_SIZE)
             .map { transaction ->
                 val user = userMap[transaction.userId]
 
@@ -377,6 +452,8 @@ class TransactionHistoryViewModel @Inject constructor(
             it.copy(
                 transactions = rows,
                 isLoading = false,
+                hasMore = rows.size >= PAGE_SIZE,
+                currentPage = 0,
                 error = null
             )
         }

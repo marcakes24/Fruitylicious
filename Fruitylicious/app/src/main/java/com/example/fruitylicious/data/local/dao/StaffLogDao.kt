@@ -67,6 +67,12 @@ interface StaffLogDao {
     @Query("SELECT * FROM staff_logs ORDER BY clockIn DESC")
     fun observeAllStaffLogs(): Flow<List<StaffLogEntity>>
 
+    @Query("SELECT * FROM staff_logs ORDER BY clockIn DESC LIMIT :limit OFFSET :offset")
+    suspend fun getStaffLogsPaged(limit: Int, offset: Int): List<StaffLogEntity>
+
+    @Query("SELECT * FROM staff_logs WHERE branchId = :branchId ORDER BY clockIn DESC LIMIT :limit OFFSET :offset")
+    suspend fun getStaffLogsByBranchPaged(branchId: Int, limit: Int, offset: Int): List<StaffLogEntity>
+
     @Query("SELECT * FROM staff_logs WHERE userId = :userId ORDER BY clockIn DESC")
     fun observeLogsByUser(userId: Int): Flow<List<StaffLogEntity>>
 

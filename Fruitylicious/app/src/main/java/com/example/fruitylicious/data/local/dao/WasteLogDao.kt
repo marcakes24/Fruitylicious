@@ -12,6 +12,12 @@ interface WasteLogDao {
     @Query("SELECT * FROM waste_logs ORDER BY dateTime DESC")
     fun observeAllWasteLogs(): Flow<List<WasteLogEntity>>
 
+    @Query("SELECT * FROM waste_logs ORDER BY dateTime DESC LIMIT :limit OFFSET :offset")
+    suspend fun getAllWasteLogsPaged(limit: Int, offset: Int): List<WasteLogEntity>
+
+    @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC LIMIT :limit OFFSET :offset")
+    suspend fun getWasteLogsByBranchPaged(branchId: Int, limit: Int, offset: Int): List<WasteLogEntity>
+
     @Query("SELECT * FROM waste_logs WHERE branchId = :branchId ORDER BY dateTime DESC")
     fun observeWasteLogsByBranch(branchId: Int): Flow<List<WasteLogEntity>>
 

@@ -58,6 +58,9 @@ data class RestockUiState(
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = true,
+    val currentPage: Int = 0,
     val isSubmitting: Boolean = false,
     val isClockedIn: Boolean = false,
     val error: String? = null,
@@ -90,6 +93,8 @@ class RestockViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<RestockUiState> = _uiState.asStateFlow()
+
+    private val PAGE_SIZE = 20
 
     private var localIngredients: List<IngredientEntity> = emptyList()
     private var localInventory: List<InventoryEntity> = emptyList()
@@ -262,6 +267,59 @@ class RestockViewModel @Inject constructor(
         }
     }
 
+    fun loadMore() {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+        
+        // Pagination only supported for local history for now in this simple implementation
+        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
+
+        _uiState.update { it.copy(isLoadingMore = true) }
+
+        viewModelScope.launch {
+            val nextPage = state.currentPage + 1
+            val offset = nextPage * PAGE_SIZE
+            
+            val newEntities = if (state.selectedBranchId == null) {
+                restockLogDao.getAllRestockLogsPaged(PAGE_SIZE, offset)
+            } else {
+                restockLogDao.getRestockLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
+            }
+            
+            if (newEntities.isEmpty()) {
+                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
+                return@launch
+            }
+            
+            val ingredientMap = localIngredients.associateBy { it.ingredientId }
+            val newRows = newEntities.map { log ->
+                val ingredient = ingredientMap[log.ingredientId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                RestockHistoryRow(
+                    restockId = log.restockId,
+                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
+                    supplier = log.supplier,
+                    quantityAdded = log.quantityAdded,
+                    unitType = ingredient?.unitType ?: "",
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    dateTime = log.dateTime
+                )
+            }
+
+            _uiState.update { 
+                it.copy(
+                    history = it.history + newRows,
+                    currentPage = nextPage,
+                    isLoadingMore = false,
+                    hasMore = newRows.size == PAGE_SIZE
+                )
+            }
+        }
+    }
+
     private fun loadHistory() {
         val state = _uiState.value
         val selectedBranchId = state.selectedBranchId
@@ -296,6 +354,7 @@ class RestockViewModel @Inject constructor(
 
         val historyRows = localRestockLogs
             .filter { it.branchId == branchId }
+            .take(PAGE_SIZE)
             .map { log ->
                 val ingredient = ingredientMap[log.ingredientId]
 
@@ -316,6 +375,8 @@ class RestockViewModel @Inject constructor(
             it.copy(
                 history = historyRows,
                 isLoading = false,
+                hasMore = historyRows.size >= PAGE_SIZE,
+                currentPage = 0,
                 error = null
             )
         }

@@ -44,6 +44,9 @@ data class StaffLogUiState(
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = true,
+    val currentPage: Int = 0,
     val error: String? = null
 )
 
@@ -71,6 +74,8 @@ class StaffLogViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<StaffLogUiState> = _uiState.asStateFlow()
+
+    private val PAGE_SIZE = 20
 
     private var localStaffLogs: List<StaffLogEntity> = emptyList()
     private var localUsers: List<UserEntity> = emptyList()
@@ -167,6 +172,59 @@ class StaffLogViewModel @Inject constructor(
         }
     }
 
+    fun loadMore() {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+        
+        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
+
+        _uiState.update { it.copy(isLoadingMore = true) }
+
+        viewModelScope.launch {
+            val nextPage = state.currentPage + 1
+            val offset = nextPage * PAGE_SIZE
+            
+            val newEntities = if (state.selectedBranchId == null) {
+                staffLogDao.getStaffLogsPaged(PAGE_SIZE, offset)
+            } else {
+                staffLogDao.getStaffLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
+            }
+            
+            if (newEntities.isEmpty()) {
+                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
+                return@launch
+            }
+            
+            val userMap = localUsers.associateBy { it.userId }
+            val newRows = newEntities.map { log ->
+                val user = userMap[log.userId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                StaffLogRow(
+                    logId = log.logId,
+                    userId = log.userId,
+                    staffName = user?.name ?: "Unknown Staff",
+                    username = user?.username ?: "unknown",
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    clockIn = log.clockIn,
+                    clockOut = log.clockOut,
+                    imagePath = log.image
+                )
+            }
+
+            _uiState.update { 
+                it.copy(
+                    logs = it.logs + newRows,
+                    currentPage = nextPage,
+                    isLoadingMore = false,
+                    hasMore = newRows.size == PAGE_SIZE
+                )
+            }
+        }
+    }
+
     private fun loadLogs() {
         val state = _uiState.value
 
@@ -200,6 +258,7 @@ class StaffLogViewModel @Inject constructor(
 
         val rows = localStaffLogs
             .filter { it.branchId == branchId }
+            .take(PAGE_SIZE)
             .map { log ->
                 val user = userMap[log.userId]
 
@@ -221,6 +280,8 @@ class StaffLogViewModel @Inject constructor(
             it.copy(
                 logs = rows,
                 isLoading = false,
+                hasMore = rows.size >= PAGE_SIZE,
+                currentPage = 0,
                 error = null
             )
         }

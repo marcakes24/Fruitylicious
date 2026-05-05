@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -154,7 +156,7 @@ fun StaffLogScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when {
-                    uiState.isLoading -> {
+                    uiState.isLoading && filteredLogs.isEmpty() -> {
                         item {
                             EmptyStaffLogText("Loading staff logs...")
                         }
@@ -172,6 +174,19 @@ fun StaffLogScreen(
                             key = { it.logId }
                         ) { log ->
                             StaffLogCard(log)
+                        }
+
+                        if (uiState.hasMore) {
+                            item {
+                                Button(
+                                    onClick = { viewModel.loadMore() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !uiState.isLoadingMore,
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlGreen)
+                                ) {
+                                    Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                }
+                            }
                         }
                     }
                 }

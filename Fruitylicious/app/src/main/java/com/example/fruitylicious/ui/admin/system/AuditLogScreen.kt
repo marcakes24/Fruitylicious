@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -335,7 +337,7 @@ fun AuditLogScreen(
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     when {
-                        uiState.isLoading -> {
+                        uiState.isLoading && filteredLogs.isEmpty() -> {
                             item {
                                 EmptyAuditText("Loading audit logs...")
                             }
@@ -353,6 +355,19 @@ fun AuditLogScreen(
                                 key = { it.logId }
                             ) { log ->
                                 AuditLogCard(log)
+                            }
+
+                            if (uiState.hasMore) {
+                                item {
+                                    Button(
+                                        onClick = { viewModel.loadMore() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !uiState.isLoadingMore,
+                                        colors = ButtonDefaults.buttonColors(containerColor = AuditGreenPrimary)
+                                    ) {
+                                        Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                    }
+                                }
                             }
                         }
                     }

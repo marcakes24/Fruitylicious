@@ -303,7 +303,10 @@ fun RestockScreen(
 
                 item {
                     RestockHistoryCard(
-                        items = filteredHistory
+                        items = filteredHistory,
+                        isLoadingMore = uiState.isLoadingMore,
+                        hasMore = uiState.hasMore,
+                        onLoadMore = { viewModel.loadMore() }
                     )
                 }
             }
@@ -520,7 +523,10 @@ private fun FilterCard(
 
 @Composable
 private fun RestockHistoryCard(
-    items: List<RestockHistoryRow>
+    items: List<RestockHistoryRow>,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -591,6 +597,18 @@ private fun RestockHistoryCard(
                             color = Color(0xFFF0F0F0),
                             thickness = 0.5.dp
                         )
+                    }
+                }
+
+                if (hasMore) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onLoadMore,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoadingMore,
+                        colors = ButtonDefaults.buttonColors(containerColor = RsGreen)
+                    ) {
+                        Text(if (isLoadingMore) "Loading..." else "Load More")
                     }
                 }
             }
