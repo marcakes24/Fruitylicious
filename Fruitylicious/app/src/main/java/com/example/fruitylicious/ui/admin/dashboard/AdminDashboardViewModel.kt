@@ -4,6 +4,7 @@ import com.example.fruitylicious.data.repository.InventoryRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.BranchDao
+import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.SyncRepository
@@ -43,7 +44,8 @@ data class AdminDashboardUiState(
     val error: String? = null,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
-    val syncError: String? = null
+    val syncError: String? = null,
+    val isClockedIn: Boolean = false
 )
 
 @HiltViewModel
@@ -56,12 +58,14 @@ class AdminDashboardViewModel @Inject constructor(
     private val reportRepository: ReportRepository,
     private val branchDao: BranchDao,
     private val logoutUseCase: LogoutUseCase,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val staffLogDao: StaffLogDao
 ) : ViewModel() {
 
     private var salesJob: Job? = null
     private var notificationJob: Job? = null
 
+    private val userId: Int = sessionManager.getUserId()
     private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
@@ -83,7 +87,17 @@ class AdminDashboardViewModel @Inject constructor(
     init {
         observeBranches()
         observeNetwork()
+        observeClockStatus()
         loadDashboard()
+    }
+
+    private fun observeClockStatus() {
+        viewModelScope.launch {
+            staffLogDao.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val isClockedIn = logs.any { it.clockOut == null }
+                _uiState.update { it.copy(isClockedIn = isClockedIn) }
+            }
+        }
     }
 
     fun onBranchSelected(branch: String) {
@@ -103,6 +117,12 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     fun logout() {
+        if (_uiState.value.isClockedIn) {
+            _uiState.update { 
+                it.copy(error = "You must clock out before logging out.") 
+            }
+            return
+        }
         logoutUseCase()
     }
 

@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DateRange
@@ -652,7 +654,11 @@ private fun TransactionDetailsDialog(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     text = transaction.displayId,
                     fontSize = 20.sp,
@@ -731,16 +737,22 @@ private fun DetailItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 6.dp)
     ) {
-        Text(text = label, fontSize = 14.sp, color = Color(0xFF64748B))
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = Color(0xFF64748B),
+            modifier = Modifier.weight(1f)
+        )
 
         Text(
             text = value,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isAmount) ThOrange else Color(0xFF1E293B)
+            color = if (isAmount) ThOrange else Color(0xFF1E293B),
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1.5f)
         )
     }
 }

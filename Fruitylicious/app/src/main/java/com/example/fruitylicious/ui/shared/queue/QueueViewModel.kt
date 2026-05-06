@@ -9,9 +9,6 @@ import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
-import com.example.fruitylicious.data.local.entity.ProductEntity
-import com.example.fruitylicious.data.local.entity.TransactionEntity
-import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,7 +16,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -66,82 +64,63 @@ class QueueViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(QueueUiState())
     val uiState: StateFlow<QueueUiState> = _uiState.asStateFlow()
 
-    private var transactions: List<TransactionEntity> = emptyList()
-    private var transactionItems: List<TransactionItemEntity> = emptyList()
-    private var products: List<ProductEntity> = emptyList()
-
     init {
-        observeTransactions()
-        observeItems()
-        observeProducts()
+        observeAll()
     }
 
-    private fun observeTransactions() {
+    private fun observeAll() {
         val since = System.currentTimeMillis() - (24 * 60 * 60 * 1000L) // Last 24 hours
+        
         viewModelScope.launch {
-            transactionDao.observeQueueTransactions(since).collectLatest { items ->
-                transactions = items
-                rebuildRows()
-            }
-        }
-    }
+            combine(
+                transactionDao.observeQueueTransactions(since),
+                transactionItemDao.observeAllTransactionItems(),
+                productDao.observeProducts()
+            ) { transactions, items, products ->
+                val currentBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
+                val productMap = products.associateBy { it.productId }
+                val itemsByTransaction = items.groupBy { it.transactionId }
 
-    private fun observeItems() {
-        viewModelScope.launch {
-            transactionItemDao.observeAllTransactionItems().collectLatest { items ->
-                transactionItems = items
-                rebuildRows()
-            }
-        }
-    }
+                transactions
+                    .filter { it.branchId == currentBranchId }
+                    .map { transaction ->
+                    val itemRows = itemsByTransaction[transaction.transactionId]
+                        .orEmpty()
+                        .map { item ->
+                            val product = productMap[item.productId]
 
-    private fun observeProducts() {
-        viewModelScope.launch {
-            productDao.observeProducts().collectLatest { items ->
-                products = items
-                rebuildRows()
-            }
-        }
-    }
+                            QueueOrderLine(
+                                productName = product?.productName ?: "Unknown Product",
+                                sizeName = item.sizeName ?: "",
+                                quantity = item.quantity,
+                                subtotal = item.subtotal
+                            )
+                        }
 
-    private fun rebuildRows() {
-        val productMap = products.associateBy { it.productId }
-        val itemsByTransaction = transactionItems.groupBy { it.transactionId }
-
-        val rows = transactions.map { transaction ->
-            val itemRows = itemsByTransaction[transaction.transactionId]
-                .orEmpty()
-                .map { item ->
-                    val product = productMap[item.productId]
-
-                    QueueOrderLine(
-                        productName = product?.productName ?: "Unknown Product",
-                        sizeName = item.sizeName ?: "",
-                        quantity = item.quantity,
-                        subtotal = item.subtotal
+                    QueueOrderRow(
+                        transactionId = transaction.transactionId,
+                        displayId = buildDisplayId(transaction.transactionId),
+                        queueNumber = buildQueueNumber(transaction.transactionId),
+                        customerName = "Walk-in Customer",
+                        branchId = transaction.branchId,
+                        paymentType = transaction.paymentType,
+                        status = transaction.status.lowercase(),
+                        totalAmount = transaction.totalAmount,
+                        dateTime = transaction.dateTime,
+                        items = itemRows
+                    )
+                }.sortedByDescending { it.dateTime }
+            }.onStart { 
+                _uiState.update { it.copy(isLoading = true) }
+            }.collect { rows ->
+                _uiState.update {
+                    it.copy(
+                        orders = rows,
+                        isLoading = false,
+                        error = null
                     )
                 }
-
-            QueueOrderRow(
-                transactionId = transaction.transactionId,
-                displayId = buildDisplayId(transaction.transactionId),
-                queueNumber = buildQueueNumber(transaction.transactionId),
-                customerName = "Walk-in Customer",
-                branchId = transaction.branchId,
-                paymentType = transaction.paymentType,
-                status = transaction.status.lowercase(),
-                totalAmount = transaction.totalAmount,
-                dateTime = transaction.dateTime,
-                items = itemRows
-            )
-        }.sortedByDescending { it.dateTime }
-
-        _uiState.update {
-            it.copy(
-                orders = rows,
-                isLoading = false,
-                error = null
-            )
+            }
         }
     }
 

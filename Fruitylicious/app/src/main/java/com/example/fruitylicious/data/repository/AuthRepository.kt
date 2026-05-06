@@ -1,5 +1,6 @@
 package com.example.fruitylicious.data.repository
 
+import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.remote.api.AuthApi
@@ -22,6 +23,7 @@ sealed class LoginResult {
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
     private val userDao: UserDao,
+    private val staffLogDao: StaffLogDao,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig
 ) {
@@ -34,6 +36,18 @@ class AuthRepository @Inject constructor(
 
         if (trimmedUsername.isBlank() || password.isBlank()) {
             return@withContext LoginResult.Error("Username and password are required.")
+        }
+
+        // Check if anyone else is still clocked in at this branch
+        val userToLogin = userDao.getUserByUsername(trimmedUsername)
+        if (userToLogin != null && userToLogin.role.equals("staff", ignoreCase = true)) {
+            val anyOpenLog = staffLogDao.getStaffLogsByBranch(branchConfig.branchId)
+                .firstOrNull { it.clockOut == null }
+
+            if (anyOpenLog != null && anyOpenLog.userId != userToLogin.userId) {
+                val activeUser = userDao.getUserById(anyOpenLog.userId)
+                return@withContext LoginResult.Error("${activeUser?.name ?: "Another user"} is still clocked in. They must clock out before you can login.")
+            }
         }
 
         val localLoginResult = loginOfflineIfValid(
@@ -121,7 +135,7 @@ class AuthRepository @Inject constructor(
 
             LoginResult.Success(body)
         } catch (exception: Exception) {
-            LoginResult.Error("Invalid username or password.")
+            LoginResult.Error("Unable to connect to server. Please check your internet connection or login with an account that has been previously synced to this device.")
         }
     }
 
