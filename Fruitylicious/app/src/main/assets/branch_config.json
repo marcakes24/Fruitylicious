@@ -1,6 +1,6 @@
 {
-  "branchId": 2,
-  "branchName": "Branch 2",
-  "apiBaseUrl": "http://192.168.254.100:8082/",
-  "apiKey": "branch2-dev-api-key-secret"
+  "branchId": 1,
+  "branchName": "Branch 1",
+  "apiBaseUrl": "http://192.168.0.135:8082/",
+  "apiKey": "branch1-dev-api-key-secret"
 }

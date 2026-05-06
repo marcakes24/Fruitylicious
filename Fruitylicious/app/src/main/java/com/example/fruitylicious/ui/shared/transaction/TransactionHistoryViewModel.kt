@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -100,20 +101,84 @@ class TransactionHistoryViewModel @Inject constructor(
 
     private val PAGE_SIZE = 20
 
-    private var localTransactions: List<TransactionEntity> = emptyList()
-    private var localTransactionItems: List<TransactionItemEntity> = emptyList()
-    private var localTransactionAddons: List<TransactionItemAddonEntity> = emptyList()
-    private var products: List<ProductEntity> = emptyList()
-    private var users: List<UserEntity> = emptyList()
-
     init {
         observeBranches()
         observeNetworkStatus()
-        observeTransactions()
-        observeItems()
-        observeAddons()
-        observeProducts()
-        observeUsers()
+        observeLocalData()
+    }
+
+    private fun observeLocalData() {
+        viewModelScope.launch {
+            combine(
+                transactionDao.observeAllTransactions(),
+                transactionItemDao.observeAllTransactionItems(),
+                transactionItemAddonDao.observeAllTransactionItemAddons(),
+                productDao.observeProducts(),
+                userDao.observeUsers()
+            ) { transactions, items, addons, products, users ->
+                val state = _uiState.value
+                val userMap = users.associateBy { it.userId }
+                val productMap = products.associateBy { it.productId }
+                val itemsByTransaction = items.groupBy { it.transactionId }
+                val addonsByItem = addons.groupBy { it.transactionItemId }
+
+                transactions
+                    .filter { transaction ->
+                        state.selectedBranchId == null || transaction.branchId == state.selectedBranchId
+                    }
+                    .take(PAGE_SIZE + (state.currentPage * PAGE_SIZE))
+                    .map { transaction ->
+                        val user = userMap[transaction.userId]
+
+                        val itemRows = itemsByTransaction[transaction.transactionId]
+                            .orEmpty()
+                            .map { item ->
+                                val product = productMap[item.productId]
+
+                                val addonNames = addonsByItem[item.transactionItemId]
+                                    .orEmpty()
+                                    .mapNotNull { addon ->
+                                        productMap[addon.addonProductId]?.productName
+                                    }
+
+                                TransactionHistoryItemRow(
+                                    transactionItemId = item.transactionItemId,
+                                    productName = product?.productName ?: "Unknown Product",
+                                    sizeName = item.sizeName ?: "",
+                                    quantity = item.quantity,
+                                    subtotal = item.subtotal,
+                                    addons = addonNames
+                                )
+                            }
+
+                        TransactionHistoryRow(
+                            transactionId = transaction.transactionId,
+                            displayId = buildDisplayId(transaction.transactionId),
+                            staffName = user?.name ?: "Unknown Staff",
+                            username = user?.username ?: "unknown",
+                            branchId = transaction.branchId,
+                            totalAmount = transaction.totalAmount,
+                            paymentType = transaction.paymentType,
+                            status = transaction.status,
+                            dateTime = transaction.dateTime,
+                            items = itemRows
+                        )
+                    }.sortedByDescending { it.dateTime }
+            }.collect { rows ->
+                val state = _uiState.value
+                // Only update from local data if we are looking at local branch or offline/non-admin
+                if (state.selectedBranchId == localBranchId || !state.isAdmin || !state.isOnline) {
+                    _uiState.update {
+                        it.copy(
+                            transactions = rows,
+                            isLoading = false,
+                            hasMore = rows.size >= PAGE_SIZE,
+                            error = null
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun observeBranches() {
@@ -185,66 +250,10 @@ class TransactionHistoryViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
 
-        _uiState.update { it.copy(isLoadingMore = true) }
-        
-        viewModelScope.launch {
-            val nextPage = state.currentPage + 1
-            val offset = nextPage * PAGE_SIZE
-            
-            val newEntities = if (state.selectedBranchId == null) {
-                transactionDao.getTransactionsPaged(PAGE_SIZE, offset)
-            } else {
-                transactionDao.getTransactionsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
-            }
-            
-            if (newEntities.isEmpty()) {
-                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
-                return@launch
-            }
-            
-            val userMap = users.associateBy { it.userId }
-            val productMap = products.associateBy { it.productId }
-            val itemsByTransaction = localTransactionItems.groupBy { it.transactionId }
-            val addonsByItem = localTransactionAddons.groupBy { it.transactionItemId }
-
-            val newRows = newEntities.map { transaction ->
-                val user = userMap[transaction.userId]
-                val itemRows = itemsByTransaction[transaction.transactionId].orEmpty().map { item ->
-                    val product = productMap[item.productId]
-                    val addonNames = addonsByItem[item.transactionItemId].orEmpty().mapNotNull { addon ->
-                        productMap[addon.addonProductId]?.productName
-                    }
-                    TransactionHistoryItemRow(
-                        transactionItemId = item.transactionItemId,
-                        productName = product?.productName ?: "Unknown Product",
-                        sizeName = item.sizeName ?: "",
-                        quantity = item.quantity,
-                        subtotal = item.subtotal,
-                        addons = addonNames
-                    )
-                }
-                TransactionHistoryRow(
-                    transactionId = transaction.transactionId,
-                    displayId = buildDisplayId(transaction.transactionId),
-                    staffName = user?.name ?: "Unknown Staff",
-                    username = user?.username ?: "unknown",
-                    branchId = transaction.branchId,
-                    totalAmount = transaction.totalAmount,
-                    paymentType = transaction.paymentType,
-                    status = transaction.status,
-                    dateTime = transaction.dateTime,
-                    items = itemRows
-                )
-            }
-
-            _uiState.update { 
-                it.copy(
-                    transactions = it.transactions + newRows,
-                    currentPage = nextPage,
-                    isLoadingMore = false,
-                    hasMore = newRows.size == PAGE_SIZE
-                )
-            }
+        _uiState.update { 
+            it.copy(
+                currentPage = it.currentPage + 1
+            ) 
         }
     }
 
@@ -253,15 +262,15 @@ class TransactionHistoryViewModel @Inject constructor(
 
         when {
             state.selectedBranchId == localBranchId -> {
-                rebuildLocalRows()
+                // Handled by observeLocalData
             }
 
             !state.isAdmin -> {
-                rebuildLocalRows()
+                // Handled by observeLocalData
             }
 
             !state.isOnline -> {
-                rebuildLocalRows()
+                // Handled by observeLocalData
             }
 
             state.selectedBranchId == null -> {
@@ -349,112 +358,6 @@ class TransactionHistoryViewModel @Inject constructor(
                         )
                     }
                 }
-            )
-        }
-    }
-
-    private fun observeTransactions() {
-        viewModelScope.launch {
-            transactionDao.observeAllTransactions().collectLatest { items ->
-                localTransactions = items
-                loadTransactions()
-            }
-        }
-    }
-
-    private fun observeItems() {
-        viewModelScope.launch {
-            transactionItemDao.observeAllTransactionItems().collectLatest { items ->
-                localTransactionItems = items
-                loadTransactions()
-            }
-        }
-    }
-
-    private fun observeAddons() {
-        viewModelScope.launch {
-            transactionItemAddonDao.observeAllTransactionItemAddons().collectLatest { items ->
-                localTransactionAddons = items
-                loadTransactions()
-            }
-        }
-    }
-
-    private fun observeProducts() {
-        viewModelScope.launch {
-            productDao.observeProducts().collectLatest { items ->
-                products = items
-                loadTransactions()
-            }
-        }
-    }
-
-    private fun observeUsers() {
-        viewModelScope.launch {
-            userDao.observeUsers().collectLatest { items ->
-                users = items
-                loadTransactions()
-            }
-        }
-    }
-
-    private fun rebuildLocalRows() {
-        val userMap = users.associateBy { it.userId }
-        val productMap = products.associateBy { it.productId }
-        val itemsByTransaction = localTransactionItems.groupBy { it.transactionId }
-        val addonsByItem = localTransactionAddons.groupBy { it.transactionItemId }
-
-        val rows = localTransactions
-            .filter { transaction -> 
-                _uiState.value.selectedBranchId == null || transaction.branchId == _uiState.value.selectedBranchId 
-            }
-            .take(PAGE_SIZE)
-            .map { transaction ->
-                val user = userMap[transaction.userId]
-
-                val itemRows = itemsByTransaction[transaction.transactionId]
-                    .orEmpty()
-                    .map { item ->
-                        val product = productMap[item.productId]
-
-                        val addonNames = addonsByItem[item.transactionItemId]
-                            .orEmpty()
-                            .mapNotNull { addon ->
-                                productMap[addon.addonProductId]?.productName
-                            }
-
-                        TransactionHistoryItemRow(
-                            transactionItemId = item.transactionItemId,
-                            productName = product?.productName ?: "Unknown Product",
-                            sizeName = item.sizeName ?: "",
-                            quantity = item.quantity,
-                            subtotal = item.subtotal,
-                            addons = addonNames
-                        )
-                    }
-
-                TransactionHistoryRow(
-                    transactionId = transaction.transactionId,
-                    displayId = buildDisplayId(transaction.transactionId),
-                    staffName = user?.name ?: "Unknown Staff",
-                    username = user?.username ?: "unknown",
-                    branchId = transaction.branchId,
-                    totalAmount = transaction.totalAmount,
-                    paymentType = transaction.paymentType,
-                    status = transaction.status,
-                    dateTime = transaction.dateTime,
-                    items = itemRows
-                )
-            }
-            .sortedByDescending { it.dateTime }
-
-        _uiState.update {
-            it.copy(
-                transactions = rows,
-                isLoading = false,
-                hasMore = rows.size >= PAGE_SIZE,
-                currentPage = 0,
-                error = null
             )
         }
     }

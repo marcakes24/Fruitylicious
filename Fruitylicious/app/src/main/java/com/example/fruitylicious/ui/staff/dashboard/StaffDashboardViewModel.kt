@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.staff.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.repository.InventoryRepository
 import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
@@ -36,7 +37,8 @@ data class StaffDashboardUiState(
     val error: String? = null,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
-    val syncError: String? = null
+    val syncError: String? = null,
+    val isClockedIn: Boolean = false
 )
 
 @HiltViewModel
@@ -47,8 +49,11 @@ class StaffDashboardViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val inventoryRepository: InventoryRepository,
     private val logoutUseCase: LogoutUseCase,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val staffLogDao: StaffLogDao
 ) : ViewModel() {
+
+    private val userId: Int = sessionManager.getUserId()
 
     private val branchId: Int =
         sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
@@ -68,6 +73,16 @@ class StaffDashboardViewModel @Inject constructor(
         observeNetwork()
         observeWeeklySales()
         observeNotifications()
+        observeClockStatus()
+    }
+
+    private fun observeClockStatus() {
+        viewModelScope.launch {
+            staffLogDao.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val isClockedIn = logs.any { it.clockOut == null }
+                _uiState.update { it.copy(isClockedIn = isClockedIn) }
+            }
+        }
     }
 
     private fun observeNetwork() {
@@ -125,6 +140,12 @@ class StaffDashboardViewModel @Inject constructor(
     }
 
     fun logout() {
+        if (_uiState.value.isClockedIn) {
+            _uiState.update { 
+                it.copy(error = "You must clock out before logging out.") 
+            }
+            return
+        }
         logoutUseCase()
     }
 
