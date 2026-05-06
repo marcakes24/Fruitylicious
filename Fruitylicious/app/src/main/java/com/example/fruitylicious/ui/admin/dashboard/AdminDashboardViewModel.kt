@@ -121,23 +121,9 @@ class AdminDashboardViewModel @Inject constructor(
     private fun observeNetwork() {
         viewModelScope.launch {
             networkMonitor.observeNetworkStatus().collectLatest { isOnline ->
-                _uiState.update { state ->
-                    val canAccess = state.isAdmin && isOnline
-
-                    val selectedBranch = if (canAccess) {
-                        state.selectedBranch
-                    } else {
-                        "B${state.localBranchId}"
-                    }
-
-                    state.copy(
-                        isOnline = isOnline,
-                        canAccessCrossBranch = canAccess,
-                        selectedBranch = selectedBranch
-                    )
+                _uiState.update {
+                    it.copy(isOnline = isOnline)
                 }
-
-                loadDashboard()
             }
         }
     }
