@@ -26,6 +26,12 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class HourlySales(
+    val hour: Int,
+    val totalSales: Float,
+    val transactionCount: Int
+)
+
 data class AdminDashboardUiState(
     val userName: String = "",
     val selectedBranchId: Int? = null,
@@ -38,9 +44,10 @@ data class AdminDashboardUiState(
     val isOnline: Boolean = false,
     val canAccessCrossBranch: Boolean = false,
     val hasNotifications: Boolean = false,
-    val weeklySalesData: List<Float> = List(7) { 0f },
-    val weeklyTotalSales: Double = 0.0,
-    val weeklyTransactionCount: Int = 0,
+    val dailySalesData: List<HourlySales> = emptyList(),
+    val dailyTotalSales: Double = 0.0,
+    val dailyTransactionCount: Int = 0,
+    val selectedHourlySales: HourlySales? = null,
     val error: String? = null,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
@@ -141,111 +148,83 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private fun loadDashboard() {
-        observeWeeklySales()
+        observeDailySales()
         observeNotifications()
     }
 
-    private fun observeWeeklySales() {
+    private fun observeDailySales() {
         salesJob?.cancel()
 
         salesJob = viewModelScope.launch {
-            val state = _uiState.value
-            val isOnline = networkMonitor.isOnline()
-            val selectedBranchId = state.selectedBranchId
-
-            if (selectedBranchId == localBranchId) {
-                observeLocalWeeklySales()
-            } else if (state.isAdmin && isOnline) {
-                loadRemoteWeeklySales()
-            } else {
-                observeLocalWeeklySales()
-            }
+            observeLocalDailySales()
         }
     }
 
-    private suspend fun observeLocalWeeklySales() {
-        val weekRange = getCurrentWeekRange()
+    private suspend fun observeLocalDailySales() {
+        val todayRange = getTodayRange()
         val branchId = _uiState.value.selectedBranchId
 
         val flow = if (branchId == null) {
-            transactionRepository.observeAllTransactionsByDateRange(weekRange.first, weekRange.second)
+            transactionRepository.observeAllTransactionsByDateRange(todayRange.first, todayRange.second)
         } else {
-            transactionRepository.observeTransactionsByDateRange(branchId, weekRange.first, weekRange.second)
+            transactionRepository.observeTransactionsByDateRange(branchId, todayRange.first, todayRange.second)
         }
 
         flow.collectLatest { transactions ->
-            val salesPerDay = MutableList(7) { 0f }
             val completed = transactions.filter { it.status.equals("completed", ignoreCase = true) }
 
-            completed.forEach { transaction ->
-                val index = getMondayBasedDayIndex(transaction.dateTime)
-                if (index in 0..6) {
-                    salesPerDay[index] += transaction.totalAmount.toFloat()
+            // 10 AM to 8 PM
+            val hourlySales = (10..19).map { hour ->
+                val hourStart = getHourTimestamp(hour)
+                val hourEnd = getHourTimestamp(hour + 1)
+                
+                val hourTransactions = completed.filter { 
+                    it.dateTime in hourStart until hourEnd
                 }
+                
+                HourlySales(
+                    hour = hour,
+                    totalSales = hourTransactions.sumOf { it.totalAmount }.toFloat(),
+                    transactionCount = hourTransactions.size
+                )
             }
 
             _uiState.update {
                 it.copy(
-                    weeklySalesData = salesPerDay,
-                    weeklyTotalSales = completed.sumOf { it.totalAmount },
-                    weeklyTransactionCount = completed.size,
+                    dailySalesData = hourlySales,
+                    dailyTotalSales = completed.sumOf { it.totalAmount },
+                    dailyTransactionCount = completed.size,
                     error = null
                 )
             }
         }
     }
 
-    private suspend fun loadRemoteWeeklySales() {
-        val branchId = _uiState.value.selectedBranchId
-        val weekStart = getCurrentWeekStartCalendar()
+    fun onHourSelected(hourlySales: HourlySales?) {
+        _uiState.update { it.copy(selectedHourlySales = hourlySales) }
+    }
 
-        val salesPerDay = MutableList(7) { 0f }
-        var weeklyTotal = 0.0
-        var weeklyCount = 0
-        var firstError: String? = null
+    private fun getTodayRange(): Pair<Long, Long> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val start = calendar.timeInMillis
+        
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+        val end = calendar.timeInMillis - 1
+        
+        return start to end
+    }
 
-        repeat(7) { index ->
-            val dayStart = weekStart.clone() as Calendar
-            dayStart.add(Calendar.DAY_OF_YEAR, index)
-
-            val dayEnd = dayStart.clone() as Calendar
-            dayEnd.add(Calendar.DAY_OF_YEAR, 1)
-
-            val result = if (branchId == null) {
-                reportRepository.getCombinedSalesReport(
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
-            } else {
-                reportRepository.getSalesReport(
-                    branchId = branchId,
-                    from = dayStart.timeInMillis,
-                    to = dayEnd.timeInMillis - 1
-                )
-            }
-
-            result.fold(
-                onSuccess = { report ->
-                    salesPerDay[index] = report.totalSales.toFloat()
-                    weeklyTotal += report.totalSales
-                    weeklyCount += report.totalTransactions
-                },
-                onFailure = { error ->
-                    if (firstError == null) {
-                        firstError = error.message
-                    }
-                }
-            )
-        }
-
-        _uiState.update {
-            it.copy(
-                weeklySalesData = salesPerDay,
-                weeklyTotalSales = weeklyTotal,
-                weeklyTransactionCount = weeklyCount,
-                error = firstError
-            )
-        }
+    private fun getHourTimestamp(hour: Int): Long {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, hour)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
     }
 
     private fun observeNotifications() {

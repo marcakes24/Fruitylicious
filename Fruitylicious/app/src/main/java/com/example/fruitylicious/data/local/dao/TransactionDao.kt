@@ -34,6 +34,16 @@ interface TransactionDao {
 
     @Query(
         """
+        SELECT * FROM transactions
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    suspend fun getTransactionsByDateRange(branchId: Int, from: Long, to: Long): List<TransactionEntity>
+
+    @Query(
+        """
         SELECT COALESCE(SUM(totalAmount), 0.0)
         FROM transactions
         WHERE branchId = :branchId
@@ -147,6 +157,54 @@ interface TransactionDao {
         from: Long,
         to: Long
     ): List<TopSellingItemRow>
+
+    @Query(
+        """
+        SELECT 
+            p.productName AS addonName,
+            SUM(tia.quantity) AS totalQty
+        FROM transaction_item_addons tia
+        INNER JOIN transaction_items ti ON tia.transactionItemId = ti.transactionItemId
+        INNER JOIN transactions t ON ti.transactionId = t.transactionId
+        INNER JOIN products p ON tia.addonProductId = p.productId
+        WHERE t.status = 'completed'
+        AND t.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR t.branchId = :branchId)
+        GROUP BY p.productName
+        ORDER BY totalQty DESC
+        LIMIT 5
+        """
+    )
+    suspend fun getTopAddons(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<TopAddonRow>
+
+    @Query(
+        """
+        SELECT 
+            p1.productName || ' + ' || p2.productName AS comboName,
+            COUNT(*) AS count
+        FROM transaction_items ti1
+        INNER JOIN transaction_items ti2 ON ti1.transactionId = ti2.transactionId 
+            AND ti1.transactionItemId < ti2.transactionItemId
+        INNER JOIN transactions t ON ti1.transactionId = t.transactionId
+        INNER JOIN products p1 ON ti1.productId = p1.productId
+        INNER JOIN products p2 ON ti2.productId = p2.productId
+        WHERE t.status = 'completed'
+        AND t.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR t.branchId = :branchId)
+        GROUP BY comboName
+        ORDER BY count DESC
+        LIMIT 5
+        """
+    )
+    suspend fun getTopFruitCombos(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<TopComboRow>
 
     @Query(
         """
@@ -271,4 +329,25 @@ interface TransactionDao {
     suspend fun getActiveQueueCountForBranch(
         branchId: Int
     ): Int
+
+    @Query(
+        """
+        SELECT 
+            u.name AS staffName,
+            COUNT(*) AS transactionCount,
+            SUM(t.totalAmount) AS totalSales
+        FROM transactions t
+        INNER JOIN users u ON t.userId = u.userId
+        WHERE t.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR t.branchId = :branchId)
+        AND t.status = 'completed'
+        GROUP BY t.userId
+        ORDER BY totalSales DESC
+        """
+    )
+    suspend fun getStaffSalesActivity(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<StaffSalesRow>
 }

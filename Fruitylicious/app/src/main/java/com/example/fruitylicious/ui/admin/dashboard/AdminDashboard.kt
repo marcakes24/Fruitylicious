@@ -3,6 +3,8 @@ package com.example.fruitylicious.ui.admin.dashboard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -128,12 +130,7 @@ fun AdminDashboardScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     DashboardHeader(
-                        selectedBranchId = uiState.selectedBranchId,
-                        branches = uiState.branches,
-                        isAdmin = uiState.isAdmin,
-                        isOnline = uiState.isOnline,
                         hasNotifications = uiState.hasNotifications,
-                        onBranchSelect = viewModel::onBranchSelected,
                         onNotificationsClick = {
                             navController.navigate(ADMIN_NOTIFICATIONS)
                         },
@@ -160,7 +157,6 @@ fun AdminDashboardScreen(
 
                     GreetingCard(
                         ownerName = uiState.userName,
-                        selectedBranchName = uiState.selectedBranchName,
                         dateText = uiState.dateText,
                         isOnline = uiState.isOnline,
                         onStartPos = {
@@ -177,9 +173,11 @@ fun AdminDashboardScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     SalesChartSection(
-                        weeklySales = uiState.weeklySalesData,
-                        totalAmount = uiState.weeklyTotalSales,
-                        transactionCount = uiState.weeklyTransactionCount,
+                        dailySales = uiState.dailySalesData,
+                        totalAmount = uiState.dailyTotalSales,
+                        transactionCount = uiState.dailyTransactionCount,
+                        selectedHour = uiState.selectedHourlySales,
+                        onHourClick = viewModel::onHourSelected,
                         onViewReport = { navController.navigate(ADMIN_REPORTS_DASHBOARD) }
                     )
 
@@ -209,12 +207,7 @@ fun AdminDashboardScreen(
 
 @Composable
 private fun DashboardHeader(
-    selectedBranchId: Int?,
-    branches: List<BranchEntity>,
-    isAdmin: Boolean,
-    isOnline: Boolean,
     hasNotifications: Boolean,
-    onBranchSelect: (Int?) -> Unit,
     onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -268,20 +261,6 @@ private fun DashboardHeader(
                     )
                 }
             }
-
-            if (isAdmin) {
-                Spacer(modifier = Modifier.width(12.dp))
-
-                BranchSelector(
-                    selectedBranchId = selectedBranchId,
-                    branches = branches,
-                    isOnline = isOnline,
-                    onBranchSelected = onBranchSelect,
-                    activeColor = DashGreenPrimary,
-                    containerColor = Color(0xFFF5F5F5),
-                    modifier = Modifier.widthIn(max = 200.dp)
-                )
-            }
         }
     }
 }
@@ -289,7 +268,6 @@ private fun DashboardHeader(
 @Composable
 private fun GreetingCard(
     ownerName: String,
-    selectedBranchName: String,
     dateText: String,
     isOnline: Boolean,
     onStartPos: () -> Unit
@@ -327,22 +305,6 @@ private fun GreetingCard(
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFFE8F5E9))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = "Viewing: $selectedBranchName",
-                            color = DashGreenPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
@@ -524,9 +486,11 @@ private fun QuickActionCard(
 
 @Composable
 private fun SalesChartSection(
-    weeklySales: List<Float>,
+    dailySales: List<HourlySales>,
     totalAmount: Double,
     transactionCount: Int,
+    selectedHour: HourlySales?,
+    onHourClick: (HourlySales?) -> Unit,
     onViewReport: () -> Unit
 ) {
     Column(
@@ -542,7 +506,7 @@ private fun SalesChartSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Sales This Week",
+                text = "Sales Today (10 AM - 8 PM)",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
@@ -577,10 +541,9 @@ private fun SalesChartSection(
             shadowElevation = 3.dp
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                val maxSales = (weeklySales.maxOrNull() ?: 0f).coerceAtLeast(100f)
+                val hourLabels = listOf("10a", "11a", "12p", "1p", "2p", "3p", "4p", "5p", "6p", "7p")
+                val maxSales = (dailySales.maxOfOrNull { it.totalSales } ?: 0f).coerceAtLeast(100f)
                 val roundedMax = (ceil(maxSales / 100.0) * 100).toInt()
-                val highlightIdx = weeklySales.indexOf(weeklySales.maxOrNull() ?: 0f)
                 val textMeasurer = rememberTextMeasurer()
 
                 val yLabels = listOf(
@@ -619,47 +582,63 @@ private fun SalesChartSection(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    Canvas(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        val tPaddingPx = topPadding.toPx()
-                        val bPaddingPx = bottomPadding.toPx()
-                        val chartHeight = size.height - tPaddingPx - bPaddingPx
-                        val barCount = weeklySales.size
-                        val gap = size.width / barCount
-                        val barWidth = gap * 0.55f
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(dailySales) {
+                                    detectTapGestures { offset ->
+                                        val barCount = dailySales.size
+                                        val gap = size.width.toFloat() / barCount
+                                        
+                                        val clickedIndex = (offset.x / gap).toInt()
+                                        if (clickedIndex in dailySales.indices) {
+                                            onHourClick(dailySales[clickedIndex])
+                                        } else {
+                                            onHourClick(null)
+                                        }
+                                    }
+                                }
+                        ) {
+                            val tPaddingPx = topPadding.toPx()
+                            val bPaddingPx = bottomPadding.toPx()
+                            val chartHeight = size.height - tPaddingPx - bPaddingPx
+                            val barCount = dailySales.size
+                            val gap = size.width / barCount
+                            val barWidth = gap * 0.55f
 
-                        for (i in 0..4) {
-                            val y = tPaddingPx + chartHeight * (1f - i / 4f)
-                            drawLine(
-                                color = Color(0xFFE0E0E0),
-                                start = Offset(0f, y),
-                                end = Offset(size.width, y),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                        }
-
-                        weeklySales.forEachIndexed { index, value ->
-                            val barHeight = (value / roundedMax) * chartHeight
-                            val left = index * gap + (gap - barWidth) / 2f
-                            val top = tPaddingPx + chartHeight - barHeight
-
-                            drawRoundRect(
-                                color = ChartBar,
-                                topLeft = Offset(left, top),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx())
-                            )
-
-                            if (index == highlightIdx && value > 0f) {
-                                adminDrawTooltip(
-                                    textMeasurer = textMeasurer,
-                                    label = value.toInt().toString(),
-                                    centerX = left + barWidth / 2f,
-                                    topY = top - 28.dp.toPx()
+                            for (i in 0..4) {
+                                val y = tPaddingPx + chartHeight * (1f - i / 4f)
+                                drawLine(
+                                    color = Color(0xFFE0E0E0),
+                                    start = Offset(0f, y),
+                                    end = Offset(size.width, y),
+                                    strokeWidth = 1.dp.toPx()
                                 )
+                            }
+
+                            dailySales.forEachIndexed { index, data ->
+                                val barHeight = (data.totalSales / roundedMax) * chartHeight
+                                val left = index * gap + (gap - barWidth) / 2f
+                                val top = tPaddingPx + chartHeight - barHeight
+
+                                val isSelected = selectedHour?.hour == data.hour
+
+                                drawRoundRect(
+                                    color = if (isSelected) DashGreenPrimary else ChartBar,
+                                    topLeft = Offset(left, top),
+                                    size = Size(barWidth, barHeight),
+                                    cornerRadius = CornerRadius(4.dp.toPx())
+                                )
+
+                                if (isSelected) {
+                                    adminDrawTooltip(
+                                        textMeasurer = textMeasurer,
+                                        label = "₱${data.totalSales.toInt()}\n${data.transactionCount} txns",
+                                        centerX = left + barWidth / 2f,
+                                        topY = top - 40.dp.toPx()
+                                    )
+                                }
                             }
                         }
                     }
@@ -668,13 +647,13 @@ private fun SalesChartSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 50.dp), // Matched 44.dp (Y-axis) + 6.dp (Spacer)
+                        .padding(start = 50.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    days.forEach { day ->
+                    hourLabels.forEach { label ->
                         Text(
-                            text = day,
-                            fontSize = 10.sp,
+                            text = label,
+                            fontSize = 9.sp,
                             color = TextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f)
@@ -692,27 +671,35 @@ private fun SalesChartSection(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = "Total This Week",
+                        text = if (selectedHour != null) {
+                            val h = selectedHour.hour
+                            val period = if (h < 12) "AM" else "PM"
+                            val displayHour = if (h > 12) h - 12 else if (h == 0) 12 else h
+                            "Details for $displayHour $period"
+                        } else {
+                            "Today's Total"
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
 
                     Column(horizontalAlignment = Alignment.End) {
+                        val displayAmount = selectedHour?.totalSales?.toDouble() ?: totalAmount
+                        val displayCount = selectedHour?.transactionCount ?: transactionCount
+
                         Text(
-                            text = "₱${String.format(Locale.US, "%,.2f", totalAmount)}",
+                            text = "₱${String.format(Locale.US, "%,.2f", displayAmount)}",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
 
-                        if (transactionCount > 0) {
-                            Text(
-                                text = "$transactionCount transactions",
-                                fontSize = 12.sp,
-                                color = TextSecondary
-                            )
-                        }
+                        Text(
+                            text = "$displayCount transactions",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
                     }
                 }
             }
@@ -726,8 +713,8 @@ private fun DrawScope.adminDrawTooltip(
     centerX: Float,
     topY: Float
 ) {
-    val bubbleWidth = 42.dp.toPx()
-    val bubbleHeight = 22.dp.toPx()
+    val bubbleWidth = 60.dp.toPx()
+    val bubbleHeight = 34.dp.toPx()
     val left = centerX - bubbleWidth / 2f
 
     val tooltipPath = Path().apply {
@@ -764,9 +751,10 @@ private fun DrawScope.adminDrawTooltip(
         text = label,
         style = TextStyle(
             color = Color(0xFF1A1A1A),
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            lineHeight = 11.sp
         )
     )
 
@@ -778,3 +766,4 @@ private fun DrawScope.adminDrawTooltip(
         )
     )
 }
+

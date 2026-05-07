@@ -3,6 +3,9 @@ package com.example.fruitylicious.ui.admin.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.SalesBreakdownRow
+import com.example.fruitylicious.data.local.dao.StaffSalesRow
+import com.example.fruitylicious.data.local.dao.TopAddonRow
+import com.example.fruitylicious.data.local.dao.TopComboRow
 import com.example.fruitylicious.data.local.dao.TopSellingItemRow
 import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.repository.ReportRepository
@@ -43,7 +46,10 @@ data class SalesReportUiState(
     val transactionCount: Int = 0,
     val timeSeriesData: List<SalesSeries> = emptyList(),
     val topItems: List<TopSellingItemRow> = emptyList(),
+    val topAddons: List<TopAddonRow> = emptyList(),
+    val topCombos: List<TopComboRow> = emptyList(),
     val salesBreakdown: List<SalesBreakdownRow> = emptyList(),
+    val staffActivity: List<StaffSalesRow> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val currentPage: Int = 0,
@@ -280,9 +286,17 @@ class SalesReportViewModel @Inject constructor(
                     }
                     updateChart(chartTransactions, branchId, period, range)
 
-                    if (branchId == null) {
-                        val aggregatedBreakdown = aggregateBreakdownFromReport(report.transactions)
-                        _uiState.update { it.copy(salesBreakdown = aggregatedBreakdown) }
+                    val aggregatedBreakdown = aggregateBreakdownFromReport(report.transactions)
+                    val topAddons = aggregateAddonsFromReport(report.transactions)
+                    val topCombos = aggregateCombosFromReport(report.transactions)
+                    val staffActivity = aggregateStaffActivityFromReport(report.transactions)
+                    _uiState.update { 
+                        it.copy(
+                            salesBreakdown = aggregatedBreakdown,
+                            topAddons = topAddons,
+                            topCombos = topCombos,
+                            staffActivity = staffActivity
+                        )
                     }
                 }
             } else {
@@ -479,6 +493,24 @@ class SalesReportViewModel @Inject constructor(
                 to = range.currentEnd
             )
 
+            val topAddons = transactionDao.getTopAddons(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val topCombos = transactionDao.getTopFruitCombos(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
+            val staffActivity = transactionDao.getStaffSalesActivity(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+
             _uiState.update {
                 it.copy(
                     period = period,
@@ -488,6 +520,9 @@ class SalesReportViewModel @Inject constructor(
                     gcashTotal = gcashTotal,
                     salesBreakdown = breakdown,
                     topItems = topItems,
+                    topAddons = topAddons,
+                    topCombos = topCombos,
+                    staffActivity = staffActivity,
                     isLoading = false,
                     hasMore = false, // Local load usually loads all for now
                     error = null
@@ -533,6 +568,13 @@ class SalesReportViewModel @Inject constructor(
             size = PAGE_SIZE
         )
 
+        // 4. Load Transactions for Addons/Combos
+        val transactionsResult = if (branchId == null) {
+            reportRepository.getCombinedTransactionReport(range.currentStart, range.currentEnd)
+        } else {
+            reportRepository.getTransactionReport(branchId, range.currentStart, range.currentEnd)
+        }
+
         summaryResult.fold(
             onSuccess = { summary ->
                 _uiState.update {
@@ -564,6 +606,19 @@ class SalesReportViewModel @Inject constructor(
             },
             onFailure = { /* silent error for top items */ }
         )
+
+        transactionsResult.onSuccess { report ->
+            val topAddons = aggregateAddonsFromReport(report.transactions)
+            val topCombos = aggregateCombosFromReport(report.transactions)
+            val staffActivity = aggregateStaffActivityFromReport(report.transactions)
+            _uiState.update {
+                it.copy(
+                    topAddons = topAddons,
+                    topCombos = topCombos,
+                    staffActivity = staffActivity
+                )
+            }
+        }
 
         itemsResult.fold(
             onSuccess = { pageResponse ->
@@ -625,6 +680,49 @@ class SalesReportViewModel @Inject constructor(
             }
         }
         return productMap.values.sortedByDescending { it.totalAmount }
+    }
+
+    private fun aggregateAddonsFromReport(transactions: List<TransactionReportItemDto>): List<TopAddonRow> {
+        val completed = transactions.filter { it.status.equals("completed", ignoreCase = true) }
+        val addonMap = mutableMapOf<String, Int>()
+        completed.forEach { trans ->
+            trans.items.forEach { item ->
+                item.addons.forEach { addonName ->
+                    addonMap[addonName] = addonMap.getOrDefault(addonName, 0) + item.quantity
+                }
+            }
+        }
+        return addonMap.map { TopAddonRow(it.key, it.value) }.sortedByDescending { it.totalQty }.take(5)
+    }
+
+    private fun aggregateCombosFromReport(transactions: List<TransactionReportItemDto>): List<TopComboRow> {
+        val completed = transactions.filter { it.status.equals("completed", ignoreCase = true) }
+        val comboMap = mutableMapOf<String, Int>()
+        completed.forEach { trans ->
+            if (trans.items.size >= 2) {
+                val sortedNames = trans.items.map { it.productName }.sorted()
+                for (i in 0 until sortedNames.size) {
+                    for (j in i + 1 until sortedNames.size) {
+                        val combo = "${sortedNames[i]} + ${sortedNames[j]}"
+                        comboMap[combo] = comboMap.getOrDefault(combo, 0) + 1
+                    }
+                }
+            }
+        }
+        return comboMap.map { TopComboRow(it.key, it.value) }.sortedByDescending { it.count }.take(5)
+    }
+
+    private fun aggregateStaffActivityFromReport(transactions: List<TransactionReportItemDto>): List<StaffSalesRow> {
+        val completed = transactions.filter { it.status.equals("completed", ignoreCase = true) }
+        val staffMap = mutableMapOf<String, StaffSalesRow>()
+        completed.forEach { trans ->
+            val current = staffMap.getOrDefault(trans.userName, StaffSalesRow(trans.userName, 0, 0.0))
+            staffMap[trans.userName] = current.copy(
+                transactionCount = current.transactionCount + 1,
+                totalSales = current.totalSales + trans.totalAmount
+            )
+        }
+        return staffMap.values.sortedByDescending { it.totalSales }
     }
 
     private data class Range(

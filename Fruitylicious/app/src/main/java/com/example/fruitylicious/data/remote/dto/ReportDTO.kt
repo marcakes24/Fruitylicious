@@ -53,16 +53,17 @@ data class WasteReportDto(
 )
 
 data class WasteReportItemDto(
-    val wasteId: String,
-    val ingredientId: Int,
-    val ingredientName: String,
-    val quantity: Double,
-    val unitType: String,
-    val reason: String,
-    val userId: Int,
-    val userName: String,
-    val dateTime: Long,
-    val image: String? = null
+    @SerializedName("wasteId") val wasteId: String,
+    @SerializedName("ingredientId") val ingredientId: Int,
+    @SerializedName("ingredientName") val ingredientName: String,
+    @SerializedName("quantity") val quantity: Double,
+    @SerializedName("unitType") val unitType: String,
+    @SerializedName("reason") val reason: String,
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("userName") val userName: String,
+    @SerializedName("branchId") val branchId: Int? = null,
+    @SerializedName("dateTime") val dateTime: Long,
+    @SerializedName("image") val image: String? = null
 )
 
 data class RestockReportDto(

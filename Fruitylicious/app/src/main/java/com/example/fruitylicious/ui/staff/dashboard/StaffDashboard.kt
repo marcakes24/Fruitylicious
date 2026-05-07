@@ -3,6 +3,7 @@ package com.example.fruitylicious.ui.staff.dashboard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -169,9 +171,11 @@ fun StaffDashboardScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     StaffSalesChartSection(
-                        weeklySales = uiState.weeklySalesData,
-                        totalAmount = uiState.weeklyTotalSales,
-                        transactionCount = uiState.weeklyTransactionCount
+                        dailySales = uiState.dailySalesData,
+                        totalAmount = uiState.dailyTotalSales,
+                        transactionCount = uiState.dailyTransactionCount,
+                        selectedHour = uiState.selectedHourlySales,
+                        onHourClick = viewModel::onHourSelected
                     )
 
                     val error = uiState.error
@@ -499,9 +503,11 @@ private fun StaffQuickActionCard(
 
 @Composable
 private fun StaffSalesChartSection(
-    weeklySales: List<Float>,
+    dailySales: List<HourlySales>,
     totalAmount: Double,
-    transactionCount: Int
+    transactionCount: Int,
+    selectedHour: HourlySales?,
+    onHourClick: (HourlySales?) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -509,7 +515,7 @@ private fun StaffSalesChartSection(
             .padding(horizontal = 16.dp)
     ) {
         Text(
-            text = "Sales This Week",
+            text = "Sales Today (10 AM - 8 PM)",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = StaffTextPrimary,
@@ -523,10 +529,9 @@ private fun StaffSalesChartSection(
             shadowElevation = 3.dp
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                val maxSales = (weeklySales.maxOrNull() ?: 0f).coerceAtLeast(100f)
+                val hourLabels = listOf("10a", "11a", "12p", "1p", "2p", "3p", "4p", "5p", "6p", "7p")
+                val maxSales = (dailySales.maxOfOrNull { it.totalSales } ?: 0f).coerceAtLeast(100f)
                 val roundedMax = (ceil(maxSales / 100.0) * 100).toInt()
-                val highlightIdx = weeklySales.indexOf(weeklySales.maxOrNull() ?: 0f)
                 val textMeasurer = rememberTextMeasurer()
 
                 val yLabels = listOf(
@@ -565,47 +570,63 @@ private fun StaffSalesChartSection(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    Canvas(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        val tPaddingPx = topPadding.toPx()
-                        val bPaddingPx = bottomPadding.toPx()
-                        val chartHeight = size.height - tPaddingPx - bPaddingPx
-                        val barCount = weeklySales.size
-                        val gap = size.width / barCount
-                        val barWidth = gap * 0.55f
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(dailySales) {
+                                    detectTapGestures { offset ->
+                                        val barCount = dailySales.size
+                                        val gap = size.width.toFloat() / barCount
+                                        
+                                        val clickedIndex = (offset.x / gap).toInt()
+                                        if (clickedIndex in dailySales.indices) {
+                                            onHourClick(dailySales[clickedIndex])
+                                        } else {
+                                            onHourClick(null)
+                                        }
+                                    }
+                                }
+                        ) {
+                            val tPaddingPx = topPadding.toPx()
+                            val bPaddingPx = bottomPadding.toPx()
+                            val chartHeight = size.height - tPaddingPx - bPaddingPx
+                            val barCount = dailySales.size
+                            val gap = size.width / barCount
+                            val barWidth = gap * 0.55f
 
-                        for (i in 0..4) {
-                            val y = tPaddingPx + chartHeight * (1f - i / 4f)
-                            drawLine(
-                                color = Color(0xFFE0E0E0),
-                                start = Offset(0f, y),
-                                end = Offset(size.width, y),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                        }
-
-                        weeklySales.forEachIndexed { index, value ->
-                            val barHeight = (value / roundedMax) * chartHeight
-                            val left = index * gap + (gap - barWidth) / 2f
-                            val top = tPaddingPx + chartHeight - barHeight
-
-                            drawRoundRect(
-                                color = StaffChartBar,
-                                topLeft = Offset(left, top),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx())
-                            )
-
-                            if (index == highlightIdx && value > 0f) {
-                                staffDrawTooltip(
-                                    textMeasurer = textMeasurer,
-                                    label = value.toInt().toString(),
-                                    centerX = left + barWidth / 2f,
-                                    topY = top - 28.dp.toPx()
+                            for (i in 0..4) {
+                                val y = tPaddingPx + chartHeight * (1f - i / 4f)
+                                drawLine(
+                                    color = Color(0xFFE0E0E0),
+                                    start = Offset(0f, y),
+                                    end = Offset(size.width, y),
+                                    strokeWidth = 1.dp.toPx()
                                 )
+                            }
+
+                            dailySales.forEachIndexed { index, data ->
+                                val barHeight = (data.totalSales / roundedMax) * chartHeight
+                                val left = index * gap + (gap - barWidth) / 2f
+                                val top = tPaddingPx + chartHeight - barHeight
+
+                                val isSelected = selectedHour?.hour == data.hour
+
+                                drawRoundRect(
+                                    color = if (isSelected) StaffGreenPrimary else StaffChartBar,
+                                    topLeft = Offset(left, top),
+                                    size = Size(barWidth, barHeight),
+                                    cornerRadius = CornerRadius(4.dp.toPx())
+                                )
+
+                                if (isSelected) {
+                                    staffDrawTooltip(
+                                        textMeasurer = textMeasurer,
+                                        label = "₱${data.totalSales.toInt()}\n${data.transactionCount} txns",
+                                        centerX = left + barWidth / 2f,
+                                        topY = top - 40.dp.toPx()
+                                    )
+                                }
                             }
                         }
                     }
@@ -614,13 +635,13 @@ private fun StaffSalesChartSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 50.dp), // Matched 44.dp (Y-axis) + 6.dp (Spacer)
+                        .padding(start = 50.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    days.forEach { day ->
+                    hourLabels.forEach { label ->
                         Text(
-                            text = day,
-                            fontSize = 10.sp,
+                            text = label,
+                            fontSize = 9.sp,
                             color = StaffTextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f)
@@ -638,27 +659,35 @@ private fun StaffSalesChartSection(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = "Total 7 Days",
+                        text = if (selectedHour != null) {
+                            val h = selectedHour.hour
+                            val period = if (h < 12) "AM" else "PM"
+                            val displayHour = if (h > 12) h - 12 else if (h == 0) 12 else h
+                            "Details for $displayHour $period"
+                        } else {
+                            "Today's Total"
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = StaffTextPrimary
                     )
 
                     Column(horizontalAlignment = Alignment.End) {
+                        val displayAmount = selectedHour?.totalSales?.toDouble() ?: totalAmount
+                        val displayCount = selectedHour?.transactionCount ?: transactionCount
+
                         Text(
-                            text = "₱${String.format(Locale.US, "%,.2f", totalAmount)}",
+                            text = "₱${String.format(Locale.US, "%,.2f", displayAmount)}",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = StaffTextPrimary
                         )
 
-                        if (transactionCount > 0) {
-                            Text(
-                                text = "$transactionCount transactions",
-                                fontSize = 12.sp,
-                                color = StaffTextSecondary
-                            )
-                        }
+                        Text(
+                            text = "$displayCount transactions",
+                            fontSize = 12.sp,
+                            color = StaffTextSecondary
+                        )
                     }
                 }
             }
@@ -672,8 +701,8 @@ private fun DrawScope.staffDrawTooltip(
     centerX: Float,
     topY: Float
 ) {
-    val bubbleWidth = 42.dp.toPx()
-    val bubbleHeight = 22.dp.toPx()
+    val bubbleWidth = 60.dp.toPx()
+    val bubbleHeight = 34.dp.toPx()
     val left = centerX - bubbleWidth / 2f
 
     val tooltipPath = Path().apply {
@@ -710,9 +739,10 @@ private fun DrawScope.staffDrawTooltip(
         text = label,
         style = TextStyle(
             color = Color(0xFF1A1A1A),
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            lineHeight = 11.sp
         )
     )
 
@@ -724,3 +754,4 @@ private fun DrawScope.staffDrawTooltip(
         )
     )
 }
+

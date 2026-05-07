@@ -65,12 +65,14 @@ interface WasteLogDao {
     @Query(
         """
         SELECT 
-            reason AS reason,
-            COUNT(*) AS count
+            UPPER(SUBSTR(reason, 1, 1)) || LOWER(SUBSTR(reason, 2)) AS reason,
+            COUNT(*) AS count,
+            SUM(CASE WHEN branchId = 1 THEN 1 ELSE 0 END) AS b1Count,
+            SUM(CASE WHEN branchId = 2 THEN 1 ELSE 0 END) AS b2Count
         FROM waste_logs
         WHERE dateTime BETWEEN :from AND :to
         AND (:branchId IS NULL OR branchId = :branchId)
-        GROUP BY reason
+        GROUP BY LOWER(reason)
         ORDER BY count DESC
         """
     )
@@ -84,7 +86,10 @@ interface WasteLogDao {
         """
         SELECT 
             i.ingredientName AS ingredientName,
-            COALESCE(SUM(w.quantity), 0) AS totalQuantity
+            COALESCE(SUM(w.quantity), 0) AS totalQuantity,
+            i.unitType AS unitType,
+            COALESCE(SUM(CASE WHEN w.branchId = 1 THEN w.quantity ELSE 0 END), 0) AS b1Qty,
+            COALESCE(SUM(CASE WHEN w.branchId = 2 THEN w.quantity ELSE 0 END), 0) AS b2Qty
         FROM waste_logs w
         INNER JOIN ingredients i ON w.ingredientId = i.ingredientId
         WHERE w.dateTime BETWEEN :from AND :to
@@ -98,4 +103,37 @@ interface WasteLogDao {
         from: Long,
         to: Long
     ): List<WasteItemRow>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM waste_logs
+        WHERE dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR branchId = :branchId)
+        """
+    )
+    suspend fun getTotalWasteCount(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): Int
+
+    @Query(
+        """
+        SELECT 
+            u.name AS staffName,
+            COUNT(*) AS count
+        FROM waste_logs w
+        INNER JOIN users u ON w.userId = u.userId
+        WHERE w.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR w.branchId = :branchId)
+        GROUP BY w.userId
+        ORDER BY count DESC
+        """
+    )
+    suspend fun getStaffWasteActivity(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<StaffWasteRow>
 }

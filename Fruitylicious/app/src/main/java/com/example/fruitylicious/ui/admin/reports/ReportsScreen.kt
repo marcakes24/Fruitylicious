@@ -16,16 +16,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -268,6 +276,98 @@ private fun ReportTabBar(
                         color = if (isSelected) Color.White else RptTextSub
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReportPeriodSelector(
+    period: String,
+    rangeText: String,
+    onPeriodSelected: (String) -> Unit,
+    onNavigate: (Int) -> Unit,
+    onDateClick: () -> Unit,
+    activeColor: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFF5F5F5))
+                .padding(4.dp)
+        ) {
+            listOf("daily", "weekly", "monthly").forEach { p ->
+                val isSelected = period == p
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Color.White else Color.Transparent)
+                        .clickable { onPeriodSelected(p) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = p.replaceFirstChar { it.uppercase() },
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) activeColor else RptTextSub
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = { onNavigate(-1) }) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Previous",
+                    tint = activeColor
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onDateClick() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = activeColor
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = rangeText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = RptTextMain
+                )
+            }
+
+            IconButton(onClick = { onNavigate(1) }) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Next",
+                    tint = activeColor
+                )
             }
         }
     }

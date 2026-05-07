@@ -52,6 +52,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.fruitylicious.data.local.dao.TopAddonRow
+import com.example.fruitylicious.data.local.dao.TopComboRow
+import com.example.fruitylicious.data.local.dao.TopSellingItemRow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import java.util.Locale
@@ -245,7 +248,8 @@ fun SalesTimeSeriesChart(
                         if (tooltipX < 0) tooltipX = 8.dp.toPx()
                         if (tooltipX + tooltipWidth > width) tooltipX = width - tooltipWidth - 8.dp.toPx()
                         
-                        val tooltipY = y - tooltipHeight - 12.dp.toPx()
+                        var tooltipY = y - tooltipHeight - 12.dp.toPx()
+                        if (tooltipY < 0) tooltipY = y + 12.dp.toPx() // Show below if no room above
                         
                         drawRoundRect(
                             color = Color.White,
@@ -278,7 +282,7 @@ fun SalesTimeSeriesChart(
         ) {
             val points = seriesList.first().points
             val labelCount = if (points.size > 8) 6 else points.size
-            val step = if (points.size > 1) (points.size - 1) / (labelCount - 1) else 1
+            val step = if (points.size > 1) (points.size - 1) / (labelCount - 1).coerceAtLeast(1) else 1
             
             for (i in 0 until labelCount) {
                 val idx = (i * step).coerceAtMost(points.size - 1)
@@ -286,7 +290,9 @@ fun SalesTimeSeriesChart(
                     text = points[idx].label,
                     fontSize = 10.sp,
                     color = RptTextSub,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -831,49 +837,102 @@ fun SalesTabContent(
             Text(
                 text = "Top Selling Items",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 color = RptTextMain
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (uiState.topItems.isEmpty()) {
-                Text("No sold items found", color = RptTextSub, fontSize = 13.sp)
+            if (uiState.isLoading) {
+                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+            } else if (uiState.topItems.isEmpty()) {
+                Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
-                uiState.topItems.forEachIndexed { index, item ->
+                TopSellingItemsChart(items = uiState.topItems)
+            }
+        }
+
+        SalesRptCard {
+            Text(
+                text = "Top Addons",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = RptTextMain
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (uiState.isLoading) {
+                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+            } else if (uiState.topAddons.isEmpty()) {
+                Text("No addons found.", fontSize = 13.sp, color = RptTextSub)
+            } else {
+                TopAddonsChart(items = uiState.topAddons)
+            }
+        }
+
+        SalesRptCard {
+            Text(
+                text = "Top Fruit Combo",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = RptTextMain
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (uiState.isLoading) {
+                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+            } else if (uiState.topCombos.isEmpty()) {
+                Text("No combos found.", fontSize = 13.sp, color = RptTextSub)
+            } else {
+                TopCombosChart(items = uiState.topCombos)
+            }
+        }
+
+        SalesRptCard {
+            Text(
+                text = "Staff Activity",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = RptTextMain
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (uiState.staffActivity.isEmpty()) {
+                Text("No staff activity data.", fontSize = 13.sp, color = RptTextSub)
+            } else {
+                uiState.staffActivity.forEach { data ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "${index + 1}.",
-                                fontSize = 15.sp,
-                                color = RptTextSub,
-                                modifier = Modifier.width(28.dp)
-                            )
-
-                            Text(
-                                text = item.productName,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = data.staffName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = RptTextMain
                             )
+                            Text(
+                                text = "${data.transactionCount} transactions",
+                                fontSize = 12.sp,
+                                color = RptTextSub
+                            )
                         }
-
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color.Black)
+                                .background(RptGreen.copy(alpha = 0.1f))
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "${item.totalQty} sold",
-                                fontSize = 13.sp,
-                                color = Color.White,
+                                text = "₱${String.format(Locale.US, "%,.0f", data.totalSales)}",
+                                color = RptGreen,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -883,6 +942,186 @@ fun SalesTabContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun TopSellingItemsChart(items: List<TopSellingItemRow>) {
+    val maxQty = items.maxOfOrNull { it.totalQty }?.toFloat() ?: 1f
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items.forEachIndexed { index, data ->
+            val fraction = if (maxQty > 0) data.totalQty.toFloat() / maxQty else 0f
+            val barColor = when (index) {
+                0 -> Color(0xFFFBC02D) // Gold/Yellow for sales
+                1 -> Color(0xFFFDD835)
+                2 -> Color(0xFFFFEB3B)
+                3 -> Color(0xFFFFF176)
+                else -> Color(0xFFFFF59D)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = data.productName,
+                    fontSize = 13.sp,
+                    color = RptTextSub,
+                    modifier = Modifier.weight(1.2f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(20.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction.coerceAtLeast(0.01f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(barColor)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = data.totalQty.toString(),
+                    fontSize = 13.sp,
+                    color = RptTextMain,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(35.dp),
+                    textAlign = TextAlign.End
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopAddonsChart(items: List<TopAddonRow>) {
+    val maxQty = items.maxOfOrNull { it.totalQty }?.toFloat() ?: 1f
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items.forEachIndexed { index, data ->
+            val fraction = if (maxQty > 0) data.totalQty.toFloat() / maxQty else 0f
+            val barColor = when (index) {
+                0 -> Color(0xFF2196F3) // Blue for addons
+                1 -> Color(0xFF42A5F5)
+                2 -> Color(0xFF64B5F6)
+                3 -> Color(0xFF90CAF9)
+                else -> Color(0xFFBBDEFB)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = data.addonName,
+                    fontSize = 13.sp,
+                    color = RptTextSub,
+                    modifier = Modifier.weight(1.2f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(20.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction.coerceAtLeast(0.01f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(barColor)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = data.totalQty.toString(),
+                    fontSize = 13.sp,
+                    color = RptTextMain,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(35.dp),
+                    textAlign = TextAlign.End
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopCombosChart(items: List<TopComboRow>) {
+    val maxCount = items.maxOfOrNull { it.count }?.toFloat() ?: 1f
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items.forEachIndexed { index, data ->
+            val fraction = if (maxCount > 0) data.count.toFloat() / maxCount else 0f
+            val barColor = when (index) {
+                0 -> Color(0xFF9C27B0) // Purple for combos
+                1 -> Color(0xFFAB47BC)
+                2 -> Color(0xFFBA68C8)
+                3 -> Color(0xFFCE93D8)
+                else -> Color(0xFFE1BEE7)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = data.comboName,
+                    fontSize = 13.sp,
+                    color = RptTextSub,
+                    modifier = Modifier.weight(1.2f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(20.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction.coerceAtLeast(0.01f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(barColor)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = data.count.toString(),
+                    fontSize = 13.sp,
+                    color = RptTextMain,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(35.dp),
+                    textAlign = TextAlign.End
+                )
+            }
+        }
     }
 }
 

@@ -14,3 +14,19 @@ data class TopSellingItemRow(
     val productName: String,
     val totalQty: Int
 )
+
+data class TopAddonRow(
+    val addonName: String,
+    val totalQty: Int
+)
+
+data class TopComboRow(
+    val comboName: String,
+    val count: Int
+)
+
+data class StaffSalesRow(
+    val staffName: String,
+    val transactionCount: Int,
+    val totalSales: Double
+)

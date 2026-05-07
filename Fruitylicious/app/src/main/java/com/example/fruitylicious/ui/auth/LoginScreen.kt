@@ -1,5 +1,6 @@
 package com.example.fruitylicious.ui.auth
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -7,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -34,6 +36,7 @@ private val BrownText = Color(0xFF5D4037)
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String) -> Unit,
+    onGuestClick: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -239,6 +242,54 @@ fun LoginScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            thickness = 1.dp,
+                            color = Color.LightGray.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "or",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = Color.Gray,
+                            fontSize = 14.sp
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            thickness = 1.dp,
+                            color = Color.LightGray.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OutlinedButton(
+                        onClick = onGuestClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(55.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFFFDEB95)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BrownText)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Continue as Guest",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     val errorMessage = uiState.error

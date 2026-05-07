@@ -24,6 +24,12 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
+data class HourlySales(
+    val hour: Int,
+    val totalSales: Float,
+    val transactionCount: Int
+)
+
 data class StaffDashboardUiState(
     val branchName: String = "",
     val userName: String = "",
@@ -32,9 +38,10 @@ data class StaffDashboardUiState(
     val isOnline: Boolean = false,
     val hasNotifications: Boolean = false,
     val dateText: String = "",
-    val weeklySalesData: List<Float> = List(7) { 0f },
-    val weeklyTotalSales: Double = 0.0,
-    val weeklyTransactionCount: Int = 0,
+    val dailySalesData: List<HourlySales> = emptyList(),
+    val dailyTotalSales: Double = 0.0,
+    val dailyTransactionCount: Int = 0,
+    val selectedHourlySales: HourlySales? = null,
     val error: String? = null,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
@@ -73,7 +80,7 @@ class StaffDashboardViewModel @Inject constructor(
 
     init {
         observeNetwork()
-        observeWeeklySales()
+        observeDailySales()
         observeNotifications()
         observeClockStatus()
     }
@@ -105,40 +112,76 @@ class StaffDashboardViewModel @Inject constructor(
         }
     }
 
-    private fun observeWeeklySales() {
-        val weekRange = getCurrentWeekRange()
+    private fun observeDailySales() {
+        val todayRange = getTodayRange()
 
         viewModelScope.launch {
             transactionRepository
                 .observeTransactionsByDateRange(
                     branchId = branchId,
-                    from = weekRange.first,
-                    to = weekRange.second
+                    from = todayRange.first,
+                    to = todayRange.second
                 )
                 .collectLatest { transactions ->
                     val completedTransactions = transactions.filter {
                         it.status.equals("completed", ignoreCase = true)
                     }
 
-                    val salesPerDay = MutableList(7) { 0f }
-
-                    completedTransactions.forEach { transaction ->
-                        val index = getMondayBasedDayIndex(transaction.dateTime)
-                        salesPerDay[index] += transaction.totalAmount.toFloat()
+                    // 10 AM to 8 PM (10 slots: 10-11, 11-12, ..., 19-20)
+                    val hourlySales = (10..19).map { hour ->
+                        val hourStart = getHourTimestamp(hour)
+                        val hourEnd = getHourTimestamp(hour + 1)
+                        
+                        val hourTransactions = completedTransactions.filter { 
+                            it.dateTime in hourStart until hourEnd
+                        }
+                        
+                        HourlySales(
+                            hour = hour,
+                            totalSales = hourTransactions.sumOf { it.totalAmount }.toFloat(),
+                            transactionCount = hourTransactions.size
+                        )
                     }
 
                     _uiState.update {
                         it.copy(
-                            weeklySalesData = salesPerDay,
-                            weeklyTotalSales = completedTransactions.sumOf { transaction ->
+                            dailySalesData = hourlySales,
+                            dailyTotalSales = completedTransactions.sumOf { transaction ->
                                 transaction.totalAmount
                             },
-                            weeklyTransactionCount = completedTransactions.size,
+                            dailyTransactionCount = completedTransactions.size,
                             error = null
                         )
                     }
                 }
         }
+    }
+
+    fun onHourSelected(hourlySales: HourlySales?) {
+        _uiState.update { it.copy(selectedHourlySales = hourlySales) }
+    }
+
+    private fun getTodayRange(): Pair<Long, Long> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val start = calendar.timeInMillis
+        
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+        val end = calendar.timeInMillis - 1
+        
+        return start to end
+    }
+
+    private fun getHourTimestamp(hour: Int): Long {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, hour)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
     }
 
     fun logout() {

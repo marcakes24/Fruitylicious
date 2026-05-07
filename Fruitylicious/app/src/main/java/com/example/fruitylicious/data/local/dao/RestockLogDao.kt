@@ -71,12 +71,69 @@ interface RestockLogDao {
         COALESCE(AVG(r.quantityAdded), 0) AS avgUnits
     FROM restock_logs r
     INNER JOIN ingredients i ON r.ingredientId = i.ingredientId
-    WHERE (:branchId IS NULL OR r.branchId = :branchId)
+    WHERE r.dateTime BETWEEN :from AND :to
+    AND (:branchId IS NULL OR r.branchId = :branchId)
     GROUP BY r.ingredientId
     ORDER BY restockCount DESC, ingredientName ASC
     """
     )
     suspend fun getRestockFrequencyReport(
-        branchId: Int?
+        branchId: Int?,
+        from: Long,
+        to: Long
     ): List<RestockFrequencyRow>
+
+    @Query(
+        """
+        SELECT 
+            i.ingredientName AS ingredientName,
+            SUM(r.quantityAdded) AS totalQuantity,
+            COUNT(*) AS count,
+            i.unitType AS unitType
+        FROM restock_logs r
+        INNER JOIN ingredients i ON r.ingredientId = i.ingredientId
+        WHERE r.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR r.branchId = :branchId)
+        GROUP BY r.ingredientId
+        ORDER BY totalQuantity DESC
+        """
+    )
+    suspend fun getMostRestockedIngredients(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<RestockIngredientRow>
+
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM restock_logs
+        WHERE dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR branchId = :branchId)
+        """
+    )
+    suspend fun getTotalRestockCount(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): Int
+
+    @Query(
+        """
+        SELECT 
+            u.name AS staffName,
+            COUNT(*) AS count
+        FROM restock_logs r
+        INNER JOIN users u ON r.userId = u.userId
+        WHERE r.dateTime BETWEEN :from AND :to
+        AND (:branchId IS NULL OR r.branchId = :branchId)
+        GROUP BY r.userId
+        ORDER BY count DESC
+        """
+    )
+    suspend fun getStaffRestockActivity(
+        branchId: Int?,
+        from: Long,
+        to: Long
+    ): List<StaffRestockRow>
 }

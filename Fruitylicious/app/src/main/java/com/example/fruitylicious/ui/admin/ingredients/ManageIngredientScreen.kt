@@ -414,7 +414,7 @@ private fun IngredientEditDialog(
         }
     }
 
-    val units = listOf("pcs", "can", "pack", "grams", "ml")
+    val units = listOf("pcs", "grams", "ml")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(

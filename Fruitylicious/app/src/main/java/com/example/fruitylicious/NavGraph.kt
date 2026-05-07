@@ -31,6 +31,7 @@ import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen as Admi
 import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 import com.example.fruitylicious.ui.admin.users.UserManagementScreen
 
+import com.example.fruitylicious.ui.shared.GuestsScreen
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.ui.shared.TimeLogScreen
 import com.example.fruitylicious.ui.shared.inventory.InventoryAdjustmentScreen
@@ -76,6 +77,7 @@ const val ADMIN_AUDIT_LOGS = "admin_audit_logs"
 const val ADMIN_QUEUE = "admin_queue"
 const val ADMIN_NOTIFICATIONS = "admin_notifications"
 const val TRANSACTION_HISTORY = "transaction_history"
+const val GUEST_SCREEN = "guest_screen"
 
 @Composable
 fun FruityliciousNavGraph(
@@ -177,8 +179,15 @@ fun FruityliciousNavGraph(
                         }
                         launchSingleTop = true
                     }
+                },
+                onGuestClick = {
+                    navController.navigate(GUEST_SCREEN)
                 }
             )
+        }
+
+        composable(GUEST_SCREEN) {
+            GuestsScreen(navController = navController)
         }
 
         composable(STAFF_DASHBOARD) {

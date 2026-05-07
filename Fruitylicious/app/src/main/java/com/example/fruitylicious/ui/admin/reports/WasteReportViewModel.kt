@@ -6,11 +6,14 @@ import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.WasteItemRow
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.dao.WasteReasonRow
+import com.example.fruitylicious.data.local.dao.StaffWasteRow
+import com.example.fruitylicious.data.local.dao.WasteUnitTotal
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,11 +22,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class WasteReportUiState(
+    val period: String = "daily",
+    val selectedDate: Long = System.currentTimeMillis(),
+    val rangeText: String = "",
     val totalWaste: Double = 0.0,
+    val totalsByUnit: List<WasteUnitTotal> = emptyList(),
+    val totalEntries: Int = 0,
     val mostWasted: String = "—",
     val mostWastedQty: Double = 0.0,
+    val mostWastedUnit: String = "",
     val reasonData: List<WasteReasonRow> = emptyList(),
     val wasteByItem: List<WasteItemRow> = emptyList(),
+    val staffActivity: List<StaffWasteRow> = emptyList(),
+    val selectedUnit: String? = null,
+    val availableUnits: List<String> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val currentPage: Int = 0,
@@ -43,28 +55,81 @@ class WasteReportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WasteReportUiState())
     val uiState: StateFlow<WasteReportUiState> = _uiState.asStateFlow()
 
+    private val localBranchId = sessionManager.getBranchId()
     private val PAGE_SIZE = 50
+
+    fun setPeriod(
+        period: String,
+        branchId: Int?
+    ) {
+        _uiState.update {
+            it.copy(
+                period = period,
+                selectedDate = System.currentTimeMillis(),
+                selectedUnit = null
+            )
+        }
+        loadReport(branchId)
+    }
+
+    fun setSelectedDate(
+        date: Long,
+        branchId: Int?
+    ) {
+        _uiState.update {
+            it.copy(selectedDate = date, selectedUnit = null)
+        }
+        loadReport(branchId)
+    }
+
+    fun setUnitFilter(unit: String?) {
+        _uiState.update { it.copy(selectedUnit = unit) }
+    }
+
+    fun navigatePeriod(
+        delta: Int,
+        branchId: Int?
+    ) {
+        val current = Calendar.getInstance().apply {
+            timeInMillis = _uiState.value.selectedDate
+        }
+
+        when (_uiState.value.period) {
+            "daily" -> current.add(Calendar.DAY_OF_YEAR, delta)
+            "weekly" -> current.add(Calendar.WEEK_OF_YEAR, delta)
+            "monthly" -> current.add(Calendar.MONTH, delta)
+        }
+
+        setSelectedDate(current.timeInMillis, branchId)
+    }
 
     fun loadReport(
         branchId: Int?
     ) {
         viewModelScope.launch {
+            val state = _uiState.value
+            val range = getRange(state.period, state.selectedDate)
+
             _uiState.update {
                 it.copy(
                     isLoading = true,
                     error = null,
                     currentPage = 0,
                     hasMore = false,
-                    wasteByItem = emptyList()
+                    wasteByItem = emptyList(),
+                    rangeText = formatRangeText(state.period, range)
                 )
             }
 
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
-            val range = getCurrentWeekRange()
 
             when {
+                branchId == null && isAdmin && isOnline -> {
+                    loadCombinedReport(range.first, range.second)
+                }
+
                 branchId == localBranchId -> {
                     loadLocalReport(
                         branchId = localBranchId,
@@ -83,7 +148,7 @@ class WasteReportViewModel @Inject constructor(
 
                 !isOnline -> {
                     loadLocalReport(
-                        branchId = localBranchId,
+                        branchId = branchId,
                         from = range.first,
                         to = range.second
                     )
@@ -107,7 +172,7 @@ class WasteReportViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
 
-            val range = getCurrentWeekRange()
+            val range = getRange(state.period, state.selectedDate)
             val nextPage = state.currentPage + 1
 
             val result = reportRepository.getWastePage(
@@ -121,11 +186,15 @@ class WasteReportViewModel @Inject constructor(
             result.fold(
                 onSuccess = { pageResponse ->
                     val newRows = pageResponse.items
-                        .groupBy { it.ingredientName }
-                        .map { (ingredientName, items) ->
+                        .groupBy { it.ingredientId }
+                        .map { (_, groupedItems) ->
+                            val first = groupedItems.first()
                             WasteItemRow(
-                                ingredientName = ingredientName,
-                                totalQuantity = items.sumOf { it.quantity }
+                                ingredientName = first.ingredientName,
+                                totalQuantity = groupedItems.sumOf { it.quantity },
+                                unitType = first.unitType,
+                                b1Qty = groupedItems.filter { (it.branchId ?: localBranchId) == 1 }.sumOf { it.quantity },
+                                b2Qty = groupedItems.filter { (it.branchId ?: localBranchId) == 2 }.sumOf { it.quantity }
                             )
                         }
                     
@@ -153,8 +222,140 @@ class WasteReportViewModel @Inject constructor(
         }
     }
 
+    private suspend fun loadCombinedReport(
+        from: Long,
+        to: Long
+    ) {
+        try {
+            val localId = localBranchId
+            val allBranches = branchDao.getAllBranches()
+            val otherBranch = allBranches.firstOrNull { it.branchId != localId }
+            
+            // 1. Load Local Data
+            val localTotal = wasteLogDao.getTotalWasteQuantity(null, from, to)
+            val localCount = wasteLogDao.getTotalWasteCount(null, from, to)
+            val localReasons = wasteLogDao.getWasteReasonReport(null, from, to)
+            val localItems = wasteLogDao.getWasteByItemReport(null, from, to)
+            val localStaff = wasteLogDao.getStaffWasteActivity(null, from, to)
+
+            var finalTotal = localTotal
+            var finalCount = localCount
+            var finalReasons = localReasons.toMutableList()
+            var finalItems = localItems.toMutableList()
+            var finalStaff = localStaff.toMutableList()
+
+            // 2. Load Remote Data for the other branch if online
+            if (otherBranch != null && networkMonitor.isOnline()) {
+                val otherId = otherBranch.branchId
+                val remoteSummary = reportRepository.getWasteSummary(otherId, from, to)
+                val remotePage = reportRepository.getWastePage(otherId, from, to, 0, PAGE_SIZE)
+
+                remoteSummary.onSuccess { summary ->
+                    finalTotal += summary.totalWasteQuantity
+                }
+
+                remotePage.onSuccess { page ->
+                    finalCount += page.totalItems.toInt()
+                    // Map remote items to WasteItemRow
+                    val remoteRows = page.items
+                        .groupBy { it.ingredientId }
+                        .map { (_, grouped) ->
+                            val first = grouped.first()
+                            WasteItemRow(
+                                ingredientName = first.ingredientName,
+                                totalQuantity = grouped.sumOf { it.quantity },
+                                unitType = first.unitType,
+                                b1Qty = if (otherId == 1) grouped.sumOf { it.quantity } else 0.0,
+                                b2Qty = if (otherId == 2) grouped.sumOf { it.quantity } else 0.0
+                            )
+                        }
+                    
+                    // Merge with localItems
+                    val mergedItems = (finalItems + remoteRows)
+                        .groupBy { it.ingredientName }
+                        .map { (name, rows) ->
+                            val first = rows.first()
+                            WasteItemRow(
+                                ingredientName = name,
+                                totalQuantity = rows.sumOf { it.totalQuantity },
+                                unitType = first.unitType,
+                                b1Qty = rows.sumOf { it.b1Qty },
+                                b2Qty = rows.sumOf { it.b2Qty }
+                            )
+                        }
+                    finalItems = mergedItems.toMutableList()
+
+                    // Merge Reasons
+                    val remoteReasons = page.items
+                        .groupBy { it.reason.trim().lowercase() }
+                        .map { (reason, grouped) ->
+                            WasteReasonRow(
+                                reason = reason.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
+                                count = grouped.size,
+                                b1Count = if (otherId == 1) grouped.size else 0,
+                                b2Count = if (otherId == 2) grouped.size else 0
+                            )
+                        }
+                    
+                    val mergedReasons = (finalReasons + remoteReasons)
+                        .groupBy { it.reason.lowercase() }
+                        .map { (_, rows) ->
+                            val first = rows.first()
+                            WasteReasonRow(
+                                reason = first.reason,
+                                count = rows.sumOf { it.count },
+                                b1Count = rows.sumOf { it.b1Count },
+                                b2Count = rows.sumOf { it.b2Count }
+                            )
+                        }
+                    finalReasons = mergedReasons.toMutableList()
+
+                    // Merge Staff
+                    val remoteStaff = page.items
+                        .groupBy { it.userName }
+                        .map { (name, grouped) -> StaffWasteRow(name, grouped.size) }
+                    
+                    finalStaff = (finalStaff + remoteStaff)
+                        .groupBy { it.staffName }
+                        .map { (name, rows) -> StaffWasteRow(name, rows.sumOf { it.count }) }
+                        .toMutableList()
+                }
+            }
+
+            val topItem = finalItems.maxByOrNull { it.totalQuantity }
+            val unitTotals = finalItems.groupBy { it.unitType }
+                .map { (unit, rows) -> WasteUnitTotal(unit, rows.sumOf { it.totalQuantity }) }
+                .sortedByDescending { it.totalQuantity }
+
+            _uiState.update {
+                it.copy(
+                    totalWaste = finalTotal,
+                    totalEntries = finalCount,
+                    totalsByUnit = unitTotals,
+                    wasteByItem = finalItems.sortedByDescending { it.totalQuantity },
+                    reasonData = finalReasons.sortedByDescending { it.count },
+                    staffActivity = finalStaff.sortedByDescending { it.count },
+                    mostWasted = topItem?.ingredientName ?: "—",
+                    mostWastedQty = topItem?.totalQuantity ?: 0.0,
+                    mostWastedUnit = topItem?.unitType ?: "",
+                    availableUnits = finalItems.map { it.unitType }.distinct().sorted(),
+                    isLoading = false,
+                    error = null
+                )
+            }
+
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to load combined waste report."
+                )
+            }
+        }
+    }
+
     private suspend fun loadLocalReport(
-        branchId: Int,
+        branchId: Int?,
         from: Long,
         to: Long
     ) {
@@ -164,6 +365,8 @@ class WasteReportViewModel @Inject constructor(
                 from = from,
                 to = to
             )
+            val totalCount = wasteLogDao.getTotalWasteCount(branchId, from, to)
+            val staffActivity = wasteLogDao.getStaffWasteActivity(branchId, from, to)
 
             val reasonData = wasteLogDao.getWasteReasonReport(
                 branchId = branchId,
@@ -177,17 +380,29 @@ class WasteReportViewModel @Inject constructor(
                 to = to
             )
 
+            // If we are viewing "All" (branchId == null) and online, we should probably fetch from remote 
+            // because local only has this branch's data. 
+            // But the current UI logic calls loadLocalReport if branchId matches local or if offline.
+
             val topItem = wasteByItem.maxByOrNull {
                 it.totalQuantity
             }
+            val unitTotals = wasteByItem.groupBy { it.unitType }
+                .map { (unit, rows) -> WasteUnitTotal(unit, rows.sumOf { it.totalQuantity }) }
+                .sortedByDescending { it.totalQuantity }
 
             _uiState.update {
                 it.copy(
                     totalWaste = totalWaste,
+                    totalEntries = totalCount,
+                    totalsByUnit = unitTotals,
                     mostWasted = topItem?.ingredientName ?: "—",
                     mostWastedQty = topItem?.totalQuantity ?: 0.0,
+                    mostWastedUnit = topItem?.unitType ?: "",
                     reasonData = reasonData,
                     wasteByItem = wasteByItem,
+                    staffActivity = staffActivity,
+                    availableUnits = wasteByItem.map { row -> row.unitType }.distinct().sorted(),
                     isLoading = false,
                     hasMore = false,
                     error = null
@@ -238,22 +453,42 @@ class WasteReportViewModel @Inject constructor(
 
         pageResult.fold(
             onSuccess = { pageResponse ->
-                val itemRows = pageResponse.items
-                    .groupBy { it.ingredientName }
-                    .map { (ingredientName, groupedItems) ->
+                val items = pageResponse.items
+                val itemRows = items
+                    .groupBy { it.ingredientId }
+                    .map { (_, groupedItems) ->
+                        val first = groupedItems.first()
                         WasteItemRow(
-                            ingredientName = ingredientName,
-                            totalQuantity = groupedItems.sumOf { it.quantity }
+                            ingredientName = first.ingredientName,
+                            totalQuantity = groupedItems.sumOf { it.quantity },
+                            unitType = first.unitType,
+                            b1Qty = groupedItems.filter { (it.branchId ?: localBranchId) == 1 }.sumOf { it.quantity },
+                            b2Qty = groupedItems.filter { (it.branchId ?: localBranchId) == 2 }.sumOf { it.quantity }
                         )
                     }
                     .sortedByDescending { it.totalQuantity }
 
-                val reasonRows = pageResponse.items
-                    .groupBy { it.reason.ifBlank { "Unspecified" } }
+                val topItem = itemRows.firstOrNull()
+                val unitTotals = itemRows.groupBy { it.unitType }
+                    .map { (unit, rows) -> WasteUnitTotal(unit, rows.sumOf { it.totalQuantity }) }
+                    .sortedByDescending { it.totalQuantity }
+
+                val staffRows = items.groupBy { it.userName }
+                    .map { (name, grouped) -> StaffWasteRow(name, grouped.size) }
+                    .sortedByDescending { it.count }
+
+                val reasonRows = items
+                    .groupBy { 
+                        it.reason.trim().lowercase()
+                            .replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString() }
+                            .ifBlank { "Unspecified" } 
+                    }
                     .map { (reason, groupedItems) ->
                         WasteReasonRow(
                             reason = reason,
-                            count = groupedItems.size
+                            count = groupedItems.size,
+                            b1Count = groupedItems.count { it.branchId == 1 },
+                            b2Count = groupedItems.count { it.branchId == 2 }
                         )
                     }
                     .sortedByDescending { it.count }
@@ -262,6 +497,15 @@ class WasteReportViewModel @Inject constructor(
                     it.copy(
                         wasteByItem = itemRows,
                         reasonData = reasonRows,
+                        staffActivity = staffRows,
+                        totalEntries = pageResponse.totalItems.toInt(),
+                        totalsByUnit = unitTotals,
+                        availableUnits = itemRows.map { row -> row.unitType }.distinct().sorted(),
+                        mostWasted = it.mostWasted.takeIf { m -> m != "—" } 
+                            ?: topItem?.ingredientName 
+                            ?: "—",
+                        mostWastedQty = if (it.mostWasted == "—") topItem?.totalQuantity ?: 0.0 else it.mostWastedQty,
+                        mostWastedUnit = if (it.mostWasted == "—") topItem?.unitType ?: "" else it.mostWastedUnit,
                         isLoading = false,
                         currentPage = 0,
                         hasMore = pageResponse.hasNext
@@ -279,21 +523,66 @@ class WasteReportViewModel @Inject constructor(
         )
     }
 
-    private fun getCurrentWeekRange(): Pair<Long, Long> {
-        val start = Calendar.getInstance()
-
-        while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-            start.add(Calendar.DAY_OF_YEAR, -1)
+    private fun getRange(period: String, baseDate: Long): Pair<Long, Long> {
+        val base = Calendar.getInstance().apply {
+            timeInMillis = baseDate
         }
 
-        start.set(Calendar.HOUR_OF_DAY, 0)
-        start.set(Calendar.MINUTE, 0)
-        start.set(Calendar.SECOND, 0)
-        start.set(Calendar.MILLISECOND, 0)
+        return when (period) {
+            "weekly" -> {
+                val start = base.clone() as Calendar
+                while (start.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+                    start.add(Calendar.DAY_OF_YEAR, -1)
+                }
+                start.set(Calendar.HOUR_OF_DAY, 0)
+                start.set(Calendar.MINUTE, 0)
+                start.set(Calendar.SECOND, 0)
+                start.set(Calendar.MILLISECOND, 0)
 
-        val end = System.currentTimeMillis()
+                val end = start.clone() as Calendar
+                end.add(Calendar.DAY_OF_YEAR, 7)
+                end.add(Calendar.MILLISECOND, -1)
 
-        return start.timeInMillis to end
+                start.timeInMillis to end.timeInMillis
+            }
+
+            "monthly" -> {
+                val start = base.clone() as Calendar
+                start.set(Calendar.DAY_OF_MONTH, 1)
+                start.set(Calendar.HOUR_OF_DAY, 0)
+                start.set(Calendar.MINUTE, 0)
+                start.set(Calendar.SECOND, 0)
+                start.set(Calendar.MILLISECOND, 0)
+
+                val end = start.clone() as Calendar
+                end.add(Calendar.MONTH, 1)
+                end.add(Calendar.MILLISECOND, -1)
+
+                start.timeInMillis to end.timeInMillis
+            }
+
+            else -> {
+                val start = base.clone() as Calendar
+                start.set(Calendar.HOUR_OF_DAY, 0)
+                start.set(Calendar.MINUTE, 0)
+                start.set(Calendar.SECOND, 0)
+                start.set(Calendar.MILLISECOND, 0)
+
+                val end = start.clone() as Calendar
+                end.add(Calendar.DAY_OF_YEAR, 1)
+                end.add(Calendar.MILLISECOND, -1)
+
+                start.timeInMillis to end.timeInMillis
+            }
+        }
+    }
+
+    private fun formatRangeText(period: String, range: Pair<Long, Long>): String {
+        val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", Locale.US)
+        return when (period) {
+            "daily" -> sdf.format(java.util.Date(range.first))
+            else -> "${sdf.format(java.util.Date(range.first))} - ${sdf.format(java.util.Date(range.second))}"
+        }
     }
 
     private fun isAdminUser(): Boolean {
