@@ -47,7 +47,6 @@ class IngredientRepository @Inject constructor(
         image: String?,
         ingredientName: String,
         unitType: String,
-        estimatedWeightPerUnit: Double,
         isPackaging: Boolean,
         lowStockThreshold: Double
     ): Result<Unit> {
@@ -62,10 +61,6 @@ class IngredientRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Unit type is required."))
         }
 
-        if (estimatedWeightPerUnit < 0.0) {
-            return Result.failure(IllegalArgumentException("Estimated weight cannot be negative."))
-        }
-
         if (lowStockThreshold < 0.0) {
             return Result.failure(IllegalArgumentException("Low stock threshold cannot be negative."))
         }
@@ -78,7 +73,6 @@ class IngredientRepository @Inject constructor(
                 image = image?.trim()?.ifBlank { null },
                 ingredientName = cleanName,
                 unitType = cleanUnit,
-                estimatedWeightPerUnit = estimatedWeightPerUnit,
                 isPackaging = isPackaging,
                 lowStockThreshold = lowStockThreshold,
                 lastModified = now,

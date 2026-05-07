@@ -60,6 +60,16 @@ class CartRepository @Inject constructor() {
         _cartItems.value = emptyList()
     }
 
+    fun updateFullItem(updatedItem: CartItem) {
+        _cartItems.value = _cartItems.value.map { item ->
+            if (item.cartLineId == updatedItem.cartLineId) {
+                updatedItem
+            } else {
+                item
+            }
+        }
+    }
+
     fun saveReceiptSummary(
         transactionId: String,
         paymentType: String,

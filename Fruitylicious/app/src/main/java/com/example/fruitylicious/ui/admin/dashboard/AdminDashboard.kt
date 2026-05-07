@@ -3,18 +3,23 @@ package com.example.fruitylicious.ui.admin.dashboard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SetMeal
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -45,13 +50,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.fruitylicious.ADMIN_ADJUSTMENT
 import com.example.fruitylicious.ADMIN_INGREDIENTS
+import com.example.fruitylicious.ADMIN_INVENTORY
 import com.example.fruitylicious.ADMIN_NOTIFICATIONS
 import com.example.fruitylicious.ADMIN_PRODUCTS
 import com.example.fruitylicious.ADMIN_RECIPES
+import com.example.fruitylicious.ADMIN_REPORTS_DASHBOARD
 import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
+import com.example.fruitylicious.ADMIN_WASTE_HISTORY
 import com.example.fruitylicious.STAFF_POS
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.ceil
@@ -94,11 +105,11 @@ fun AdminDashboardScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = uiState.userName,
+                    ownerName = uiState.userName,
                     onLogout = viewModel::logout
                 )
             }
@@ -117,7 +128,10 @@ fun AdminDashboardScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     DashboardHeader(
-                        selectedBranch = uiState.selectedBranch,
+                        selectedBranchId = uiState.selectedBranchId,
+                        branches = uiState.branches,
+                        isAdmin = uiState.isAdmin,
+                        isOnline = uiState.isOnline,
                         hasNotifications = uiState.hasNotifications,
                         onBranchSelect = viewModel::onBranchSelected,
                         onNotificationsClick = {
@@ -130,11 +144,23 @@ fun AdminDashboardScreen(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    if (uiState.isAdmin && !uiState.isOnline) {
+                        Text(
+                            text = "Offline mode: Only local branch data is visible.",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     GreetingCard(
-                        adminName = uiState.userName,
-                        selectedBranch = uiState.selectedBranch,
+                        ownerName = uiState.userName,
+                        selectedBranchName = uiState.selectedBranchName,
                         dateText = uiState.dateText,
                         isOnline = uiState.isOnline,
                         onStartPos = {
@@ -153,7 +179,8 @@ fun AdminDashboardScreen(
                     SalesChartSection(
                         weeklySales = uiState.weeklySalesData,
                         totalAmount = uiState.weeklyTotalSales,
-                        transactionCount = uiState.weeklyTransactionCount
+                        transactionCount = uiState.weeklyTransactionCount,
+                        onViewReport = { navController.navigate(ADMIN_REPORTS_DASHBOARD) }
                     )
 
                     val error = uiState.error
@@ -182,9 +209,12 @@ fun AdminDashboardScreen(
 
 @Composable
 private fun DashboardHeader(
-    selectedBranch: String,
+    selectedBranchId: Int?,
+    branches: List<BranchEntity>,
+    isAdmin: Boolean,
+    isOnline: Boolean,
     hasNotifications: Boolean,
-    onBranchSelect: (String) -> Unit,
+    onBranchSelect: (Int?) -> Unit,
     onNotificationsClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -239,33 +269,18 @@ private fun DashboardHeader(
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            if (isAdmin) {
+                Spacer(modifier = Modifier.width(12.dp))
 
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF5F5F5))
-                    .padding(3.dp)
-            ) {
-                listOf("B1", "B2", "All").forEach { branch ->
-                    val isSelected = selectedBranch == branch
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) DashGreenPrimary else Color.Transparent)
-                            .clickable { onBranchSelect(branch) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = branch,
-                            color = if (isSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = DashGreenPrimary,
+                    containerColor = Color(0xFFF5F5F5),
+                    modifier = Modifier.widthIn(max = 200.dp)
+                )
             }
         }
     }
@@ -273,19 +288,12 @@ private fun DashboardHeader(
 
 @Composable
 private fun GreetingCard(
-    adminName: String,
-    selectedBranch: String,
+    ownerName: String,
+    selectedBranchName: String,
     dateText: String,
     isOnline: Boolean,
     onStartPos: () -> Unit
 ) {
-    val branchName = when (selectedBranch) {
-        "B1" -> "Branch 1"
-        "B2" -> "Branch 2"
-        "All" -> "All Branches"
-        else -> selectedBranch
-    }
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -302,7 +310,7 @@ private fun GreetingCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Hello, ${adminName.ifBlank { "Admin User" }}",
+                        text = "Hello, ${ownerName.ifBlank { "Owner User" }}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
@@ -326,7 +334,7 @@ private fun GreetingCard(
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
-                            text = "Viewing: $branchName",
+                            text = "Viewing: $selectedBranchName",
                             color = DashGreenPrimary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -434,9 +442,9 @@ private fun QuickActionsSection(
         )
 
         val actions = listOf(
-            Triple(Icons.Outlined.Inventory2, "Products", ADMIN_PRODUCTS),
-            Triple(Icons.Outlined.SetMeal, "Ingredients", ADMIN_INGREDIENTS),
-            Triple(Icons.AutoMirrored.Outlined.MenuBook, "Recipes", ADMIN_RECIPES),
+            Triple(Icons.Outlined.Search, "Inventory Monitoring", ADMIN_INVENTORY),
+            Triple(Icons.Outlined.Tune, "Inventory Adjustment", ADMIN_ADJUSTMENT),
+            Triple(Icons.Outlined.DeleteOutline, "Waste Management", ADMIN_WASTE_HISTORY),
             Triple(Icons.Outlined.Autorenew, "Restock", ADMIN_RESTOCK_HISTORY)
         )
 
@@ -518,20 +526,49 @@ private fun QuickActionCard(
 private fun SalesChartSection(
     weeklySales: List<Float>,
     totalAmount: Double,
-    transactionCount: Int
+    transactionCount: Int,
+    onViewReport: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = "Sales This Week",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary,
-            modifier = Modifier.padding(bottom = 10.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Sales This Week",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+
+            TextButton(
+                onClick = onViewReport,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = "View Report",
+                    fontSize = 12.sp,
+                    color = DashGreenPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = DashGreenPrimary
+                )
+            }
+        }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),

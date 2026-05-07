@@ -32,7 +32,7 @@ class ManageIngredientsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         ManageIngredientsUiState(
-            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            isAdmin = sessionManager.isAdmin(),
             userBranchId = "B${sessionManager.getBranchId()}"
         )
     )
@@ -59,7 +59,6 @@ class ManageIngredientsViewModel @Inject constructor(
         existingIngredientId: Int?,
         name: String,
         unitType: String,
-        estimatedWeightPerUnit: Double,
         lowStockThreshold: Double,
         isPackaging: Boolean,
         image: String?
@@ -77,11 +76,6 @@ class ManageIngredientsViewModel @Inject constructor(
             return
         }
 
-        if (estimatedWeightPerUnit < 0.0) {
-            setError("Estimated weight cannot be negative.")
-            return
-        }
-
         if (lowStockThreshold < 0.0) {
             setError("Low stock threshold cannot be negative.")
             return
@@ -93,7 +87,6 @@ class ManageIngredientsViewModel @Inject constructor(
                 image = image?.takeIf { it.isNotBlank() },
                 ingredientName = cleanName,
                 unitType = cleanUnit,
-                estimatedWeightPerUnit = estimatedWeightPerUnit,
                 isPackaging = isPackaging,
                 lowStockThreshold = lowStockThreshold
             )

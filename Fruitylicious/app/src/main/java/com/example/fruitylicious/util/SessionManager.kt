@@ -100,6 +100,11 @@ class SessionManager @Inject constructor(
         return preferences.getString(KEY_ROLE, null)
     }
 
+    fun isAdmin(): Boolean {
+        val role = getRole()
+        return role?.equals("admin", ignoreCase = true) == true
+    }
+
     fun getBranchId(): Int {
         return preferences.getInt(KEY_BRANCH_ID, 0)
     }

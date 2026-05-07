@@ -78,7 +78,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.IngredientEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import com.example.fruitylicious.util.ImageStorage
 import kotlinx.coroutines.launch
 
@@ -126,11 +126,11 @@ fun ManageIngredientsScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }
@@ -243,12 +243,11 @@ fun ManageIngredientsScreen(
                 IngredientEditDialog(
                     ingredient = currentIngredient,
                     onDismiss = { showEditDialog = false },
-                    onSave = { name, unit, weight, threshold, isPackaging, image ->
+                    onSave = { name, unit, threshold, isPackaging, image ->
                         viewModel.saveIngredient(
                             existingIngredientId = currentIngredient?.ingredientId,
                             name = name,
                             unitType = unit,
-                            estimatedWeightPerUnit = weight.toDoubleOrNull() ?: 0.0,
                             lowStockThreshold = threshold.toDoubleOrNull() ?: 0.0,
                             isPackaging = isPackaging,
                             image = image
@@ -387,7 +386,6 @@ private fun IngredientEditDialog(
     onSave: (
         name: String,
         unit: String,
-        weight: String,
         threshold: String,
         isPackaging: Boolean,
         image: String?
@@ -395,7 +393,6 @@ private fun IngredientEditDialog(
 ) {
     var name by remember { mutableStateOf(ingredient?.ingredientName ?: "") }
     var selectedUnit by remember { mutableStateOf(ingredient?.unitType ?: "") }
-    var weight by remember { mutableStateOf(ingredient?.estimatedWeightPerUnit?.toString() ?: "") }
     var threshold by remember { mutableStateOf(ingredient?.lowStockThreshold?.toString() ?: "") }
     var imagePath by remember { mutableStateOf(ingredient?.image) }
     var packagingChecked by remember { mutableStateOf(ingredient?.isPackaging ?: false) }
@@ -511,22 +508,6 @@ private fun IngredientEditDialog(
                     }
                 }
 
-                FieldBlock("Estimated Weight") {
-                    Column {
-                        DialogTextField(
-                            value = weight,
-                            onValueChange = { weight = it },
-                            placeholder = "0.00"
-                        )
-                        Text(
-                            text = "For 'pcs', 'can', or 'pack', enter weight/volume in g/ml per unit.",
-                            fontSize = 11.sp,
-                            color = MiTextSub,
-                            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-                        )
-                    }
-                }
-
                 FieldBlock("Low Stock Threshold") {
                     DialogTextField(
                         value = threshold,
@@ -591,7 +572,6 @@ private fun IngredientEditDialog(
                             onSave(
                                 name,
                                 selectedUnit,
-                                weight,
                                 threshold,
                                 packagingChecked,
                                 imagePath

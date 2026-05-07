@@ -143,8 +143,7 @@ class TransactionRepository @Inject constructor(
 
                     val deductionPerItem = computeInventoryDeduction(
                         recipeQuantity = recipe.quantityRequired,
-                        unitType = ingredient.unitType,
-                        estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
+                        unitType = ingredient.unitType
                     )
 
                     val totalRequired = deductionPerItem * cartItem.quantity
@@ -163,8 +162,7 @@ class TransactionRepository @Inject constructor(
 
                         val deductionPerMixItem = computeInventoryDeduction(
                             recipeQuantity = getMixIngredientQuantity(cartItem.sizeName),
-                            unitType = ingredient.unitType,
-                            estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
+                            unitType = ingredient.unitType
                         )
 
                         val totalRequired = deductionPerMixItem * cartItem.quantity
@@ -184,8 +182,7 @@ class TransactionRepository @Inject constructor(
 
                             val deductionPerAddon = computeInventoryDeduction(
                                 recipeQuantity = recipe.quantityRequired,
-                                unitType = ingredient.unitType,
-                                estimatedWeightPerUnit = ingredient.estimatedWeightPerUnit
+                                unitType = ingredient.unitType
                             )
 
                             val totalRequired = deductionPerAddon * addon.quantity * cartItem.quantity
@@ -433,24 +430,12 @@ class TransactionRepository @Inject constructor(
 
     private fun computeInventoryDeduction(
         recipeQuantity: Double,
-        unitType: String,
-        estimatedWeightPerUnit: Double
+        unitType: String
     ): Double {
         val unit = unitType.lowercase(Locale.US)
         
-        // Units that typically represent more than 1 gram and need conversion from recipe grams
-        val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
-                             unit == "kg" || unit == "unit" || unit == "units" ||
-                             unit == "bottle" || unit == "tub"
-
-        return if (needsConversion) {
-            if (estimatedWeightPerUnit > 0.0) {
-                recipeQuantity / estimatedWeightPerUnit
-            } else if (unit == "kg") {
-                recipeQuantity / 1000.0
-            } else {
-                recipeQuantity
-            }
+        return if (unit == "kg") {
+            recipeQuantity / 1000.0
         } else {
             recipeQuantity
         }

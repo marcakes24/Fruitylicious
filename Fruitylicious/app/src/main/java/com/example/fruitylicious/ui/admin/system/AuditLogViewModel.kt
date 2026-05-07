@@ -98,6 +98,8 @@ class AuditLogViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
+                currentPage = 0,
+                hasMore = true,
                 error = null
             )
         }
@@ -173,7 +175,10 @@ class AuditLogViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
         
-        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
+        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteLogsPage(state.currentPage + 1)
+            return
+        }
 
         _uiState.update { it.copy(isLoadingMore = true) }
 
@@ -238,12 +243,8 @@ class AuditLogViewModel @Inject constructor(
                 loadLocalLogs(localBranchId)
             }
 
-            state.selectedBranchId == null -> {
-                loadRemoteAllBranches()
-            }
-
             else -> {
-                loadRemoteBranch(state.selectedBranchId)
+                loadRemoteLogsPage(0)
             }
         }
     }
@@ -282,20 +283,29 @@ class AuditLogViewModel @Inject constructor(
         }
     }
 
-    private fun loadRemoteBranch(branchId: Int) {
+    private fun loadRemoteLogsPage(page: Int) {
+        val state = _uiState.value
         viewModelScope.launch {
-            val from = 0L
-            val to = System.currentTimeMillis()
+            if (page == 0) {
+                _uiState.update { it.copy(isLoading = true, error = null, logs = emptyList()) }
+            } else {
+                _uiState.update { it.copy(isLoadingMore = true) }
+            }
 
-            val result = reportRepository.getAuditLogsReport(
-                branchId = branchId,
-                from = from,
-                to = to
+            val now = System.currentTimeMillis()
+            val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
+
+            val result = reportRepository.getAuditLogsPage(
+                branchId = state.selectedBranchId,
+                from = monthAgo,
+                to = now,
+                page = page,
+                size = PAGE_SIZE
             )
 
             result.fold(
-                onSuccess = { report ->
-                    val rows = report.logs.map { log ->
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { log ->
                         AuditLogRow(
                             logId = log.logId,
                             action = extractActionTitle(log.action),
@@ -303,16 +313,19 @@ class AuditLogViewModel @Inject constructor(
                             userName = log.userName,
                             username = "unknown",
                             tableAffected = log.tableAffected,
-                            branchId = report.branchId ?: branchId,
-                            branchName = report.branchName ?: "Branch $branchId",
+                            branchId = state.selectedBranchId ?: 0,
+                            branchName = branches.firstOrNull { it.branchId == state.selectedBranchId }?.branchName ?: "Remote Branch",
                             timestamp = log.timestamp
                         )
                     }
 
                     _uiState.update {
                         it.copy(
-                            logs = rows,
+                            logs = if (page == 0) newRows else it.logs + newRows,
                             isLoading = false,
+                            isLoadingMore = false,
+                            currentPage = page,
+                            hasMore = pageResponse.hasNext,
                             error = null
                         )
                     }
@@ -321,6 +334,7 @@ class AuditLogViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
+                            isLoadingMore = false,
                             error = error.message ?: "Failed to load remote audit logs."
                         )
                     }
@@ -329,76 +343,16 @@ class AuditLogViewModel @Inject constructor(
         }
     }
 
+    private fun loadRemoteBranch(branchId: Int) {
+        loadRemoteLogsPage(0)
+    }
+
     private fun loadRemoteAllBranches() {
-        viewModelScope.launch {
-            val from = 0L
-            val to = System.currentTimeMillis()
-
-            val allRows = mutableListOf<AuditLogRow>()
-            var firstError: String? = null
-
-            val branchList = branches.ifEmpty {
-                listOf(
-                    BranchEntity(
-                        branchId = localBranchId,
-                        branchName = "Branch $localBranchId",
-                        address = "",
-                        contactNumber = "",
-                        lastModified = 0L,
-                        isSynced = true,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            for (branch in branchList) {
-                val result = reportRepository.getAuditLogsReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        val rows = report.logs.map { log ->
-                            AuditLogRow(
-                                logId = log.logId,
-                                action = extractActionTitle(log.action),
-                                description = log.action,
-                                userName = log.userName,
-                                username = "unknown",
-                                tableAffected = log.tableAffected,
-                                branchId = report.branchId ?: branch.branchId,
-                                branchName = report.branchName ?: branch.branchName,
-                                timestamp = log.timestamp
-                            )
-                        }
-
-                        allRows.addAll(rows)
-                    },
-                    onFailure = { error ->
-                        if (firstError == null) {
-                            firstError = error.message
-                        }
-                    }
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    logs = allRows.sortedByDescending { row -> row.timestamp },
-                    isLoading = false,
-                    error = firstError
-                )
-            }
-        }
+        loadRemoteLogsPage(0)
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 
     private fun extractActionTitle(action: String): String {

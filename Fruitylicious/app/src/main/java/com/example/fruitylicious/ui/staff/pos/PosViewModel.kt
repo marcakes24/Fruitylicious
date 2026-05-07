@@ -70,8 +70,7 @@ class PosViewModel @Inject constructor(
 
     private fun observeClockInStatus() {
         viewModelScope.launch {
-            val role = sessionManager.getRole()
-            if (role?.equals("admin", ignoreCase = true) == true) {
+            if (sessionManager.isAdmin()) {
                 _uiState.update { it.copy(isClockedIn = true) }
                 return@launch
             }
@@ -208,6 +207,59 @@ class PosViewModel @Inject constructor(
 
         cartRepository.addCustomItem(
             CartItem(
+                productId = product.productId,
+                variantId = variant.variantId,
+                productName = product.productName,
+                sizeName = variant.sizeName,
+                quantity = quantity,
+                unitPrice = variant.price,
+                subtotal = subtotal,
+                addons = addons
+            )
+        )
+    }
+
+    fun updateCustomizedItem(
+        cartLineId: String,
+        product: ProductEntity,
+        variant: ProductVariantEntity,
+        mixAddon: ProductEntity?,
+        selectedAddons: List<ProductEntity>,
+        quantity: Int
+    ) {
+        val addons = buildList {
+            mixAddon?.let {
+                add(
+                    CartAddon(
+                        addonProductId = it.productId,
+                        addonName = it.productName,
+                        quantity = 1,
+                        unitPrice = 15.0,
+                        subtotal = 15.0,
+                        addonType = "MIX"
+                    )
+                )
+            }
+
+            selectedAddons.forEach { addon ->
+                add(
+                    CartAddon(
+                        addonProductId = addon.productId,
+                        addonName = addon.productName,
+                        quantity = 1,
+                        unitPrice = addon.price,
+                        subtotal = addon.price,
+                        addonType = "ADDON"
+                    )
+                )
+            }
+        }
+
+        val subtotal = (variant.price + addons.sumOf { it.subtotal }) * quantity
+
+        cartRepository.updateFullItem(
+            CartItem(
+                cartLineId = cartLineId,
                 productId = product.productId,
                 variantId = variant.variantId,
                 productName = product.productName,

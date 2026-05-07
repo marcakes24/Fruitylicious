@@ -113,7 +113,6 @@ class AdjustmentRepository @Inject constructor(
                             image = null,
                             ingredientName = "Ingredient $ingredientId",
                             unitType = "unit",
-                            estimatedWeightPerUnit = 1.0,
                             isPackaging = false,
                             lowStockThreshold = 0.0,
                             lastModified = now,

@@ -13,15 +13,16 @@ fun SharedDrawerContent(
     scope: CoroutineScope,
     userName: String,
     branchName: String = "",
+    isClockedIn: Boolean = false,
     onLogout: () -> Unit
 ) {
     when (mode) {
-        SharedScreenMode.ADMIN -> {
-            AdminSideBarContent(
+        SharedScreenMode.OWNER -> {
+            OwnerSideBarContent(
                 navController = navController,
                 drawerState = drawerState,
                 scope = scope,
-                adminName = userName.ifBlank { "Admin User" },
+                ownerName = userName.ifBlank { "Admin User" },
                 onLogout = onLogout
             )
         }
@@ -33,6 +34,7 @@ fun SharedDrawerContent(
                 scope = scope,
                 staffName = userName.ifBlank { "Staff User" },
                 branchName = branchName.ifBlank { "Branch" },
+                isClockedIn = isClockedIn,
                 onLogout = onLogout
             )
         }

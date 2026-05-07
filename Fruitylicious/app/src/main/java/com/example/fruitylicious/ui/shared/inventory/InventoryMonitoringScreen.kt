@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
@@ -57,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
@@ -75,7 +78,7 @@ private val ImTextSub = Color.Gray
 @Composable
 fun InventoryMonitoringScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -164,6 +167,7 @@ fun InventoryMonitoringScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = true,
                     onLogout = onLogout
                 )
             }
@@ -192,10 +196,13 @@ fun InventoryMonitoringScreen(
 
             if (uiState.isAdmin && !uiState.isOnline) {
                 Text(
-                    text = "Offline mode: showing local branch inventory only.",
+                    text = "Offline mode: Only local branch inventory is available.",
                     color = ImTextSub,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 )
             }
 
@@ -314,67 +321,16 @@ private fun Header(
             )
 
             if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // if (isOnline) {
-                        InventoryBranchButton(
-                            label = "All",
-                            selected = selectedBranchId == null,
-                            onClick = {
-                                onBranchSelect(null)
-                            }
-                        )
-
-                        branches.forEach { branch ->
-                            InventoryBranchButton(
-                                label = "B${branch.branchId}",
-                                selected = selectedBranchId == branch.branchId,
-                                onClick = {
-                                    onBranchSelect(branch.branchId)
-                                }
-                            )
-                        }
-                    /* } else {
-                        InventoryBranchButton(
-                            label = "B$localBranchId",
-                            selected = true,
-                            onClick = {
-                                onBranchSelect(localBranchId)
-                            }
-                        )
-                    } */
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = ImGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun InventoryBranchButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) ImGreen else Color.Transparent)
-            .clickable {
-                onClick()
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Color.White else Color(0xFF666E7A),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
@@ -494,8 +450,8 @@ private fun InventoryListItem(
     }
 
     val statusColor = when (item.status) {
-        "Good" -> Color(0xFF4CAF50)
-        "Normal" -> Color(0xFFFFB300)
+        "Normal" -> Color(0xFF4CAF50)
+        "Warning" -> Color(0xFFFFB300)
         else -> Color(0xFFEF5350)
     }
 
@@ -503,57 +459,60 @@ private fun InventoryListItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF5F5F5)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (imageFile != null && imageFile.exists()) {
-                    AsyncImage(
-                        model = imageFile,
-                        contentDescription = item.ingredientName,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Inventory2,
-                        contentDescription = "Inventory",
-                        tint = ImGreen,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.size(10.dp))
-
-            Column {
-                Text(
-                    text = item.ingredientName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ImTextMain
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFF5F5F5)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageFile != null && imageFile.exists()) {
+                AsyncImage(
+                    model = imageFile,
+                    contentDescription = item.ingredientName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-
-                Text(
-                    text = item.branchName.ifBlank {
-                        if (item.branchId == 0) {
-                            "All Branches"
-                        } else {
-                            "Branch ${item.branchId}"
-                        }
-                    },
-                    fontSize = 12.sp,
-                    color = ImTextSub
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Inventory2,
+                    contentDescription = "Inventory",
+                    tint = ImGreen,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.ingredientName,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = ImTextMain,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = item.branchName.ifBlank {
+                    if (item.branchId == 0) {
+                        "All Branches"
+                    } else {
+                        "Branch ${item.branchId}"
+                    }
+                },
+                fontSize = 12.sp,
+                color = ImTextSub,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
 
         Column(horizontalAlignment = Alignment.End) {
             Text(

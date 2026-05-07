@@ -36,7 +36,7 @@ class ReportsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         ReportsUiState(
-            adminName = sessionManager.getUserName().ifBlank { "Admin User" },
+            adminName = sessionManager.getUserName().ifBlank { "Owner User" },
             isAdmin = isAdminUser(),
             localBranchId = localBranchId,
             selectedBranchId = localBranchId
@@ -101,9 +101,6 @@ class ReportsViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

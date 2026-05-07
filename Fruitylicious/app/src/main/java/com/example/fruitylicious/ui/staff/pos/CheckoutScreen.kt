@@ -163,8 +163,7 @@ fun CheckoutScreen(
                                         receivedAmountText = amountReceived
                                     )
                                 }
-                            },
-                            onBack = onBack
+                            }
                         )
                     }
 
@@ -258,8 +257,7 @@ fun CheckoutForm(
     isAmountValid: Boolean,
     isLoading: Boolean,
     error: String?,
-    onConfirm: () -> Unit,
-    onBack: () -> Unit
+    onConfirm: () -> Unit
 ) {
     val isCash = selectedPaymentMethod == "Cash"
 
@@ -270,13 +268,6 @@ fun CheckoutForm(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back"
-            )
-        }
-
         CheckoutCard {
             Text(
                 text = "Order Summary",
@@ -519,7 +510,7 @@ fun CheckoutForm(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
-            enabled = isAmountValid && cartItems.isNotEmpty() && !isLoading,
+            enabled = isAmountValid && cartItems.isNotEmpty() && !isLoading && customerName.isNotBlank(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = GreenHeader,
                 disabledContainerColor = Color.LightGray.copy(alpha = 0.5f)

@@ -1,9 +1,15 @@
 package com.example.fruitylicious.ui.admin.reports
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -24,16 +31,342 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.fruitylicious.ADMIN_SALES_SUMMARY
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SalesTimeSeriesChart(
+    seriesList: List<SalesSeries>,
+    selectedPointIndex: Int?,
+    selectedSeriesIndex: Int?,
+    onSelectionChanged: (Int?, Int?) -> Unit
+) {
+    if (seriesList.isEmpty() || seriesList.all { it.points.isEmpty() }) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No chart data available", color = RptTextSub)
+        }
+        return
+    }
+
+    val textMeasurer = rememberTextMeasurer()
+
+    val allPoints = seriesList.flatMap { it.points }
+    val maxSales = allPoints.maxOfOrNull { it.sales }?.toFloat()?.coerceAtLeast(100f) ?: 100f
+    val chartHeight = 160.dp
+    
+    // Grid lines count
+    val gridLines = 4
+
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+                .pointerInput(seriesList) {
+                    val firstSeries = seriesList.firstOrNull() ?: return@pointerInput
+                    val pointsCount = firstSeries.points.size
+                    if (pointsCount < 2) return@pointerInput
+                    val step = size.width.toFloat() / (pointsCount - 1)
+
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val updateSelection = { position: Offset ->
+                            val index = (position.x / step).roundToInt().coerceIn(0, pointsCount - 1)
+                            
+                            // If multiple series, find the one closest to the touch point Y
+                            // For now, we'll use the one with highest sales as a proxy if it's a tap
+                            // or just iterate and find closest y
+                            val chartY = position.y
+                            val seriesIdx = seriesList.indices.minByOrNull { sIdx ->
+                                val p = seriesList[sIdx].points.getOrNull(index) ?: return@minByOrNull Float.MAX_VALUE
+                                val y = size.height - (p.sales.toFloat() / maxSales * size.height)
+                                abs(y - chartY)
+                            } ?: 0
+                            
+                            onSelectionChanged(index, seriesIdx)
+                        }
+                        updateSelection(down.position)
+                        drag(down.id) { change ->
+                            updateSelection(change.position)
+                            change.consume()
+                        }
+                    }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val width = size.width
+                val height = size.height
+                val pointsCount = seriesList.firstOrNull()?.points?.size ?: 0
+                if (pointsCount < 2) return@Canvas
+                
+                val step = width / (pointsCount - 1)
+
+                // Draw horizontal grid lines
+                for (i in 0..gridLines) {
+                    val y = height - (i * height / gridLines)
+                    drawLine(
+                        color = Color(0xFFEEEEEE),
+                        start = Offset(0f, y),
+                        end = Offset(width, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Draw series
+                seriesList.forEachIndexed { sIdx, series ->
+                    val seriesColor = when (sIdx) {
+                        0 -> RptRed
+                        1 -> RptBlue
+                        else -> RptGreen
+                    }
+                    
+                    val path = Path()
+                    val fillPath = Path()
+                    
+                    series.points.forEachIndexed { pIdx, point ->
+                        val x = pIdx * step
+                        val y = height - (point.sales.toFloat() / maxSales * height)
+                        
+                        if (pIdx == 0) {
+                            path.moveTo(x, y)
+                            fillPath.moveTo(x, height)
+                            fillPath.lineTo(x, y)
+                        } else {
+                            val prevX = (pIdx - 1) * step
+                            val prevPoint = series.points[pIdx - 1]
+                            val prevY = height - (prevPoint.sales.toFloat() / maxSales * height)
+                            
+                            // Cubic Bezier for smooth curves
+                            path.cubicTo(
+                                prevX + step / 2f, prevY,
+                                x - step / 2f, y,
+                                x, y
+                            )
+                            fillPath.cubicTo(
+                                prevX + step / 2f, prevY,
+                                x - step / 2f, y,
+                                x, y
+                            )
+                        }
+                        
+                        if (pIdx == series.points.lastIndex) {
+                            fillPath.lineTo(x, height)
+                            fillPath.close()
+                        }
+                    }
+
+                    // Draw area fill
+                    drawPath(
+                        path = fillPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(seriesColor.copy(alpha = 0.2f), Color.Transparent),
+                            startY = 0f,
+                            endY = height
+                        )
+                    )
+
+                    // Draw line
+                    drawPath(
+                        path = path,
+                        color = seriesColor,
+                        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                    )
+
+                    // Draw interactive point and tooltip
+                    if (selectedSeriesIndex == sIdx && selectedPointIndex != null && 
+                        selectedPointIndex in series.points.indices) {
+                        val pIdx = selectedPointIndex!!
+                        val point = series.points[pIdx]
+                        val x = pIdx * step
+                        val y = height - (point.sales.toFloat() / maxSales * height)
+
+                        // Vertical guide line
+                        drawLine(
+                            color = RptTextSub.copy(alpha = 0.5f),
+                            start = Offset(x, y),
+                            end = Offset(x, height),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+
+                        // Point circle
+                        drawCircle(
+                            color = seriesColor,
+                            radius = 6.dp.toPx(),
+                            center = Offset(x, y)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 3.dp.toPx(),
+                            center = Offset(x, y)
+                        )
+
+                        // Tooltip logic
+                        val tooltipText = "${point.label}\nTransactions: ${point.transactionCount}\n₱${String.format(Locale.US, "%,.2f", point.sales)}"
+                        val textResult = textMeasurer.measure(
+                            text = tooltipText,
+                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = RptTextMain)
+                        )
+                        
+                        val tooltipWidth = textResult.size.width + 16.dp.toPx()
+                        val tooltipHeight = textResult.size.height + 12.dp.toPx()
+                        
+                        var tooltipX = x - tooltipWidth / 2f
+                        if (tooltipX < 0) tooltipX = 8.dp.toPx()
+                        if (tooltipX + tooltipWidth > width) tooltipX = width - tooltipWidth - 8.dp.toPx()
+                        
+                        val tooltipY = y - tooltipHeight - 12.dp.toPx()
+                        
+                        drawRoundRect(
+                            color = Color.White,
+                            topLeft = Offset(tooltipX, tooltipY),
+                            size = Size(tooltipWidth, tooltipHeight),
+                            cornerRadius = CornerRadius(8.dp.toPx()),
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.1f),
+                                offset = Offset(0f, 4f),
+                                blurRadius = 8f
+                            )
+                        )
+                        
+                        // Draw Tooltip text
+                        drawText(
+                            textLayoutResult = textResult,
+                            topLeft = Offset(tooltipX + 8.dp.toPx(), tooltipY + 6.dp.toPx())
+                        )
+                    }
+                }
+            }
+        }
+
+        // Labels
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            val points = seriesList.first().points
+            val labelCount = if (points.size > 8) 6 else points.size
+            val step = if (points.size > 1) (points.size - 1) / (labelCount - 1) else 1
+            
+            for (i in 0 until labelCount) {
+                val idx = (i * step).coerceAtMost(points.size - 1)
+                Text(
+                    text = points[idx].label,
+                    fontSize = 10.sp,
+                    color = RptTextSub,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        
+        // Legend if multiple series
+        if (seriesList.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                seriesList.forEachIndexed { index, series ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onSelectionChanged(selectedPointIndex, index) }
+                            .padding(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when (index) {
+                                        0 -> RptRed
+                                        1 -> RptBlue
+                                        else -> RptGreen
+                                    }
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = series.name,
+                            fontSize = 11.sp,
+                            color = if (selectedSeriesIndex == index) RptTextMain else RptTextSub,
+                            fontWeight = if (selectedSeriesIndex == index) FontWeight.Bold else FontWeight.Medium
+                        )
+                        if (index < seriesList.lastIndex) Spacer(modifier = Modifier.width(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawRoundRect(
+    color: Color,
+    topLeft: Offset,
+    size: Size,
+    cornerRadius: CornerRadius,
+    shadow: androidx.compose.ui.graphics.Shadow? = null
+) {
+    if (shadow != null) {
+        val paint = android.graphics.Paint().apply {
+            this.color = android.graphics.Color.WHITE
+            setShadowLayer(shadow.blurRadius, shadow.offset.x, shadow.offset.y, android.graphics.Color.argb((shadow.color.alpha * 255).toInt(), 0, 0, 0))
+        }
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawRoundRect(
+                topLeft.x,
+                topLeft.y,
+                topLeft.x + size.width,
+                topLeft.y + size.height,
+                cornerRadius.x,
+                cornerRadius.y,
+                paint
+            )
+        }
+    } else {
+        drawRoundRect(
+            color = color,
+            topLeft = topLeft,
+            size = size,
+            cornerRadius = cornerRadius
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +378,9 @@ fun SalesTabContent(
     val uiState by viewModel.uiState.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
+    
+    var selectedPointIndex by remember(uiState.timeSeriesData) { mutableStateOf<Int?>(null) }
+    var selectedSeriesIndex by remember(uiState.timeSeriesData) { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(branchId) {
         viewModel.loadReport(branchId)
@@ -198,10 +534,12 @@ fun SalesTabContent(
             ) {
                 Text(
                     text = "₱${String.format(Locale.US, "%,.2f", uiState.totalSales)}",
-                    fontSize = 32.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = RptTextMain,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
@@ -237,6 +575,88 @@ fun SalesTabContent(
         }
 
         SalesRptCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = when (uiState.period) {
+                            "daily" -> "This Day"
+                            "weekly" -> "This Week"
+                            "monthly" -> "This Month"
+                            else -> "This Day"
+                        },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RptTextMain
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = uiState.rangeText,
+                        fontSize = 13.sp,
+                        color = RptTextSub
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    tint = RptTextSub,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Transactions", fontSize = 14.sp, color = RptTextSub)
+                    Text(
+                        text = uiState.transactionCount.toString(),
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RptTextMain
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Total Sales", fontSize = 14.sp, color = RptTextSub)
+                    Text(
+                        text = "₱${String.format(Locale.US, "%,.2f", uiState.totalSales)}",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RptRed,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            SalesTimeSeriesChart(
+                seriesList = uiState.timeSeriesData,
+                selectedPointIndex = selectedPointIndex,
+                selectedSeriesIndex = selectedSeriesIndex,
+                onSelectionChanged = { pIdx, sIdx ->
+                    selectedPointIndex = pIdx
+                    selectedSeriesIndex = sIdx
+                }
+            )
+        }
+
+        val activeSeriesIndex = when (branchId) {
+            1 -> 0
+            2 -> 1
+            else -> 2
+        }
+        val activeColor = when (branchId) {
+            1 -> RptRed
+            2 -> RptBlue
+            else -> RptGreen
+        }
+
+        SalesRptCard {
             Text(
                 text = "Sales Breakdown (${uiState.period})",
                 fontWeight = FontWeight.Bold,
@@ -246,10 +666,16 @@ fun SalesTabContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val isAllView = branchId == null && activeSeriesIndex == 2
+
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text("Product", modifier = Modifier.weight(1f), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold)
-                Text("Qty", modifier = Modifier.width(40.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                Text("Total", modifier = Modifier.width(100.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                Text("Qty", modifier = Modifier.width(35.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Total", modifier = Modifier.width(70.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                if (isAllView) {
+                    Text("B1 %", modifier = Modifier.width(42.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text("B2 %", modifier = Modifier.width(42.dp), fontSize = 12.sp, color = RptTextSub, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFF5F5F5))
@@ -258,36 +684,91 @@ fun SalesTabContent(
                 Text("No sales found", color = RptTextSub, fontSize = 13.sp)
             } else {
                 uiState.salesBreakdown.forEach { row ->
-                    Row(
+                    val displayQty = when (activeSeriesIndex) {
+                        0 -> row.b1Qty
+                        1 -> row.b2Qty
+                        else -> row.qty
+                    }
+                    
+                    val displayAmount = when (activeSeriesIndex) {
+                        0 -> row.b1Amount
+                        1 -> row.b2Amount
+                        else -> row.totalAmount
+                    }
+                    
+                    if (displayQty > 0 || activeSeriesIndex == 2) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = row.productName,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = activeColor,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Text(
+                                text = displayQty.toString(),
+                                modifier = Modifier.width(35.dp),
+                                fontSize = 13.sp,
+                                color = RptTextMain,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = "₱${String.format(Locale.US, "%,.0f", displayAmount)}",
+                                modifier = Modifier.width(70.dp),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFF9A825),
+                                textAlign = TextAlign.End
+                            )
+
+                            if (isAllView) {
+                                // Calculate percentages based on branch counts
+                                val totalQty = (row.b1Qty + row.b2Qty).coerceAtLeast(row.qty)
+                                val b1Pct = if (totalQty > 0) (row.b1Qty.toDouble() / totalQty * 100).roundToInt() else 0
+                                val b2Pct = if (totalQty > 0) (row.b2Qty.toDouble() / totalQty * 100).roundToInt() else 0
+                                
+                                Text(
+                                    text = "$b1Pct%",
+                                    modifier = Modifier.width(42.dp),
+                                    fontSize = 12.sp,
+                                    color = RptTextMain,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = "$b2Pct%",
+                                    modifier = Modifier.width(42.dp),
+                                    fontSize = 12.sp,
+                                    color = RptTextMain,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (uiState.hasMore) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.Top
+                            .padding(top = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = row.productName,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RptTextMain,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Text(
-                            text = row.qty.toString(),
-                            modifier = Modifier.width(40.dp),
-                            fontSize = 15.sp,
-                            color = RptTextMain,
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = "₱${String.format(Locale.US, "%,.2f", row.totalAmount)}",
-                            modifier = Modifier.width(100.dp),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RptGreen,
-                            textAlign = TextAlign.End
-                        )
+                        if (uiState.isLoadingMore) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = RptGreen)
+                        } else {
+                            TextButton(onClick = { viewModel.loadMoreItems(branchId) }) {
+                                Text("Load More", color = RptGreen, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -399,32 +880,6 @@ fun SalesTabContent(
                     }
                 }
             }
-        }
-
-        Button(
-            onClick = {
-                navController.navigate(ADMIN_SALES_SUMMARY)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = RptGreen),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                text = "Go to Full Sales Summary",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

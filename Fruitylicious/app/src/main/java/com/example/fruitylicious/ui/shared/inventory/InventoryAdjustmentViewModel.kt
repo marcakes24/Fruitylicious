@@ -13,6 +13,7 @@ import com.example.fruitylicious.data.local.entity.InventoryAdjustmentEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.repository.AdjustmentRepository
+import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
@@ -55,7 +56,12 @@ data class InventoryAdjustmentUiState(
     val searchQuery: String = "",
     val startDate: Long? = null,
     val endDate: Long? = null,
+    val totalAdjustments: Int = 0,
+    val netAdjustmentQuantity: Double = 0.0,
     val isLoading: Boolean = true,
+    val isLoadingMore: Boolean = false,
+    val currentPage: Int = 0,
+    val hasMore: Boolean = false,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
     val localBranchId: Int = 1,
@@ -66,6 +72,7 @@ data class InventoryAdjustmentUiState(
 @HiltViewModel
 class InventoryAdjustmentViewModel @Inject constructor(
     private val adjustmentRepository: AdjustmentRepository,
+    private val reportRepository: ReportRepository,
     private val inventoryDao: InventoryDao,
     private val ingredientDao: IngredientDao,
     private val adjustmentDao: InventoryAdjustmentDao,
@@ -81,14 +88,28 @@ class InventoryAdjustmentViewModel @Inject constructor(
         InventoryAdjustmentUiState(
             isAdmin = isAdminUser(),
             selectedBranchId = localBranchId,
-            localBranchId = localBranchId
+            localBranchId = localBranchId,
+            startDate = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis,
+            endDate = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
         )
     )
     val uiState: StateFlow<InventoryAdjustmentUiState> = _uiState.asStateFlow()
 
+    private val PAGE_SIZE = 50
+
     private var inventoryItems: List<InventoryEntity> = emptyList()
     private var ingredients: List<IngredientEntity> = emptyList()
-    private var adjustments: List<InventoryAdjustmentEntity> = emptyList()
     private var branches: List<BranchEntity> = emptyList()
     private var users: List<UserEntity> = emptyList()
 
@@ -97,8 +118,23 @@ class InventoryAdjustmentViewModel @Inject constructor(
         observeNetwork()
         observeInventory()
         observeIngredients()
-        observeAdjustments()
         observeUsers()
+        observeLocalAdjustments()
+
+        // Initial load
+        loadHistory()
+    }
+
+    private fun observeLocalAdjustments() {
+        viewModelScope.launch {
+            adjustmentDao.observeAllAdjustments().collectLatest {
+                val state = _uiState.value
+                // If we are looking at the local branch or offline, refresh history
+                if (!state.isOnline || state.selectedBranchId == localBranchId) {
+                    loadLocalHistory()
+                }
+            }
+        }
     }
 
     private fun observeBranches() {
@@ -106,7 +142,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
             branchDao.observeAllBranches().collectLatest { items ->
                 branches = items
                 _uiState.update { it.copy(branches = items) }
-                rebuildState()
+                rebuildIngredients()
             }
         }
     }
@@ -118,7 +154,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
                     val forcedBranchId = if (!current.isAdmin) localBranchId else current.selectedBranchId
                     current.copy(isOnline = online, selectedBranchId = forcedBranchId)
                 }
-                rebuildState()
+                loadHistory()
             }
         }
     }
@@ -127,7 +163,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
         viewModelScope.launch {
             inventoryDao.observeAllInventory().collectLatest { items ->
                 inventoryItems = items
-                rebuildState()
+                rebuildIngredients()
             }
         }
     }
@@ -136,16 +172,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
         viewModelScope.launch {
             ingredientDao.observeIngredients().collectLatest { items ->
                 ingredients = items
-                rebuildState()
-            }
-        }
-    }
-
-    private fun observeAdjustments() {
-        viewModelScope.launch {
-            adjustmentDao.observeAllAdjustments().collectLatest { items ->
-                adjustments = items
-                rebuildState()
+                rebuildIngredients()
             }
         }
     }
@@ -154,7 +181,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
         viewModelScope.launch {
             userDao.observeAllUsers().collectLatest { items ->
                 users = items
-                rebuildState()
+                rebuildIngredients()
             }
         }
     }
@@ -163,12 +190,11 @@ class InventoryAdjustmentViewModel @Inject constructor(
         val state = _uiState.value
         val finalBranchId = if (state.isAdmin && state.isOnline) branchId else localBranchId
         _uiState.update { it.copy(selectedBranchId = finalBranchId) }
-        rebuildState()
+        loadHistory()
     }
 
     fun setSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
-        rebuildState()
     }
 
     fun setDateRange(start: Long?, end: Long?) {
@@ -187,46 +213,89 @@ class InventoryAdjustmentViewModel @Inject constructor(
                 }
             )
         }
-        rebuildState()
+        loadHistory()
     }
 
-    private fun rebuildState() {
-        val currentState = _uiState.value
+    fun loadHistory() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, currentPage = 0, history = emptyList()) }
+
+            if (state.isOnline && state.selectedBranchId != localBranchId) {
+                loadRemoteHistory()
+            } else {
+                loadLocalHistory()
+            }
+        }
+    }
+
+    fun loadMoreHistory() {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+            val nextPage = state.currentPage + 1
+            
+            val from = state.startDate ?: 0L
+            val to = state.endDate ?: System.currentTimeMillis()
+
+            val result = reportRepository.getInventoryAdjustmentPage(
+                branchId = state.selectedBranchId,
+                from = from,
+                to = to,
+                page = nextPage,
+                size = PAGE_SIZE
+            )
+
+            result.fold(
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { item ->
+                        val isAdd = item.adjustmentAmount >= 0.0
+                        AdjustmentHistoryRow(
+                            adjustmentId = item.adjustmentId,
+                            ingredientName = item.ingredientName,
+                            adjustmentType = if (isAdd) "Add" else "Reduce",
+                            quantity = abs(item.adjustmentAmount),
+                            reason = item.reason,
+                            dateTime = item.dateTime,
+                            branchId = state.selectedBranchId ?: 0,
+                            branchName = branches.firstOrNull { it.branchId == state.selectedBranchId }?.branchName ?: "Remote Branch",
+                            userName = item.userName
+                        )
+                    }
+                    _uiState.update {
+                        it.copy(
+                            history = it.history + newRows,
+                            currentPage = nextPage,
+                            hasMore = pageResponse.hasNext,
+                            isLoadingMore = false
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(isLoadingMore = false, error = error.message) }
+                }
+            )
+        }
+    }
+
+    private suspend fun loadLocalHistory() {
+        val state = _uiState.value
+        val from = state.startDate ?: 0L
+        val to = state.endDate ?: System.currentTimeMillis()
+        
+        val items = if (state.selectedBranchId == null) {
+            adjustmentDao.getAdjustmentsByDateRangeAllBranches(from, to)
+        } else {
+            adjustmentDao.getAdjustmentsByDateRange(state.selectedBranchId, from, to)
+        }
+        
         val ingredientMap = ingredients.associateBy { it.ingredientId }
         val branchMap = branches.associateBy { it.branchId }
         val userMap = users.associateBy { it.userId }
 
-        val ingredientRows = inventoryItems
-            .filter { it.branchId == localBranchId }
-            .mapNotNull { inventory ->
-                val ingredient = ingredientMap[inventory.ingredientId] ?: return@mapNotNull null
-                AdjustmentIngredientRow(
-                    ingredientId = inventory.ingredientId,
-                    branchId = inventory.branchId,
-                    ingredientName = ingredient.ingredientName,
-                    currentStock = inventory.currentStock,
-                    unitType = ingredient.unitType
-                )
-            }.sortedBy { it.ingredientName.lowercase() }
-
-        val historyRows = adjustments.filter { adjustment ->
-            val branchMatches = currentState.selectedBranchId == null || adjustment.branchId == currentState.selectedBranchId
-            val ingredientName = ingredientMap[adjustment.ingredientId]?.ingredientName ?: ""
-            val userName = userMap[adjustment.userId]?.name ?: "User ${adjustment.userId}"
-            val branchName = branchMap[adjustment.branchId]?.branchName ?: "Branch ${adjustment.branchId}"
-            
-            val query = currentState.searchQuery.trim()
-            val searchMatches = query.isBlank() || 
-                    ingredientName.contains(query, ignoreCase = true) ||
-                    userName.contains(query, ignoreCase = true) ||
-                    adjustment.reason.contains(query, ignoreCase = true) ||
-                    branchName.contains(query, ignoreCase = true)
-
-            val dateMatches = (currentState.startDate == null || adjustment.dateTime >= currentState.startDate) &&
-                             (currentState.endDate == null || adjustment.dateTime <= currentState.endDate)
-
-            branchMatches && searchMatches && dateMatches
-        }.map { adjustment ->
+        val rows = items.map { adjustment ->
             val isAdd = adjustment.adjustmentAmount >= 0.0
             AdjustmentHistoryRow(
                 adjustmentId = adjustment.adjustmentId,
@@ -241,7 +310,98 @@ class InventoryAdjustmentViewModel @Inject constructor(
             )
         }.sortedByDescending { it.dateTime }
 
-        _uiState.update { it.copy(ingredients = ingredientRows, history = historyRows, isLoading = false) }
+        _uiState.update {
+            it.copy(
+                history = rows,
+                isLoading = false,
+                hasMore = false,
+                totalAdjustments = rows.size,
+                netAdjustmentQuantity = rows.sumOf { r -> if (r.adjustmentType == "Add") r.quantity else -r.quantity }
+            )
+        }
+    }
+
+    private suspend fun loadRemoteHistory() {
+        val state = _uiState.value
+        val from = state.startDate ?: 0L
+        val to = state.endDate ?: System.currentTimeMillis()
+
+        val summaryResult = reportRepository.getInventoryAdjustmentSummary(
+            branchId = state.selectedBranchId,
+            from = from,
+            to = to
+        )
+
+        val pageResult = reportRepository.getInventoryAdjustmentPage(
+            branchId = state.selectedBranchId,
+            from = from,
+            to = to,
+            page = 0,
+            size = PAGE_SIZE
+        )
+
+        summaryResult.fold(
+            onSuccess = { summary ->
+                _uiState.update {
+                    it.copy(
+                        totalAdjustments = summary.totalAdjustments,
+                        netAdjustmentQuantity = summary.netAdjustmentQuantity
+                    )
+                }
+            },
+            onFailure = { error ->
+                _uiState.update { it.copy(error = error.message) }
+            }
+        )
+
+        pageResult.fold(
+            onSuccess = { pageResponse ->
+                val rows = pageResponse.items.map { item ->
+                    val isAdd = item.adjustmentAmount >= 0.0
+                    AdjustmentHistoryRow(
+                        adjustmentId = item.adjustmentId,
+                        ingredientName = item.ingredientName,
+                        adjustmentType = if (isAdd) "Add" else "Reduce",
+                        quantity = abs(item.adjustmentAmount),
+                        reason = item.reason,
+                        dateTime = item.dateTime,
+                        branchId = state.selectedBranchId ?: 0,
+                        branchName = branches.firstOrNull { it.branchId == state.selectedBranchId }?.branchName ?: "Remote Branch",
+                        userName = item.userName
+                    )
+                }
+                _uiState.update {
+                    it.copy(
+                        history = rows,
+                        isLoading = false,
+                        currentPage = 0,
+                        hasMore = pageResponse.hasNext
+                    )
+                }
+            },
+            onFailure = { error ->
+                _uiState.update { it.copy(isLoading = false, error = it.error ?: error.message) }
+            }
+        )
+    }
+
+    private fun rebuildIngredients() {
+        val ingredientMap = ingredients.associateBy { it.ingredientId }
+
+        val ingredientRows = inventoryItems
+            .filter { it.branchId == localBranchId }
+            .mapNotNull { inventory ->
+                val ingredient = ingredientMap[inventory.ingredientId] ?: return@mapNotNull null
+                AdjustmentIngredientRow(
+                    ingredientId = inventory.ingredientId,
+                    branchId = inventory.branchId,
+                    ingredientName = ingredient.ingredientName,
+                    currentStock = inventory.currentStock,
+                    unitType = ingredient.unitType
+                )
+            }.sortedBy { it.ingredientName.lowercase() }
+
+        _uiState.update { it.copy(ingredients = ingredientRows) }
     }
 
     fun submitAdjustment(ingredient: AdjustmentIngredientRow?, type: String, quantityText: String, reason: String) {
@@ -256,6 +416,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
             val result = adjustmentRepository.adjustInventory(ingredient.ingredientId, localBranchId, userId, signedAmount, reason.ifBlank { "Inventory adjustment" })
             if (result.isSuccess) {
                 _uiState.update { it.copy(successMessage = "Adjustment saved.", error = null) }
+                loadHistory()
             } else {
                 _uiState.update { it.copy(error = result.exceptionOrNull()?.message ?: "Failed to save adjustment.", successMessage = null) }
             }
@@ -265,7 +426,6 @@ class InventoryAdjustmentViewModel @Inject constructor(
     fun clearMessages() { _uiState.update { it.copy(error = null, successMessage = null) } }
     private fun setError(message: String) { _uiState.update { it.copy(error = message, successMessage = null) } }
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-        return role.equals("admin", ignoreCase = true) || role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

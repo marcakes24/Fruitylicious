@@ -1,6 +1,6 @@
 package com.example.fruitylicious.ui.shared
 
 enum class SharedScreenMode {
-    ADMIN,
+    OWNER,
     STAFF
 }

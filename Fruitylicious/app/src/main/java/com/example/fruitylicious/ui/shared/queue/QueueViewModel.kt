@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.ProductDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
+import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
@@ -26,7 +27,8 @@ data class QueueOrderLine(
     val productName: String,
     val sizeName: String,
     val quantity: Int,
-    val subtotal: Double
+    val subtotal: Double,
+    val addons: List<String> = emptyList()
 )
 
 data class QueueOrderRow(
@@ -55,6 +57,7 @@ class QueueViewModel @Inject constructor(
     private val database: PosDatabase,
     private val transactionDao: TransactionDao,
     private val transactionItemDao: TransactionItemDao,
+    private val transactionItemAddonDao: TransactionItemAddonDao,
     private val productDao: ProductDao,
     private val auditLogDao: AuditLogDao,
     private val sessionManager: SessionManager,
@@ -75,11 +78,13 @@ class QueueViewModel @Inject constructor(
             combine(
                 transactionDao.observeQueueTransactions(since),
                 transactionItemDao.observeAllTransactionItems(),
+                transactionItemAddonDao.observeAllTransactionItemAddons(),
                 productDao.observeProducts()
-            ) { transactions, items, products ->
+            ) { transactions, items, addons, products ->
                 val currentBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
                 val productMap = products.associateBy { it.productId }
                 val itemsByTransaction = items.groupBy { it.transactionId }
+                val addonsByItem = addons.groupBy { it.transactionItemId }
 
                 transactions
                     .filter { it.branchId == currentBranchId }
@@ -88,12 +93,19 @@ class QueueViewModel @Inject constructor(
                         .orEmpty()
                         .map { item ->
                             val product = productMap[item.productId]
+                            val itemAddons = addonsByItem[item.transactionItemId]
+                                .orEmpty()
+                                .map { addon ->
+                                    val addonProduct = productMap[addon.addonProductId]
+                                    addonProduct?.productName ?: "Unknown Addon"
+                                }
 
                             QueueOrderLine(
                                 productName = product?.productName ?: "Unknown Product",
                                 sizeName = item.sizeName ?: "",
                                 quantity = item.quantity,
-                                subtotal = item.subtotal
+                                subtotal = item.subtotal,
+                                addons = itemAddons
                             )
                         }
 
@@ -134,37 +146,56 @@ class QueueViewModel @Inject constructor(
         val nextStatus = nextStatus(order.status) ?: return
 
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val userId = sessionManager.getUserId()
-            val branchId = order.branchId.takeIf { it > 0 } ?: branchConfig.branchId
+            try {
+                // Update selected tab immediately for a snappier feel
+                _uiState.update { 
+                    it.copy(
+                        selectedStatus = nextStatus,
+                        isLoading = true, 
+                        successMessage = null, 
+                        error = null
+                    ) 
+                }
+                
+                val now = System.currentTimeMillis()
+                val userId = sessionManager.getUserId()
+                val branchId = order.branchId.takeIf { it > 0 } ?: branchConfig.branchId
 
-            database.withTransaction {
-                transactionDao.updateTransactionStatus(
-                    transactionId = order.transactionId,
-                    status = nextStatus,
-                    lastModified = now
-                )
-
-                auditLogDao.upsertAuditLog(
-                    AuditLogEntity(
-                        logId = UUID.randomUUID().toString(),
-                        userId = userId,
-                        branchId = branchId,
-                        action = "Updated order ${order.displayId} status to $nextStatus.",
-                        tableAffected = "transactions",
-                        timestamp = now,
-                        lastModified = now,
-                        isSynced = false,
-                        syncedAt = null
+                database.withTransaction {
+                    transactionDao.updateTransactionStatus(
+                        transactionId = order.transactionId,
+                        status = nextStatus,
+                        lastModified = now
                     )
-                )
-            }
 
-            _uiState.update {
-                it.copy(
-                    successMessage = "Order updated.",
-                    error = null
-                )
+                    auditLogDao.upsertAuditLog(
+                        AuditLogEntity(
+                            logId = UUID.randomUUID().toString(),
+                            userId = userId,
+                            branchId = branchId,
+                            action = "Updated order ${order.displayId} status to $nextStatus.",
+                            tableAffected = "transactions",
+                            timestamp = now,
+                            lastModified = now,
+                            isSynced = false,
+                            syncedAt = null
+                        )
+                    )
+                }
+
+                _uiState.update {
+                    it.copy(
+                        successMessage = "Order moved to ${nextStatus.replaceFirstChar { it.uppercase() }}.",
+                        isLoading = false
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Failed to update order: ${e.message}"
+                    )
+                }
             }
         }
     }

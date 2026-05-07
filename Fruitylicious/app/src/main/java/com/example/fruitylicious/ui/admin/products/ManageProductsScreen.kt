@@ -77,7 +77,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import com.example.fruitylicious.util.ImageStorage
 import kotlinx.coroutines.launch
 
@@ -143,11 +143,11 @@ fun ManageProductsScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }

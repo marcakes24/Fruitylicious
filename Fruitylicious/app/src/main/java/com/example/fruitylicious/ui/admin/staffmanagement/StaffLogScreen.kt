@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -47,13 +48,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import com.example.fruitylicious.util.ImageStorage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +83,7 @@ fun StaffLogScreen(
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
+    var expandedImagePath by remember { mutableStateOf<String?>(null) }
 
     val filteredLogs = remember(uiState.logs, searchQuery) {
         uiState.logs.filter { log ->
@@ -89,6 +93,13 @@ fun StaffLogScreen(
         }
     }
 
+    if (expandedImagePath != null) {
+        ExpandedImageDialog(
+            imagePath = expandedImagePath!!,
+            onDismiss = { expandedImagePath = null }
+        )
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -96,11 +107,11 @@ fun StaffLogScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }
@@ -138,10 +149,13 @@ fun StaffLogScreen(
 
             if (uiState.isAdmin && !uiState.isOnline) {
                 Text(
-                    text = "Offline mode: showing local branch staff logs only.",
+                    text = "Offline mode: Only local branch staff logs are available.",
                     color = SlTextSub,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 )
             }
 
@@ -173,7 +187,10 @@ fun StaffLogScreen(
                             items = filteredLogs,
                             key = { it.logId }
                         ) { log ->
-                            StaffLogCard(log)
+                            StaffLogCard(
+                                log = log,
+                                onImageClick = { path -> expandedImagePath = path }
+                            )
                         }
 
                         if (uiState.hasMore) {
@@ -234,59 +251,16 @@ private fun Header(
             )
 
             if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // if (isOnline) {
-                        StaffBranchButton(
-                            label = "All",
-                            selected = selectedBranchId == null,
-                            onClick = { onBranchSelect(null) }
-                        )
-
-                        branches.forEach { branch ->
-                            StaffBranchButton(
-                                label = "B${branch.branchId}",
-                                selected = selectedBranchId == branch.branchId,
-                                onClick = { onBranchSelect(branch.branchId) }
-                            )
-                        }
-                    /* } else {
-                        StaffBranchButton(
-                            label = "B$localBranchId",
-                            selected = true,
-                            onClick = { onBranchSelect(localBranchId) }
-                        )
-                    } */
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = SlGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun StaffBranchButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) SlGreen else Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Color.White else Color(0xFF666E7A),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
@@ -349,7 +323,10 @@ private fun EmptyStaffLogText(text: String) {
 }
 
 @Composable
-private fun StaffLogCard(log: StaffLogRow) {
+private fun StaffLogCard(
+    log: StaffLogRow,
+    onImageClick: (String) -> Unit
+) {
     val context = LocalContext.current
 
     val imageFile = log.imagePath?.let {
@@ -368,7 +345,10 @@ private fun StaffLogCard(log: StaffLogRow) {
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF5F5F5)),
+                        .background(Color(0xFFF5F5F5))
+                        .clickable(enabled = log.imagePath != null) {
+                            onImageClick(log.imagePath!!)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (imageFile != null && imageFile.exists()) {
@@ -505,4 +485,49 @@ private fun formatDate(timestamp: Long): String {
 
 private fun formatTime(timestamp: Long): String {
     return SimpleDateFormat("hh:mm a", Locale.US).format(Date(timestamp))
+}
+
+@Composable
+fun ExpandedImageDialog(
+    imagePath: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val imageFile = ImageStorage.getImageFile(context, imagePath)
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.9f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = imageFile,
+                contentDescription = "Expanded clock-in image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 48.dp, end = 16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+    }
 }

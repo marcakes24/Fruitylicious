@@ -4,10 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,13 +38,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import androidx.compose.runtime.collectAsState
 import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import kotlinx.coroutines.launch
 
 val RptGreen = Color(0xFF2E7D32)
@@ -80,37 +84,51 @@ fun ReportsScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = uiState.adminName,
+                    ownerName = uiState.adminName,
                     onLogout = onLogout
                 )
             }
         }
     ) {
-        androidx.compose.foundation.layout.Column(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(RptPageBg)
         ) {
-            ReportsHeader(
-                selectedBranchId = uiState.selectedBranchId,
-                canAccessCrossBranch = uiState.canAccessCrossBranch,
-                branches = uiState.branches,
-                onBranchSelected = { viewModel.onBranchSelected(it) },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
+        ReportsHeader(
+            selectedBranchId = uiState.selectedBranchId,
+            canAccessCrossBranch = uiState.canAccessCrossBranch,
+            isOnline = uiState.isOnline,
+            branches = uiState.branches,
+            onBranchSelected = { viewModel.onBranchSelected(it) },
+            onMenuClick = {
+                scope.launch {
+                    drawerState.open()
                 }
-            )
+            }
+        )
 
-            ReportTabBar(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
+        if (uiState.isAdmin && !uiState.isOnline) {
+            Text(
+                text = "Offline mode: Only local branch reports are available.",
+                color = RptTextSub,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 4.dp)
             )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        ReportTabBar(
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it }
+        )
 
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
@@ -148,6 +166,7 @@ fun ReportsScreen(
 private fun ReportsHeader(
     selectedBranchId: Int?,
     canAccessCrossBranch: Boolean,
+    isOnline: Boolean,
     branches: List<BranchEntity>,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -179,51 +198,14 @@ private fun ReportsHeader(
         )
 
         if (canAccessCrossBranch) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White)
-                    .padding(2.dp)
-            ) {
-                // "All" option
-                val isAllSelected = selectedBranchId == null
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (isAllSelected) RptGreen else Color.Transparent)
-                        .clickable { onBranchSelected(null) }
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "All",
-                        color = if (isAllSelected) Color.White else RptTextSub,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                branches.forEach { branch ->
-                    val isSelected = selectedBranchId == branch.branchId
-                    val displayName = "B${branch.branchId}"
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(if (isSelected) RptGreen else Color.Transparent)
-                            .clickable { onBranchSelected(branch.branchId) }
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = displayName,
-                            color = if (isSelected) Color.White else RptTextSub,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
+            BranchSelector(
+                selectedBranchId = selectedBranchId,
+                branches = branches,
+                isOnline = isOnline,
+                onBranchSelected = onBranchSelected,
+                activeColor = RptGreen,
+                containerColor = Color.White
+            )
         } else {
             // Display only local branch name if restricted
             selectedBranchId?.let { id ->

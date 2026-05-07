@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -69,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -106,6 +108,42 @@ fun PosScreen(
     val cartItems = uiState.cartItems
     val cartTotal = uiState.totalAmount
     val cartCount = cartItems.sumOf { it.quantity }
+
+    var editingCartItem by remember { mutableStateOf<CartItem?>(null) }
+
+    editingCartItem?.let { cartItem ->
+        val product = uiState.products.find { it.productId == cartItem.productId }
+        if (product != null) {
+            val variants = uiState.variantsByProductId[product.productId].orEmpty()
+            ProductCustomizeDialog(
+                product = product,
+                variants = variants,
+                mainProducts = uiState.products,
+                addons = uiState.addons,
+                recipes = uiState.recipes,
+                inventory = uiState.inventory,
+                ingredients = uiState.ingredients,
+                initialVariantId = cartItem.variantId,
+                initialMixAddonId = cartItem.addons.find { it.addonType == "MIX" }?.addonProductId,
+                initialSelectedAddonsIds = cartItem.addons.filter { it.addonType == "ADDON" }.map { it.addonProductId },
+                initialQuantity = cartItem.quantity,
+                onDismiss = {
+                    editingCartItem = null
+                },
+                onAddToCart = { variant, mixAddon, selectedAddons, qty ->
+                    viewModel.updateCustomizedItem(
+                        cartLineId = cartItem.cartLineId,
+                        product = product,
+                        variant = variant,
+                        mixAddon = mixAddon,
+                        selectedAddons = selectedAddons,
+                        quantity = qty
+                    )
+                    editingCartItem = null
+                }
+            )
+        }
+    }
 
     selectedProduct?.let { product ->
         val variants = uiState.variantsByProductId[product.productId].orEmpty()
@@ -275,6 +313,9 @@ fun PosScreen(
                 },
                 onCheckout = {
                     onNavigate(STAFF_CHECKOUT)
+                },
+                onItemClick = { item ->
+                    editingCartItem = item
                 }
             )
         }
@@ -402,6 +443,10 @@ private fun ProductCustomizeDialog(
     recipes: List<ProductRecipeEntity>,
     inventory: List<InventoryEntity>,
     ingredients: List<IngredientEntity>,
+    initialVariantId: Int? = null,
+    initialMixAddonId: Int? = null,
+    initialSelectedAddonsIds: List<Int> = emptyList(),
+    initialQuantity: Int = 1,
     onDismiss: () -> Unit,
     onAddToCart: (
         variant: ProductVariantEntity,
@@ -410,16 +455,20 @@ private fun ProductCustomizeDialog(
         quantity: Int
     ) -> Unit
 ) {
-    var selectedVariant by remember(variants) {
-        mutableStateOf(variants.firstOrNull())
+    var selectedVariant by remember(variants, initialVariantId) {
+        mutableStateOf(variants.find { it.variantId == initialVariantId } ?: variants.firstOrNull())
     }
 
-    var mixFlavor by remember { mutableStateOf(false) }
-    var selectedFlavor by remember { mutableStateOf<ProductEntity?>(null) }
+    var mixFlavor by remember(initialMixAddonId) { mutableStateOf(initialMixAddonId != null) }
+    var selectedFlavor by remember(initialMixAddonId, mainProducts) {
+        mutableStateOf(mainProducts.find { it.productId == initialMixAddonId })
+    }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var dropdownWidth by remember { mutableStateOf(0.dp) }
-    var selectedAddOns by remember { mutableStateOf(setOf<ProductEntity>()) }
-    var quantity by remember { mutableStateOf(1) }
+    var selectedAddOns by remember(initialSelectedAddonsIds, addons) {
+        mutableStateOf(addons.filter { it.productId in initialSelectedAddonsIds }.toSet())
+    }
+    var quantity by remember(initialQuantity) { mutableStateOf(initialQuantity) }
 
     val density = LocalDensity.current
 
@@ -433,6 +482,9 @@ private fun ProductCustomizeDialog(
 
     val availableMixFlavors = mainProducts.filter { it.productId != product.productId }
     val availableAddons = addons.filter { it.productId != selectedFlavor?.productId }
+    val paidAddons = availableAddons.filter { it.price > 0.0 }
+    val freeAddons = availableAddons.filter { it.price == 0.0 }
+
 
     val variantRecipe = recipes.filter {
         it.productId == product.productId && it.variantId == selectedVariant?.variantId
@@ -500,20 +552,9 @@ private fun ProductCustomizeDialog(
 
             val available = if (stockItem != null && ingredient != null) {
                 val unit = ingredient.unitType.lowercase(Locale.US)
-                val weight = ingredient.estimatedWeightPerUnit
-                
-                val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
-                                     unit == "kg" || unit == "unit" || unit == "units" ||
-                                     unit == "bottle" || unit == "tub"
 
-                if (needsConversion) {
-                    if (weight > 0.0) {
-                        stockItem.currentStock * weight
-                    } else if (unit == "kg") {
-                        stockItem.currentStock * 1000.0
-                    } else {
-                        stockItem.currentStock
-                    }
+                if (unit == "kg") {
+                    stockItem.currentStock * 1000.0
                 } else {
                     stockItem.currentStock
                 }
@@ -780,7 +821,7 @@ private fun ProductCustomizeDialog(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Add-ons",
+                    text = "Add-ons (Optional)",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1B1B1B)
@@ -795,139 +836,165 @@ private fun ProductCustomizeDialog(
                         fontSize = 13.sp
                     )
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        availableAddons.chunked(3).forEach { rowItems ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                rowItems.forEach { addon ->
-                                    val isSelected = addon in selectedAddOns
+                    @Composable
+                    fun AddonGrid(list: List<ProductEntity>, isPaid: Boolean) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            list.chunked(3).forEach { rowItems ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    rowItems.forEach { addon ->
+                                        val isSelected = addon in selectedAddOns
 
-                                    val addonRecipe = recipes.filter {
-                                        it.productId == addon.productId && it.variantId == null
-                                    }
-
-                                    val hasAddonRecipe = addonRecipe.isNotEmpty()
-
-                                    val isAddonStockAvailable = remember(
-                                        addon,
-                                        quantity,
-                                        recipes,
-                                        inventory,
-                                        ingredients
-                                    ) {
-                                        if (!hasAddonRecipe) {
-                                            return@remember false
+                                        val addonRecipe = recipes.filter {
+                                            it.productId == addon.productId && it.variantId == null
                                         }
 
-                                        addonRecipe.all { line ->
-                                            val required = line.quantityRequired * quantity
+                                        val hasAddonRecipe = addonRecipe.isNotEmpty()
 
-                                            val stockItem = inventory.find {
-                                                it.ingredientId == line.ingredientId
+                                        val isAddonStockAvailable = remember(
+                                            addon,
+                                            quantity,
+                                            recipes,
+                                            inventory,
+                                            ingredients
+                                        ) {
+                                            if (!hasAddonRecipe) {
+                                                return@remember false
                                             }
 
-                                            val ingredient = ingredients.find {
-                                                it.ingredientId == line.ingredientId
-                                            }
+                                            addonRecipe.all { line ->
+                                                val required = line.quantityRequired * quantity
 
-                                            val available = if (stockItem != null && ingredient != null) {
-                                                val unit = ingredient.unitType.lowercase(Locale.US)
-                                                val weight = ingredient.estimatedWeightPerUnit
+                                                val stockItem = inventory.find {
+                                                    it.ingredientId == line.ingredientId
+                                                }
 
-                                                val needsConversion = unit == "pcs" || unit == "can" || unit == "pack" || 
-                                                                     unit == "kg" || unit == "unit" || unit == "units" ||
-                                                                     unit == "bottle" || unit == "tub"
+                                                val ingredient = ingredients.find {
+                                                    it.ingredientId == line.ingredientId
+                                                }
 
-                                                if (needsConversion) {
-                                                    if (weight > 0.0) {
-                                                        stockItem.currentStock * weight
-                                                    } else if (unit == "kg") {
+                                                val available = if (stockItem != null && ingredient != null) {
+                                                    val unit = ingredient.unitType.lowercase(Locale.US)
+
+                                                    if (unit == "kg") {
                                                         stockItem.currentStock * 1000.0
                                                     } else {
                                                         stockItem.currentStock
                                                     }
                                                 } else {
-                                                    stockItem.currentStock
+                                                    0.0
                                                 }
-                                            } else {
-                                                0.0
-                                            }
 
-                                            available >= required
+                                                available >= required
+                                            }
                                         }
-                                    }
 
-                                    val isAddonSelectable = hasAddonRecipe && isAddonStockAvailable
+                                        val isAddonSelectable = hasAddonRecipe && isAddonStockAvailable
 
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                when {
-                                                    isSelected -> GreenPrimary
-                                                    !isAddonSelectable -> Color(0xFFF5F5F5)
-                                                    else -> Color.White
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(if (isPaid) 68.dp else 52.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(
+                                                    when {
+                                                        isSelected -> GreenPrimary
+                                                        !isAddonSelectable -> Color(0xFFF5F5F5)
+                                                        else -> Color.White
+                                                    }
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    when {
+                                                        isSelected -> GreenPrimary
+                                                        !isAddonSelectable -> Color(0xFFE0E0E0)
+                                                        else -> Color(0xFFEEEEEE)
+                                                    },
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .clickable(enabled = isAddonSelectable || isSelected) {
+                                                    selectedAddOns = if (isSelected) {
+                                                        selectedAddOns - addon
+                                                    } else {
+                                                        selectedAddOns + addon
+                                                    }
                                                 }
-                                            )
-                                            .border(
-                                                1.dp,
-                                                when {
-                                                    isSelected -> GreenPrimary
-                                                    !isAddonSelectable -> Color(0xFFE0E0E0)
-                                                    else -> Color(0xFFEEEEEE)
-                                                },
-                                                RoundedCornerShape(12.dp)
-                                            )
-                                            .clickable(enabled = isAddonSelectable || isSelected) {
-                                                selectedAddOns = if (isSelected) {
-                                                    selectedAddOns - addon
-                                                } else {
-                                                    selectedAddOns + addon
-                                                }
-                                            }
-                                            .padding(horizontal = 8.dp, vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                text = addon.productName,
-                                                fontSize = 12.sp,
-                                                color = when {
-                                                    isSelected -> Color.White
-                                                    !isAddonSelectable -> Color.LightGray
-                                                    else -> Color(0xFF1B1B1B)
-                                                },
-                                                fontWeight = if (isSelected) {
-                                                    FontWeight.Bold
-                                                } else {
-                                                    FontWeight.Medium
-                                                },
-                                                textAlign = TextAlign.Center
-                                            )
+                                                .padding(horizontal = 4.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center,
+                                                modifier = Modifier.fillMaxHeight()
+                                            ) {
+                                                Text(
+                                                    text = addon.productName,
+                                                    fontSize = 11.sp,
+                                                    color = when {
+                                                        isSelected -> Color.White
+                                                        !isAddonSelectable -> Color.LightGray
+                                                        else -> Color(0xFF1B1B1B)
+                                                    },
+                                                    fontWeight = if (isSelected) {
+                                                        FontWeight.Bold
+                                                    } else {
+                                                        FontWeight.Medium
+                                                    },
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    lineHeight = 12.sp
+                                                )
 
-                                            Text(
-                                                text = when {
+                                                val subText = when {
                                                     !hasAddonRecipe -> "No Recipe"
                                                     !isAddonStockAvailable -> "Out of Stock"
-                                                    else -> "+ ₱${String.format(Locale.US, "%,.2f", addon.price)}"
-                                                },
-                                                fontSize = 10.sp,
-                                                color = when {
-                                                    isSelected -> Color.White.copy(alpha = 0.8f)
-                                                    !isAddonSelectable -> Color.Red.copy(alpha = 0.6f)
-                                                    else -> Color.Gray
+                                                    addon.price == 0.0 -> ""
+                                                    else -> "+₱${String.format(Locale.US, "%,.2f", addon.price)}"
                                                 }
-                                            )
+
+                                                if (subText.isNotEmpty()) {
+                                                    Text(
+                                                        text = subText,
+                                                        fontSize = 9.sp,
+                                                        color = when {
+                                                            isSelected -> Color.White.copy(alpha = 0.8f)
+                                                            !isAddonSelectable -> Color.Red.copy(alpha = 0.6f)
+                                                            else -> Color.Gray
+                                                        }
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                }
 
-                                if (rowItems.size < 3) {
-                                    repeat(3 - rowItems.size) {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                    if (rowItems.size < 3) {
+                                        repeat(3 - rowItems.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (paidAddons.isNotEmpty()) {
+                            Text(
+                                text = "Paid Add-ons",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            AddonGrid(paidAddons, isPaid = true)
+                        }
+                        if (freeAddons.isNotEmpty()) {
+                            Text(
+                                text = "Free Add-ons",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            AddonGrid(freeAddons, isPaid = false)
                         }
                     }
                 }
@@ -1118,7 +1185,8 @@ private fun CartBottomSection(
     onQuantityChange: (CartItem, Int) -> Unit,
     onRemove: (CartItem) -> Unit,
     onClear: () -> Unit,
-    onCheckout: () -> Unit
+    onCheckout: () -> Unit,
+    onItemClick: (CartItem) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         AnimatedVisibility(visible = addedToCartMsg) {
@@ -1217,7 +1285,8 @@ private fun CartBottomSection(
                 onQuantityChange = onQuantityChange,
                 onRemove = onRemove,
                 onClear = onClear,
-                onCheckout = onCheckout
+                onCheckout = onCheckout,
+                onItemClick = onItemClick
             )
         }
     }
@@ -1245,7 +1314,8 @@ private fun CartPanel(
     onQuantityChange: (CartItem, Int) -> Unit,
     onRemove: (CartItem) -> Unit,
     onClear: () -> Unit,
-    onCheckout: () -> Unit
+    onCheckout: () -> Unit,
+    onItemClick: (CartItem) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1279,6 +1349,7 @@ private fun CartPanel(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable { onItemClick(item) }
                             .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

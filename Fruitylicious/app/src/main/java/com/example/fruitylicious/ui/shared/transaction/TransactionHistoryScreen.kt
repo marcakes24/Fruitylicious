@@ -53,7 +53,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +66,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 
@@ -81,7 +82,7 @@ private val ThRed = Color.Red
 @Composable
 fun TransactionHistoryScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -175,6 +176,7 @@ fun TransactionHistoryScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = true,
                     onLogout = onLogout
                 )
             }
@@ -188,6 +190,7 @@ fun TransactionHistoryScreen(
             Header(
                 selectedBranchId = uiState.selectedBranchId,
                 canAccessCrossBranch = uiState.canAccessCrossBranch,
+                isOnline = uiState.isOnline,
                 branches = uiState.branches,
                 onBranchSelect = {
                     viewModel.onBranchSelected(it)
@@ -200,11 +203,23 @@ fun TransactionHistoryScreen(
                 }
             )
 
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: Only local branch transactions are visible.",
+                    color = ThTextSub,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (!uiState.error.isNullOrBlank()) {
@@ -283,7 +298,8 @@ fun TransactionHistoryScreen(
 private fun Header(
     selectedBranchId: Int?,
     canAccessCrossBranch: Boolean,
-    branches: List<com.example.fruitylicious.data.local.entity.BranchEntity>,
+    isOnline: Boolean,
+    branches: List<BranchEntity>,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -310,50 +326,14 @@ private fun Header(
             )
 
             if (canAccessCrossBranch) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // "All" option
-                    val isAllSelected = selectedBranchId == null
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isAllSelected) ThGreen else Color.Transparent)
-                            .clickable { onBranchSelect(null) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "All",
-                            color = if (isAllSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    branches.forEach { branch ->
-                        val isSelected = selectedBranchId == branch.branchId
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) ThGreen else Color.Transparent)
-                                .clickable { onBranchSelect(branch.branchId) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "B${branch.branchId}",
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = ThGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             } else {
                 selectedBranchId?.let { id ->
                     Text(

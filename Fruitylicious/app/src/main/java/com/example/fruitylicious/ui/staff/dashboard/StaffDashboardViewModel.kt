@@ -28,6 +28,7 @@ data class StaffDashboardUiState(
     val branchName: String = "",
     val userName: String = "",
     val branchId: Int = 0,
+    val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
     val hasNotifications: Boolean = false,
     val dateText: String = "",
@@ -63,6 +64,7 @@ class StaffDashboardViewModel @Inject constructor(
             branchName = branchConfig.branchName,
             userName = sessionManager.getUserName(),
             branchId = branchId,
+            isAdmin = sessionManager.isAdmin(),
             dateText = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.US).format(Date())
         )
     )
@@ -150,6 +152,8 @@ class StaffDashboardViewModel @Inject constructor(
     }
 
     fun syncNow() {
+        if (_uiState.value.isSyncing) return
+
         viewModelScope.launch {
             if (!networkMonitor.isOnline()) {
                 _uiState.update {

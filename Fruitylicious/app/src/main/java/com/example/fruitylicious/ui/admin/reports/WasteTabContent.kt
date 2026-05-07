@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -203,6 +204,25 @@ fun WasteTabContent(
                             }
                         }
                     }
+                    
+                    if (uiState.hasMore) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (uiState.isLoadingMore) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = RptRed
+                                )
+                            } else {
+                                androidx.compose.material3.TextButton(onClick = { viewModel.loadMore(branchId) }) {
+                                    Text("Load More", color = RptRed, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -265,6 +285,25 @@ fun WasteTabContent(
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
+                            }
+                        }
+                    }
+                    
+                    if (uiState.hasMore) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (uiState.isLoadingMore) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = RptRed
+                                )
+                            } else {
+                                androidx.compose.material3.TextButton(onClick = { viewModel.loadMore(branchId) }) {
+                                    Text("Load More", color = RptRed, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }

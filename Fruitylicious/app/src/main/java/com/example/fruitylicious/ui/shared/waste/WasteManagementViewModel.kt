@@ -123,6 +123,8 @@ class WasteManagementViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
+                currentPage = 0,
+                hasMore = true,
                 error = null
             )
         }
@@ -180,11 +182,7 @@ class WasteManagementViewModel @Inject constructor(
 
     private fun observeClockInStatus() {
         viewModelScope.launch {
-            val role = sessionManager.getRole()
-
-            if (role?.equals("admin", ignoreCase = true) == true ||
-                role?.equals("owner", ignoreCase = true) == true
-            ) {
+            if (sessionManager.isAdmin()) {
                 _uiState.update { it.copy(isClockedIn = true) }
                 return@launch
             }
@@ -580,9 +578,6 @@ class WasteManagementViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

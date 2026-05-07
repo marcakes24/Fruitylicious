@@ -40,4 +40,30 @@ interface InventoryAdjustmentDao {
 
     @Query("SELECT * FROM inventory_adjustments ORDER BY dateTime DESC")
     fun observeAllAdjustments(): Flow<List<InventoryAdjustmentEntity>>
+
+    @Query(
+        """
+        SELECT * FROM inventory_adjustments
+        WHERE branchId = :branchId
+        AND dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    suspend fun getAdjustmentsByDateRange(
+        branchId: Int,
+        from: Long,
+        to: Long
+    ): List<InventoryAdjustmentEntity>
+
+    @Query(
+        """
+        SELECT * FROM inventory_adjustments
+        WHERE dateTime BETWEEN :from AND :to
+        ORDER BY dateTime DESC
+        """
+    )
+    suspend fun getAdjustmentsByDateRangeAllBranches(
+        from: Long,
+        to: Long
+    ): List<InventoryAdjustmentEntity>
 }

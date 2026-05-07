@@ -390,14 +390,6 @@ class RecipeManagementViewModel @Inject constructor(
     }
 
     private fun recipeInputUnitFor(ingredient: IngredientEntity): String {
-        val unitType = ingredient.unitType.lowercase()
-        val hasWeight = ingredient.estimatedWeightPerUnit > 0.0
-
-        return when (unitType) {
-            "pcs", "piece", "pieces", "can", "pack" -> if (hasWeight) "g" else ingredient.unitType
-            "grams", "gram", "g" -> "g"
-            "milliliters", "milliliter", "ml" -> "ml"
-            else -> ingredient.unitType
-        }
+        return ingredient.unitType
     }
 }

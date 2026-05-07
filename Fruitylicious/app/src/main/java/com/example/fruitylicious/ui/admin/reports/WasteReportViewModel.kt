@@ -25,6 +25,9 @@ data class WasteReportUiState(
     val reasonData: List<WasteReasonRow> = emptyList(),
     val wasteByItem: List<WasteItemRow> = emptyList(),
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val currentPage: Int = 0,
+    val hasMore: Boolean = false,
     val error: String? = null
 )
 
@@ -40,6 +43,8 @@ class WasteReportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(WasteReportUiState())
     val uiState: StateFlow<WasteReportUiState> = _uiState.asStateFlow()
 
+    private val PAGE_SIZE = 50
+
     fun loadReport(
         branchId: Int?
     ) {
@@ -47,7 +52,10 @@ class WasteReportViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = true,
-                    error = null
+                    error = null,
+                    currentPage = 0,
+                    hasMore = false,
+                    wasteByItem = emptyList()
                 )
             }
 
@@ -81,21 +89,67 @@ class WasteReportViewModel @Inject constructor(
                     )
                 }
 
-                branchId == null -> {
-                    loadRemoteAllBranchesReport(
-                        from = range.first,
-                        to = range.second
-                    )
-                }
-
                 else -> {
-                    loadRemoteBranchReport(
+                    loadRemoteReport(
                         branchId = branchId,
                         from = range.first,
                         to = range.second
                     )
                 }
             }
+        }
+    }
+
+    fun loadMore(branchId: Int?) {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+
+            val range = getCurrentWeekRange()
+            val nextPage = state.currentPage + 1
+
+            val result = reportRepository.getWastePage(
+                branchId = branchId,
+                from = range.first,
+                to = range.second,
+                page = nextPage,
+                size = PAGE_SIZE
+            )
+
+            result.fold(
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items
+                        .groupBy { it.ingredientName }
+                        .map { (ingredientName, items) ->
+                            WasteItemRow(
+                                ingredientName = ingredientName,
+                                totalQuantity = items.sumOf { it.quantity }
+                            )
+                        }
+                    
+                    // Note: Simple grouping on client side for now as the items are paginated.
+                    // Ideal would be if the backend provided paginated grouped data.
+                    
+                    _uiState.update {
+                        it.copy(
+                            wasteByItem = it.wasteByItem + newRows,
+                            currentPage = nextPage,
+                            hasMore = pageResponse.hasNext,
+                            isLoadingMore = false
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMore = false,
+                            error = error.message
+                        )
+                    }
+                }
+            )
         }
     }
 
@@ -135,6 +189,7 @@ class WasteReportViewModel @Inject constructor(
                     reasonData = reasonData,
                     wasteByItem = wasteByItem,
                     isLoading = false,
+                    hasMore = false,
                     error = null
                 )
             }
@@ -148,135 +203,80 @@ class WasteReportViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadRemoteBranchReport(
-        branchId: Int,
+    private suspend fun loadRemoteReport(
+        branchId: Int?,
         from: Long,
         to: Long
     ) {
-        val result = reportRepository.getWasteReport(
+        val summaryResult = reportRepository.getWasteSummary(
             branchId = branchId,
             from = from,
             to = to
         )
 
-        result.fold(
-            onSuccess = { reportDto ->
-                applyRemoteItems(
-                    totalWaste = reportDto.totalWasteQuantity,
-                    items = reportDto.items
-                )
+        val pageResult = reportRepository.getWastePage(
+            branchId = branchId,
+            from = from,
+            to = to,
+            page = 0,
+            size = PAGE_SIZE
+        )
+
+        summaryResult.fold(
+            onSuccess = { summary ->
+                _uiState.update {
+                    it.copy(
+                        totalWaste = summary.totalWasteQuantity,
+                        mostWasted = summary.topWastedIngredient ?: "—"
+                    )
+                }
             },
-            onFailure = { exception ->
+            onFailure = { error ->
+                _uiState.update { it.copy(error = error.message) }
+            }
+        )
+
+        pageResult.fold(
+            onSuccess = { pageResponse ->
+                val itemRows = pageResponse.items
+                    .groupBy { it.ingredientName }
+                    .map { (ingredientName, groupedItems) ->
+                        WasteItemRow(
+                            ingredientName = ingredientName,
+                            totalQuantity = groupedItems.sumOf { it.quantity }
+                        )
+                    }
+                    .sortedByDescending { it.totalQuantity }
+
+                val reasonRows = pageResponse.items
+                    .groupBy { it.reason.ifBlank { "Unspecified" } }
+                    .map { (reason, groupedItems) ->
+                        WasteReasonRow(
+                            reason = reason,
+                            count = groupedItems.size
+                        )
+                    }
+                    .sortedByDescending { it.count }
+
+                _uiState.update {
+                    it.copy(
+                        wasteByItem = itemRows,
+                        reasonData = reasonRows,
+                        isLoading = false,
+                        currentPage = 0,
+                        hasMore = pageResponse.hasNext
+                    )
+                }
+            },
+            onFailure = { error ->
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = exception.message ?: "Failed to load remote waste report."
+                        error = it.error ?: error.message
                     )
                 }
             }
         )
-    }
-
-    private suspend fun loadRemoteAllBranchesReport(
-        from: Long,
-        to: Long
-    ) {
-        try {
-            val branches = branchDao.getAllBranches()
-
-            val branchList = branches.ifEmpty {
-                emptyList()
-            }
-
-            if (branchList.isEmpty()) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "No branches found."
-                    )
-                }
-                return
-            }
-
-            val allItems = mutableListOf<com.example.fruitylicious.data.remote.dto.WasteReportItemDto>()
-            var totalWaste = 0.0
-            var firstError: String? = null
-
-            for (branch in branchList) {
-                val result = reportRepository.getWasteReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        totalWaste += report.totalWasteQuantity
-                        allItems.addAll(report.items)
-                    },
-                    onFailure = { exception ->
-                        if (firstError == null) {
-                            firstError = exception.message
-                        }
-                    }
-                )
-            }
-
-            applyRemoteItems(
-                totalWaste = totalWaste,
-                items = allItems,
-                warning = firstError
-            )
-        } catch (exception: Exception) {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    error = exception.message ?: "Failed to load combined waste report."
-                )
-            }
-        }
-    }
-
-    private fun applyRemoteItems(
-        totalWaste: Double,
-        items: List<com.example.fruitylicious.data.remote.dto.WasteReportItemDto>,
-        warning: String? = null
-    ) {
-        val reasonRows = items
-            .groupBy { it.reason.ifBlank { "Unspecified" } }
-            .map { (reason, groupedItems) ->
-                WasteReasonRow(
-                    reason = reason,
-                    count = groupedItems.size
-                )
-            }
-            .sortedByDescending { it.count }
-
-        val itemRows = items
-            .groupBy { it.ingredientName }
-            .map { (ingredientName, groupedItems) ->
-                WasteItemRow(
-                    ingredientName = ingredientName,
-                    totalQuantity = groupedItems.sumOf { it.quantity }
-                )
-            }
-            .sortedByDescending { it.totalQuantity }
-
-        val topItem = itemRows.maxByOrNull {
-            it.totalQuantity
-        }
-
-        _uiState.update {
-            it.copy(
-                totalWaste = totalWaste,
-                mostWasted = topItem?.ingredientName ?: "—",
-                mostWastedQty = topItem?.totalQuantity ?: 0.0,
-                reasonData = reasonRows,
-                wasteByItem = itemRows,
-                isLoading = false,
-                error = warning
-            )
-        }
     }
 
     private fun getCurrentWeekRange(): Pair<Long, Long> {
@@ -297,9 +297,6 @@ class WasteReportViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

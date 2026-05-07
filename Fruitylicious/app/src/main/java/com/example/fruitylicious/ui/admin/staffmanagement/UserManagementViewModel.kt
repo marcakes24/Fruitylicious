@@ -72,7 +72,7 @@ class UserManagementViewModel @Inject constructor(
             return
         }
 
-        if (cleanRole !in listOf("admin", "staff", "owner")) {
+        if (cleanRole !in listOf("staff", "admin")) {
             setError("Invalid role selected.")
             return
         }

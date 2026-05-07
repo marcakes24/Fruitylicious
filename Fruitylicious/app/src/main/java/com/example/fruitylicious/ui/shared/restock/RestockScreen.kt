@@ -66,12 +66,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import java.text.SimpleDateFormat
@@ -89,7 +91,7 @@ private val RsTextSub = Color(0xFF64748B)
 @Composable
 fun RestockScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -180,6 +182,7 @@ fun RestockScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = onLogout
                 )
             }
@@ -208,10 +211,13 @@ fun RestockScreen(
 
             if (uiState.isAdmin && !uiState.isOnline) {
                 Text(
-                    text = "Offline mode: showing local branch restock history only.",
+                    text = "Offline mode: Only local branch restock history is visible.",
                     color = RsTextSub,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 )
             }
 
@@ -219,7 +225,7 @@ fun RestockScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -368,67 +374,16 @@ private fun Header(
             )
 
             if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // if (isOnline) {
-                        RestockBranchButton(
-                            label = "All",
-                            selected = selectedBranchId == null,
-                            onClick = {
-                                onBranchSelect(null)
-                            }
-                        )
-
-                        branches.forEach { branch ->
-                            RestockBranchButton(
-                                label = "B${branch.branchId}",
-                                selected = selectedBranchId == branch.branchId,
-                                onClick = {
-                                    onBranchSelect(branch.branchId)
-                                }
-                            )
-                        }
-                    /* } else {
-                        RestockBranchButton(
-                            label = "B$localBranchId",
-                            selected = true,
-                            onClick = {
-                                onBranchSelect(localBranchId)
-                            }
-                        )
-                    } */
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = RsGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun RestockBranchButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) RsGreen else Color.Transparent)
-            .clickable {
-                onClick()
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Color.White else Color(0xFF666E7A),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 

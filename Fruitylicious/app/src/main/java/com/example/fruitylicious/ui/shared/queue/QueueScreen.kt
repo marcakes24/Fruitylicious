@@ -66,7 +66,7 @@ private val QueueOrange = Color(0xFFFFA000)
 @Composable
 fun QueueScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -97,6 +97,7 @@ fun QueueScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = true,
                     onLogout = onLogout
                 )
             }
@@ -343,27 +344,42 @@ private fun OrderCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             order.items.forEach { item ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
                 ) {
-                    val sizeText = if (item.sizeName.isBlank()) {
-                        ""
-                    } else {
-                        " (${item.sizeName})"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val sizeText = if (item.sizeName.isBlank()) {
+                            ""
+                        } else {
+                            " (${item.sizeName})"
+                        }
+
+                        Text(
+                            text = "${item.quantity}x ${item.productName}$sizeText",
+                            fontSize = 13.sp,
+                            color = Color.DarkGray
+                        )
+
+                        Text(
+                            text = "₱${String.format(Locale.US, "%,.2f", item.subtotal)}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
-                    Text(
-                        text = "${item.quantity}x ${item.productName}$sizeText",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
-                    )
-
-                    Text(
-                        text = "₱${String.format(Locale.US, "%,.2f", item.subtotal)}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (item.addons.isNotEmpty()) {
+                        Text(
+                            text = " + ${item.addons.joinToString(", ")}",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(start = 24.dp)
+                        )
+                    }
                 }
             }
 

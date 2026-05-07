@@ -16,7 +16,6 @@ data class AdminIngredientDto(
     val image: String?,
     val ingredientName: String,
     val unitType: String,
-    val estimatedWeightPerUnit: Double,
     val isPackaging: Boolean,
     val lowStockThreshold: Double,
     val lastModified: Long,

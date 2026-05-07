@@ -26,6 +26,8 @@ import android.content.Context
 import android.util.Log
 import com.example.fruitylicious.util.ImageStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -60,8 +62,14 @@ class SyncRepository @Inject constructor(
     private val sessionManager: SessionManager
 ) {
 
+    private val syncMutex = Mutex()
+
     suspend fun sync(lastPulledAt: Long): SyncResult {
-        return smartSync(lastPulledAt)
+        return syncMutex.withLock {
+            // Use the latest value from sessionManager in case it was updated by another process
+            val currentLastPulled = sessionManager.getLastPulledAt()
+            smartSync(currentLastPulled)
+        }
     }
 
     suspend fun smartSync(lastPulledAt: Long): SyncResult {
@@ -126,14 +134,28 @@ class SyncRepository @Inject constructor(
     suspend fun hasRemoteUpdates(since: Long): Boolean {
         return try {
             val response = syncApi.hasUpdates(since)
+
             if (response.isSuccessful) {
-                response.body()?.hasUpdates ?: true
+                val body = response.body()
+
+                Log.d(
+                    "SyncRepository",
+                    "hasRemoteUpdates: since=$since, hasUpdates=${body?.hasUpdates}, changedCount=${body?.changedCount}, serverTime=${body?.serverTime}"
+                )
+
+                body?.hasUpdates ?: true
             } else {
-                // Endpoint might not exist yet, fallback to true to pull normally
-                true
+                Log.w(
+                    "SyncRepository",
+                    "hasRemoteUpdates failed: code=${response.code()}, message=${response.message()}"
+                )
+
+                // If endpoint does not exist, fallback to pulling.
+                response.code() == 404
             }
         } catch (e: Exception) {
-            true // Fallback to true on network error/timeout
+            Log.e("SyncRepository", "Error checking for remote updates", e)
+            false
         }
     }
 
@@ -288,7 +310,38 @@ class SyncRepository @Inject constructor(
                 body.auditLogs.forEach { auditLogDao.upsertAuditLog(it.copy(isSynced = true, syncedAt = pulledAt)) }
             }
 
-            sessionManager.saveLastPulledAt(body.serverTime)
+            // Advance lastPulledAt: prefer serverTime, fallback to current time
+            // Ensure we always move forward to avoid infinite sync loops if server/client clocks differ
+            val maxLastModified = sequenceOf(
+                body.branches.map { it.lastModified },
+                body.users.map { it.lastModified },
+                body.products.map { it.lastModified },
+                body.ingredients.map { it.lastModified },
+                body.productVariants.map { it.lastModified },
+                body.productRecipes.map { it.lastModified },
+                body.inventory.map { it.lastModified },
+                body.transactions.map { it.lastModified },
+                body.transactionItems.map { it.lastModified },
+                body.transactionItemAddons.map { it.lastModified },
+                body.restockLogs.map { it.lastModified },
+                body.inventoryAdjustments.map { it.lastModified },
+                body.wasteLogs.map { it.lastModified },
+                body.staffLogs.map { it.lastModified },
+                body.auditLogs.map { it.lastModified }
+            ).flatten().maxOrNull() ?: 0L
+
+            val nextSince = maxOf(
+                since + 1,
+                body.serverTime,
+                maxLastModified + 1
+            )
+
+            sessionManager.saveLastPulledAt(nextSince)
+
+            Log.d(
+                "SyncRepository",
+                "pullUpdates: oldSince=$since, serverTime=${body.serverTime}, maxLastModified=$maxLastModified, pulledAt=$pulledAt, savedNextSince=$nextSince"
+            )
 
             val pulledCount =
                 body.branches.size + body.users.size + body.products.size + body.ingredients.size +

@@ -99,12 +99,14 @@ class TransactionHistoryViewModel @Inject constructor(
 
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
-    private val PAGE_SIZE = 20
+    private val PAGE_SIZE = 50
 
     init {
         observeBranches()
         observeNetworkStatus()
         observeLocalData()
+        
+        loadTransactions()
     }
 
     private fun observeLocalData() {
@@ -172,7 +174,7 @@ class TransactionHistoryViewModel @Inject constructor(
                         it.copy(
                             transactions = rows,
                             isLoading = false,
-                            hasMore = rows.size >= PAGE_SIZE,
+                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE,
                             error = null
                         )
                     }
@@ -228,7 +230,10 @@ class TransactionHistoryViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
-                error = null
+                currentPage = 0,
+                hasMore = true,
+                error = null,
+                transactions = emptyList()
             )
         }
 
@@ -239,7 +244,9 @@ class TransactionHistoryViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isLoading = true,
-                error = null
+                error = null,
+                currentPage = 0,
+                transactions = emptyList()
             )
         }
 
@@ -250,62 +257,56 @@ class TransactionHistoryViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
 
-        _uiState.update { 
-            it.copy(
-                currentPage = it.currentPage + 1
-            ) 
+        if (state.isOnline && (state.selectedBranchId != localBranchId || state.isAdmin)) {
+            loadRemoteTransactionsPage(state.currentPage + 1)
+        } else {
+            _uiState.update { 
+                it.copy(
+                    currentPage = it.currentPage + 1
+                ) 
+            }
         }
     }
 
     private fun loadTransactions() {
         val state = _uiState.value
 
-        when {
-            state.selectedBranchId == localBranchId -> {
-                // Handled by observeLocalData
-            }
-
-            !state.isAdmin -> {
-                // Handled by observeLocalData
-            }
-
-            !state.isOnline -> {
-                // Handled by observeLocalData
-            }
-
-            state.selectedBranchId == null -> {
-                fetchRemoteCombinedTransactions()
-            }
-
-            else -> {
-                fetchRemoteBranchTransactions(state.selectedBranchId)
-            }
+        if (state.isOnline && (state.selectedBranchId != localBranchId || state.isAdmin)) {
+            loadRemoteTransactionsPage(0)
+        } else {
+            // Local load is handled by observeLocalData, but we can trigger a rebuild if needed
         }
     }
 
-    private fun fetchRemoteBranchTransactions(branchId: Int) {
+    private fun loadRemoteTransactionsPage(page: Int) {
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
+            if (page == 0) {
+                _uiState.update { it.copy(isLoading = true, error = null, transactions = emptyList()) }
+            } else {
+                _uiState.update { it.copy(isLoadingMore = true) }
             }
 
             val now = System.currentTimeMillis()
             val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
 
-            val result = reportRepository.getTransactionReport(
-                branchId = branchId,
+            val result = reportRepository.getTransactionPage(
+                branchId = _uiState.value.selectedBranchId,
                 from = monthAgo,
-                to = now
+                to = now,
+                page = page,
+                size = PAGE_SIZE
             )
 
             result.fold(
-                onSuccess = { report ->
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { it.toHistoryRow() }
                     _uiState.update {
                         it.copy(
-                            transactions = report.transactions.map { item ->
-                                item.toHistoryRow()
-                            }.sortedByDescending { row -> row.dateTime },
+                            transactions = if (page == 0) newRows else it.transactions + newRows,
                             isLoading = false,
+                            isLoadingMore = false,
+                            currentPage = page,
+                            hasMore = pageResponse.hasNext,
                             error = null
                         )
                     }
@@ -313,8 +314,8 @@ class TransactionHistoryViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            transactions = emptyList(),
                             isLoading = false,
+                            isLoadingMore = false,
                             error = error.message ?: "Failed to load transactions."
                         )
                     }
@@ -323,49 +324,18 @@ class TransactionHistoryViewModel @Inject constructor(
         }
     }
 
+    private fun fetchRemoteBranchTransactions(branchId: Int) {
+        loadRemoteTransactionsPage(0)
+    }
+
     private fun fetchRemoteCombinedTransactions() {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
-            }
-
-            val now = System.currentTimeMillis()
-            val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
-
-            val result = reportRepository.getCombinedTransactionReport(
-                from = monthAgo,
-                to = now
-            )
-
-            result.fold(
-                onSuccess = { report ->
-                    _uiState.update {
-                        it.copy(
-                            transactions = report.transactions.map { item ->
-                                item.toHistoryRow()
-                            }.sortedByDescending { row -> row.dateTime },
-                            isLoading = false,
-                            error = null
-                        )
-                    }
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            transactions = emptyList(),
-                            isLoading = false,
-                            error = error.message ?: "Failed to load combined transactions."
-                        )
-                    }
-                }
-            )
-        }
+        loadRemoteTransactionsPage(0)
     }
 
     fun voidTransaction(transactionId: String) {
         if (!isAdminUser()) {
             _uiState.update {
-                it.copy(error = "Only admins can void transactions.")
+                it.copy(error = "Only owners can void transactions.")
             }
             return
         }
@@ -437,10 +407,7 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 
     private fun buildDisplayId(transactionId: String): String {

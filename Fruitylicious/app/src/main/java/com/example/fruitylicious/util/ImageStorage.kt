@@ -1,15 +1,41 @@
 package com.example.fruitylicious.util
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Base64
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
 object ImageStorage {
 
     private const val ROOT_FOLDER = "fruitylicious/images"
     private const val BASE64_PREFIX = "base64:"
+
+    fun saveBitmap(
+        context: Context,
+        bitmap: Bitmap,
+        folder: String
+    ): String {
+        val directory = File(
+            context.filesDir,
+            "$ROOT_FOLDER/$folder"
+        )
+
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+
+        val fileName = "${UUID.randomUUID()}.jpg"
+        val destinationFile = File(directory, fileName)
+
+        FileOutputStream(destinationFile).use { output ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+        }
+
+        return "$folder/$fileName"
+    }
 
     fun saveImageFromUri(
         context: Context,

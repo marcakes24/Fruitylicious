@@ -101,6 +101,8 @@ class StaffLogViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
+                currentPage = 0,
+                hasMore = true,
                 error = null
             )
         }
@@ -176,7 +178,10 @@ class StaffLogViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
         
-        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
+        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteLogsPage(state.currentPage + 1)
+            return
+        }
 
         _uiState.update { it.copy(isLoadingMore = true) }
 
@@ -241,12 +246,8 @@ class StaffLogViewModel @Inject constructor(
                 loadLocalLogs(localBranchId)
             }
 
-            state.selectedBranchId == null -> {
-                loadRemoteAllBranches()
-            }
-
             else -> {
-                loadRemoteBranch(state.selectedBranchId)
+                loadRemoteLogsPage(0)
             }
         }
     }
@@ -287,27 +288,36 @@ class StaffLogViewModel @Inject constructor(
         }
     }
 
-    private fun loadRemoteBranch(branchId: Int) {
+    private fun loadRemoteLogsPage(page: Int) {
+        val state = _uiState.value
         viewModelScope.launch {
-            val from = 0L
-            val to = System.currentTimeMillis()
+            if (page == 0) {
+                _uiState.update { it.copy(isLoading = true, error = null, logs = emptyList()) }
+            } else {
+                _uiState.update { it.copy(isLoadingMore = true) }
+            }
 
-            val result = reportRepository.getStaffLogsReport(
-                branchId = branchId,
-                from = from,
-                to = to
+            val now = System.currentTimeMillis()
+            val monthAgo = now - 30L * 24L * 60L * 60L * 1000L
+
+            val result = reportRepository.getStaffLogsPage(
+                branchId = state.selectedBranchId,
+                from = monthAgo,
+                to = now,
+                page = page,
+                size = PAGE_SIZE
             )
 
             result.fold(
-                onSuccess = { report ->
-                    val rows = report.logs.map { log ->
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { log ->
                         StaffLogRow(
                             logId = log.logId,
                             userId = log.userId,
                             staffName = log.userName,
                             username = "unknown",
-                            branchId = report.branchId ?: branchId,
-                            branchName = report.branchName ?: "Branch $branchId",
+                            branchId = log.branchId ?: state.selectedBranchId ?: 0,
+                            branchName = log.branchName ?: branches.firstOrNull { it.branchId == log.branchId }?.branchName ?: "Remote Branch",
                             clockIn = log.clockIn,
                             clockOut = log.clockOut,
                             imagePath = ImageStorage.saveBase64Image(
@@ -316,12 +326,15 @@ class StaffLogViewModel @Inject constructor(
                                 folder = "staff_logs"
                             )
                         )
-                    }.sortedByDescending { it.clockIn }
+                    }
 
                     _uiState.update {
                         it.copy(
-                            logs = rows,
+                            logs = if (page == 0) newRows else it.logs + newRows,
                             isLoading = false,
+                            isLoadingMore = false,
+                            currentPage = page,
+                            hasMore = pageResponse.hasNext,
                             error = null
                         )
                     }
@@ -329,8 +342,8 @@ class StaffLogViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            logs = emptyList(),
                             isLoading = false,
+                            isLoadingMore = false,
                             error = error.message ?: "Failed to load remote staff logs."
                         )
                     }
@@ -339,79 +352,15 @@ class StaffLogViewModel @Inject constructor(
         }
     }
 
+    private fun loadRemoteBranch(branchId: Int) {
+        loadRemoteLogsPage(0)
+    }
+
     private fun loadRemoteAllBranches() {
-        viewModelScope.launch {
-            val from = 0L
-            val to = System.currentTimeMillis()
-
-            val allRows = mutableListOf<StaffLogRow>()
-            var firstError: String? = null
-
-            val branchList = branches.ifEmpty {
-                listOf(
-                    BranchEntity(
-                        branchId = localBranchId,
-                        branchName = "Branch $localBranchId",
-                        address = "",
-                        contactNumber = "",
-                        lastModified = 0L,
-                        isSynced = true,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            for (branch in branchList) {
-                val result = reportRepository.getStaffLogsReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        val rows = report.logs.map { log ->
-                            StaffLogRow(
-                                logId = log.logId,
-                                userId = log.userId,
-                                staffName = log.userName,
-                                username = "unknown",
-                                branchId = report.branchId ?: branch.branchId,
-                                branchName = report.branchName ?: branch.branchName,
-                                clockIn = log.clockIn,
-                                clockOut = log.clockOut,
-                                imagePath = ImageStorage.saveBase64Image(
-                                    context = context,
-                                    base64Value = log.image,
-                                    folder = "staff_logs"
-                                )
-                            )
-                        }
-
-                        allRows.addAll(rows)
-                    },
-                    onFailure = { error ->
-                        if (firstError == null) {
-                            firstError = error.message
-                        }
-                    }
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    logs = allRows.sortedByDescending { row -> row.clockIn },
-                    isLoading = false,
-                    error = firstError
-                )
-            }
-        }
+        loadRemoteLogsPage(0)
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

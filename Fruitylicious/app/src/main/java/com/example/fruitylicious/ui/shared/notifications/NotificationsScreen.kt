@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
@@ -51,6 +52,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
 import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
+import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
@@ -67,7 +70,7 @@ private val WarningYellow = Color(0xFFFBC02D)
 @Composable
 fun NotificationsScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -92,6 +95,7 @@ fun NotificationsScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = true, // Common status for screens
                     onLogout = onLogout
                 )
             }
@@ -106,6 +110,7 @@ fun NotificationsScreen(
                 selectedBranchId = uiState.selectedBranchId,
                 branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
+                isOnline = uiState.isOnline,
                 onBranchSelected = { viewModel.selectBranch(it) },
                 onMenuClick = {
                     scope.launch {
@@ -114,10 +119,22 @@ fun NotificationsScreen(
                 }
             )
 
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: Only local branch notifications are available.",
+                    color = NotifTextSub,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -135,7 +152,7 @@ fun NotificationsScreen(
                             NotificationItem(
                                 notification = notification,
                                 onRestock = {
-                                    val route = if (mode == SharedScreenMode.ADMIN) {
+                                    val route = if (mode == SharedScreenMode.OWNER) {
                                         ADMIN_RESTOCK_HISTORY
                                     } else {
                                         STAFF_RESTOCK_HISTORY
@@ -157,8 +174,9 @@ fun NotificationsScreen(
 @Composable
 private fun Header(
     selectedBranchId: Int?,
-    branches: List<com.example.fruitylicious.data.local.entity.BranchEntity>,
+    branches: List<BranchEntity>,
     isAdmin: Boolean,
+    isOnline: Boolean,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -189,50 +207,14 @@ private fun Header(
             )
 
             if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // "All" option
-                    val isAllSelected = selectedBranchId == null
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isAllSelected) NotifGreen else Color.Transparent)
-                            .clickable { onBranchSelected(null) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "All",
-                            color = if (isAllSelected) Color.White else Color(0xFF666E7A),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    branches.forEach { branch ->
-                        val isSelected = selectedBranchId == branch.branchId
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) NotifGreen else Color.Transparent)
-                                .clickable { onBranchSelected(branch.branchId) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "B${branch.branchId}",
-                                color = if (isSelected) Color.White else Color(0xFF666E7A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelected,
+                    activeColor = NotifGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
     }

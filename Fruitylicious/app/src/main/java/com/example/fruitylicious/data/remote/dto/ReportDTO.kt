@@ -1,5 +1,7 @@
 package com.example.fruitylicious.data.remote.dto
 
+import com.google.gson.annotations.SerializedName
+
 data class SalesReportDto(
     val branchId: Int?,
     val branchName: String?,
@@ -18,7 +20,11 @@ data class SalesReportItemDto(
     val productId: Int,
     val productName: String,
     val quantitySold: Int,
-    val grossSales: Double
+    val grossSales: Double,
+    val b1Qty: Int = 0,
+    val b2Qty: Int = 0,
+    val b1Amount: Double = 0.0,
+    val b2Amount: Double = 0.0
 )
 
 data class InventoryReportDto(
@@ -143,4 +149,51 @@ data class AuditLogReportItemDto(
     val action: String,
     val tableAffected: String,
     val timestamp: Long
+)
+
+data class SalesSummaryDto(
+    val totalSales: Double,
+    val totalTransactions: Int,
+    val averageTransactionValue: Double,
+    val previousSales: Double,
+    val cashTotal: Double,
+    val gcashTotal: Double
+)
+
+data class WasteSummaryDto(
+    val totalWasteQuantity: Double,
+    val totalWasteCost: Double = 0.0,
+    val topWastedIngredient: String? = null
+)
+
+data class RestockSummaryDto(
+    val totalRestockQuantity: Double,
+    val totalRestockCost: Double = 0.0
+)
+
+data class InventoryAdjustmentSummaryDto(
+    @SerializedName("totalAdjustmentEntries") val totalAdjustments: Int = 0,
+    @SerializedName("totalAdjustmentAmount") val netAdjustmentQuantity: Double = 0.0
+)
+
+data class InventoryAdjustmentReportItemDto(
+    val adjustmentId: String,
+    val ingredientId: Int,
+    val ingredientName: String,
+    @SerializedName("adjustmentAmount") val adjustmentAmount: Double = 0.0,
+    @SerializedName("unitType") val unitType: String? = null,
+    val reason: String,
+    val userId: Int,
+    val userName: String,
+    val dateTime: Long
+)
+
+data class PageResponseDto<T>(
+    val items: List<T> = emptyList(),
+    val page: Int = 0,
+    val size: Int = 50,
+    val totalItems: Long = 0L,
+    val totalPages: Int = 0,
+    val hasNext: Boolean = false,
+    val hasPrevious: Boolean = false
 )

@@ -55,12 +55,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -129,11 +131,11 @@ fun AuditLogScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }
@@ -178,10 +180,13 @@ fun AuditLogScreen(
 
                 if (uiState.isAdmin && !uiState.isOnline) {
                     Text(
-                        text = "Offline mode: showing local branch audit logs only.",
+                        text = "Offline mode: Only local branch audit logs are available.",
                         color = AuditGrayText,
                         fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                     )
                 }
 
@@ -414,61 +419,16 @@ private fun AuditHeader(
             )
 
             if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF5F5F5))
-                        .padding(4.dp)
-                ) {
-                    // if (isOnline) {
-                        AuditBranchButton(
-                            label = "All",
-                            selected = selectedBranchId == null,
-                            onClick = { onBranchSelect(null) }
-                        )
-
-                        branches.forEach { branch ->
-                            AuditBranchButton(
-                                label = "B${branch.branchId}",
-                                selected = selectedBranchId == branch.branchId,
-                                onClick = { onBranchSelect(branch.branchId) }
-                            )
-                        }
-                    /* } else {
-                        val localBranch = branches.firstOrNull { it.branchId == localBranchId }
-
-                        AuditBranchButton(
-                            label = "B${localBranch?.branchId ?: localBranchId}",
-                            selected = true,
-                            onClick = { onBranchSelect(localBranchId) }
-                        )
-                    } */
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = AuditGreenPrimary,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun AuditBranchButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) AuditGreenPrimary else Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Color.White else Color(0xFF666E7A),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 

@@ -33,8 +33,13 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,6 +88,7 @@ fun StaffSideBarContent(
     scope: CoroutineScope,
     staffName: String,
     branchName: String,
+    isClockedIn: Boolean = false,
     onLogout: () -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -148,13 +154,15 @@ fun StaffSideBarContent(
 
         StaffSidebarUserInfo(
             staffName = staffName,
-            branchName = branchName
+            branchName = branchName,
+            isClockedIn = isClockedIn
         )
 
         StaffSidebarLogout(
             navController = navController,
             drawerState = drawerState,
             scope = scope,
+            isClockedIn = isClockedIn,
             onLogout = onLogout
         )
     }
@@ -299,7 +307,8 @@ private fun StaffSidebarNavItem(
 @Composable
 private fun StaffSidebarUserInfo(
     staffName: String,
-    branchName: String
+    branchName: String,
+    isClockedIn: Boolean = false
 ) {
     HorizontalDivider(
         color = StaffWhiteFaint,
@@ -342,6 +351,12 @@ private fun StaffSidebarUserInfo(
                 color = StaffWhiteMid,
                 fontSize = 12.sp
             )
+
+            Text(
+                text = if (isClockedIn) "Clocked In" else "Clocked Out",
+                color = if (isClockedIn) Color(0xFF81C784) else StaffWhiteMid,
+                fontSize = 11.sp
+            )
         }
     }
 }
@@ -351,8 +366,11 @@ private fun StaffSidebarLogout(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,
+    isClockedIn: Boolean = false,
     onLogout: () -> Unit
 ) {
+    var showClockOutDialog by remember { mutableStateOf(false) }
+
     HorizontalDivider(
         color = StaffWhiteFaint,
         thickness = 1.dp
@@ -362,17 +380,21 @@ private fun StaffSidebarLogout(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                onLogout()
+                if (isClockedIn) {
+                    showClockOutDialog = true
+                } else {
+                    onLogout()
 
-                scope.launch {
-                    drawerState.close()
-                }
-
-                navController.navigate(LOGIN) {
-                    popUpTo(0) {
-                        inclusive = true
+                    scope.launch {
+                        drawerState.close()
                     }
-                    launchSingleTop = true
+
+                    navController.navigate(LOGIN) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
                 }
             }
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -392,6 +414,19 @@ private fun StaffSidebarLogout(
             color = StaffWhiteFull,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
+        )
+    }
+
+    if (showClockOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showClockOutDialog = false },
+            title = { Text("Active Clock-In") },
+            text = { Text("You must clock out before logging out.") },
+            confirmButton = {
+                TextButton(onClick = { showClockOutDialog = false }) {
+                    Text("OK")
+                }
+            }
         )
     }
 }

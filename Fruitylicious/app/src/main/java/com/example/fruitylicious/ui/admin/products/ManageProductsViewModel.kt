@@ -43,7 +43,7 @@ class ManageProductsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         ManageProductsUiState(
-            isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true,
+            isAdmin = sessionManager.isAdmin(),
             userBranchId = "B${sessionManager.getBranchId()}"
         )
     )

@@ -36,15 +36,15 @@ data class InventoryMonitoringRow(
         get() {
             return if (lowStockThreshold > 0.0) {
                 when {
-                    currentStock <= lowStockThreshold -> "Low"
-                    currentStock <= lowStockThreshold * 2 -> "Normal"
-                    else -> "Good"
+                    currentStock <= lowStockThreshold -> "Critical"
+                    currentStock <= lowStockThreshold * 2 -> "Warning"
+                    else -> "Normal"
                 }
             } else {
                 when {
-                    currentStock >= 50.0 -> "Good"
-                    currentStock >= 20.0 -> "Normal"
-                    else -> "Low"
+                    currentStock >= 50.0 -> "Normal"
+                    currentStock >= 20.0 -> "Warning"
+                    else -> "Critical"
                 }
             }
         }
@@ -435,9 +435,6 @@ class InventoryMonitoringViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

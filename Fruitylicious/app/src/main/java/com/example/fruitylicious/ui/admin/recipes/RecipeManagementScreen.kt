@@ -36,7 +36,7 @@ import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalContext
@@ -70,11 +70,11 @@ fun RecipeManagementScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }
@@ -243,7 +243,7 @@ private fun ProductGridItem(
             .aspectRatio(0.9f)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFFFFDE7),
+        color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
         Box {
@@ -677,21 +677,6 @@ private fun RecipeIngredientRow(
                 }
             }
         }
-
-        val unit = selectedIngredient?.unitType ?: ""
-        val weight = selectedIngredient?.estimatedWeightPerUnit ?: 0.0
-        val isPcsCanOrPackWithWeight = (unit.equals("pcs", ignoreCase = true) || 
-                                       unit.equals("can", ignoreCase = true) ||
-                                       unit.equals("pack", ignoreCase = true)) && weight > 0.0
-
-        if (isPcsCanOrPackWithWeight) {
-            Text(
-                text = "Enter grams. Inventory deducts $unit using estimated weight per unit.",
-                fontSize = 9.sp,
-                color = RmTextSub,
-                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-            )
-        }
     }
 }
 
@@ -706,9 +691,9 @@ private fun ProductImage(
 
     Surface(
         shape = CircleShape,
-        color = Color(0xFFFFFDE7),
+        color = Color(0xFFF5F5F5),
         modifier = Modifier.size(size),
-        border = BorderStroke(1.dp, Color(0xFFFFD54F))
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
         if (imageFile != null && imageFile.exists()) {
             AsyncImage(

@@ -53,7 +53,7 @@ class UserRepository @Inject constructor(
         }
 
         if (cleanRole !in listOf("staff", "admin")) {
-            return Result.failure(IllegalArgumentException("Role must be staff or admin."))
+            return Result.failure(IllegalArgumentException("Role must be staff or owner."))
         }
 
         if (cleanUsername.isBlank()) {

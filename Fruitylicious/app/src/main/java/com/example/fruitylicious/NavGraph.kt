@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -25,7 +27,6 @@ import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
-import com.example.fruitylicious.ui.admin.reports.SalesSummaryScreen as AdminSalesSummaryScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen as AdminStaffLogScreen
 import com.example.fruitylicious.ui.admin.system.AuditLogScreen
 import com.example.fruitylicious.ui.admin.users.UserManagementScreen
@@ -71,7 +72,6 @@ const val ADMIN_RESTOCK_HISTORY = "admin_restock_history"
 const val ADMIN_USERS = "admin_users"
 const val ADMIN_STAFF_LOGS = "admin_staff_logs"
 const val ADMIN_REPORTS_DASHBOARD = "admin_reports_dashboard"
-const val ADMIN_SALES_SUMMARY = "admin_sales_summary"
 const val ADMIN_AUDIT_LOGS = "admin_audit_logs"
 const val ADMIN_QUEUE = "admin_queue"
 const val ADMIN_NOTIFICATIONS = "admin_notifications"
@@ -82,14 +82,16 @@ fun FruityliciousNavGraph(
     navController: NavHostController = rememberNavController(),
     sessionManager: SessionManager
 ) {
-    val startDestination = if (sessionManager.isLoggedIn() && !sessionManager.isSessionExpired()) {
-        if (sessionManager.getRole().equals("admin", ignoreCase = true)) {
-            ADMIN_DASHBOARD
+    val startDestination = remember {
+        if (sessionManager.isLoggedIn() && !sessionManager.isSessionExpired()) {
+            if (sessionManager.isAdmin()) {
+                ADMIN_DASHBOARD
+            } else {
+                STAFF_DASHBOARD
+            }
         } else {
-            STAFF_DASHBOARD
+            LOGIN
         }
-    } else {
-        LOGIN
     }
 
     LaunchedEffect(Unit) {
@@ -118,10 +120,16 @@ fun FruityliciousNavGraph(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
+                var lastUpdateTime = 0L
                 awaitPointerEventScope {
                     while (true) {
-                        awaitPointerEvent()
-                        sessionManager.updateActivity()
+                        val event = awaitPointerEvent()
+                        val currentTime = System.currentTimeMillis()
+                        // Only update activity on Press events and throttle to once per 30 seconds
+                        if (event.type == PointerEventType.Press && currentTime - lastUpdateTime > 30_000L) {
+                            sessionManager.updateActivity()
+                            lastUpdateTime = currentTime
+                        }
                     }
                 }
             }
@@ -129,35 +137,35 @@ fun FruityliciousNavGraph(
         NavHost(
             navController = navController,
             startDestination = startDestination,
-        enterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { it },
-                animationSpec = tween(400, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(400))
-        },
-        exitTransition = {
-            slideOutHorizontally(
-                targetOffsetX = { -it / 3 },
-                animationSpec = tween(400, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(400))
-        },
-        popEnterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { -it / 3 },
-                animationSpec = tween(400, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(400))
-        },
-        popExitTransition = {
-            slideOutHorizontally(
-                targetOffsetX = { it },
-                animationSpec = tween(400, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(400))
-        }
-    ) {
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { -it / 3 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 3 },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(300))
+            }
+        ) {
         composable(LOGIN) {
             LoginScreen(
                 onLoginSuccess = { role ->
-                    val destination = if (role.equals("admin", ignoreCase = true)) {
+                    val destination = if (sessionManager.isAdmin()) {
                         ADMIN_DASHBOARD
                     } else {
                         STAFF_DASHBOARD
@@ -175,7 +183,8 @@ fun FruityliciousNavGraph(
 
         composable(STAFF_DASHBOARD) {
             StaffDashboardScreen(
-                navController = navController
+                navController = navController,
+                mode = SharedScreenMode.STAFF
             )
         }
 
@@ -187,8 +196,11 @@ fun FruityliciousNavGraph(
                     }
                 },
                 onBack = {
-                    val role = sessionManager.getRole()
-                    val fallback = if (role.equals("admin", ignoreCase = true)) ADMIN_DASHBOARD else STAFF_DASHBOARD
+                    val fallback = if (sessionManager.isAdmin()) {
+                        ADMIN_DASHBOARD
+                    } else {
+                        STAFF_DASHBOARD
+                    }
                     safeBack(fallback)
                 }
             )
@@ -197,7 +209,13 @@ fun FruityliciousNavGraph(
         composable(STAFF_CHECKOUT) {
             CheckoutScreen(
                 onNavigate = { route ->
-                    navController.navigate(route) {
+                    val destination = if (route == STAFF_QUEUE && sessionManager.isAdmin()) {
+                        ADMIN_QUEUE
+                    } else {
+                        route
+                    }
+
+                    navController.navigate(destination) {
                         popUpTo(STAFF_CHECKOUT) {
                             inclusive = true
                         }
@@ -367,7 +385,7 @@ fun FruityliciousNavGraph(
         composable(ADMIN_INVENTORY) {
             InventoryMonitoringScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -380,7 +398,7 @@ fun FruityliciousNavGraph(
         composable(ADMIN_ADJUSTMENT) {
             InventoryAdjustmentScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -393,7 +411,7 @@ fun FruityliciousNavGraph(
         composable(ADMIN_WASTE_HISTORY) {
             WasteManagementScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -406,7 +424,7 @@ fun FruityliciousNavGraph(
         composable(ADMIN_RESTOCK_HISTORY) {
             RestockScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -459,21 +477,10 @@ fun FruityliciousNavGraph(
             )
         }
 
-        composable(ADMIN_SALES_SUMMARY) {
-            AdminSalesSummaryScreen(
-                navController = navController,
-                adminName = sessionManager.getUserName(),
-                onLogout = {
-                    sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
-                }
-            )
-        }
-
         composable(ADMIN_QUEUE) {
             QueueScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -486,7 +493,7 @@ fun FruityliciousNavGraph(
         composable(ADMIN_NOTIFICATIONS) {
             SharedNotificationsScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {
@@ -499,7 +506,7 @@ fun FruityliciousNavGraph(
         composable(TRANSACTION_HISTORY) {
             SharedTransactionHistoryScreen(
                 navController = navController,
-                mode = SharedScreenMode.ADMIN,
+                mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
                 onLogout = {

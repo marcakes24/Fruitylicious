@@ -66,7 +66,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.UserEntity
-import com.example.fruitylicious.ui.shared.AdminSideBarContent
+import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import kotlinx.coroutines.launch
 
 private val BrandGreen = Color(0xFF2E7D32)
@@ -102,11 +102,11 @@ fun UserManagementScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                AdminSideBarContent(
+                OwnerSideBarContent(
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    adminName = adminName,
+                    ownerName = adminName,
                     onLogout = onLogout
                 )
             }
@@ -273,7 +273,7 @@ private fun UserListItem(
     onClick: () -> Unit
 ) {
     val displayRole = if (user.role.equals("admin", ignoreCase = true)) {
-        "Owner"
+        "Admin"
     } else {
         "Staff"
     }
@@ -349,10 +349,13 @@ private fun UserDialog(
     var name by remember { mutableStateOf(user?.name ?: "") }
     var username by remember { mutableStateOf(user?.username ?: "") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var dialogError by remember { mutableStateOf<String?>(null) }
+
     var selectedRole by remember {
         mutableStateOf(
             if (user?.role.equals("admin", ignoreCase = true)) {
-                "Owner"
+                "Admin"
             } else {
                 "Staff"
             }
@@ -401,7 +404,7 @@ private fun UserDialog(
                     label = "Name",
                     value = name,
                     placeholder = "Enter name",
-                    onValueChange = { name = it }
+                    onValueChange = { name = it; dialogError = null }
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -410,7 +413,7 @@ private fun UserDialog(
                     label = "Username",
                     value = username,
                     placeholder = "Enter username",
-                    onValueChange = { username = it }
+                    onValueChange = { username = it; dialogError = null }
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -420,8 +423,29 @@ private fun UserDialog(
                     value = password,
                     placeholder = if (user == null) "Enter password" else "Leave blank to keep current",
                     isPassword = true,
-                    onValueChange = { password = it }
+                    onValueChange = { password = it; dialogError = null }
                 )
+
+                if (password.isNotEmpty() || user == null) {
+                    Spacer(Modifier.height(16.dp))
+
+                    CustomLabelledField(
+                        label = "Confirm Password",
+                        value = confirmPassword,
+                        placeholder = "Re-enter password",
+                        isPassword = true,
+                        onValueChange = { confirmPassword = it; dialogError = null }
+                    )
+                }
+
+                if (dialogError != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = dialogError!!,
+                        color = Color.Red,
+                        fontSize = 12.sp
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
 
@@ -438,11 +462,11 @@ private fun UserDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     RoleSelectionButton(
-                        label = "Owner",
-                        isSelected = selectedRole == "Owner",
+                        label = "Admin",
+                        isSelected = selectedRole == "Admin",
                         modifier = Modifier.weight(1f)
                     ) {
-                        selectedRole = "Owner"
+                        selectedRole = "Admin"
                     }
 
                     RoleSelectionButton(
@@ -493,11 +517,24 @@ private fun UserDialog(
 
                     Button(
                         onClick = {
+                            if (name.isBlank() || username.isBlank()) {
+                                dialogError = "Name and username are required."
+                                return@Button
+                            }
+                            if (user == null && password.isBlank()) {
+                                dialogError = "Password is required."
+                                return@Button
+                            }
+                            if (password != confirmPassword) {
+                                dialogError = "Passwords do not match."
+                                return@Button
+                            }
+
                             onSave(
                                 name,
                                 username,
                                 password,
-                                if (selectedRole == "Owner") "admin" else "staff"
+                                if (selectedRole == "Admin") "admin" else "staff"
                             )
                         },
                         modifier = Modifier
@@ -586,7 +623,7 @@ private fun RoleSelectionButton(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (label == "Owner") Icons.Default.Settings else Icons.Default.Person,
+                imageVector = if (label == "Admin") Icons.Default.Settings else Icons.Default.Person,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = if (isSelected) BrandGreen else Color.Black

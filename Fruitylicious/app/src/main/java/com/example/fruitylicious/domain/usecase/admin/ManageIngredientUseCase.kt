@@ -26,7 +26,6 @@ class ManageIngredientUseCase @Inject constructor(
         image: String?,
         ingredientName: String,
         unitType: String,
-        estimatedWeightPerUnit: Double,
         isPackaging: Boolean,
         lowStockThreshold: Double
     ): Result<Unit> {
@@ -35,7 +34,6 @@ class ManageIngredientUseCase @Inject constructor(
             image = image,
             ingredientName = ingredientName,
             unitType = unitType,
-            estimatedWeightPerUnit = estimatedWeightPerUnit,
             isPackaging = isPackaging,
             lowStockThreshold = lowStockThreshold
         )

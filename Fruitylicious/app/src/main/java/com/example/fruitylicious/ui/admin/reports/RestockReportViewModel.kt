@@ -21,6 +21,9 @@ data class RestockReportUiState(
     val totalToday: Double = 0.0,
     val frequencyItems: List<RestockFrequencyRow> = emptyList(),
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val currentPage: Int = 0,
+    val hasMore: Boolean = false,
     val error: String? = null
 )
 
@@ -36,6 +39,8 @@ class RestockReportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RestockReportUiState())
     val uiState: StateFlow<RestockReportUiState> = _uiState.asStateFlow()
 
+    private val PAGE_SIZE = 50
+
     fun loadReport(
         branchId: Int?
     ) {
@@ -43,7 +48,10 @@ class RestockReportViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = true,
-                    error = null
+                    error = null,
+                    currentPage = 0,
+                    hasMore = false,
+                    frequencyItems = emptyList()
                 )
             }
 
@@ -51,55 +59,95 @@ class RestockReportViewModel @Inject constructor(
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
 
-            val todayStart = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-            val now = System.currentTimeMillis()
+            val range = getMonthlyRange()
 
             when {
                 branchId == localBranchId -> {
                     loadLocalReport(
                         branchId = localBranchId,
-                        from = todayStart,
-                        to = now
+                        from = range.first,
+                        to = range.second
                     )
                 }
 
                 !isAdmin -> {
                     loadLocalReport(
                         branchId = localBranchId,
-                        from = todayStart,
-                        to = now
+                        from = range.first,
+                        to = range.second
                     )
                 }
 
                 !isOnline -> {
                     loadLocalReport(
                         branchId = localBranchId,
-                        from = todayStart,
-                        to = now
-                    )
-                }
-
-                branchId == null -> {
-                    loadRemoteAllBranchesReport(
-                        from = todayStart,
-                        to = now
+                        from = range.first,
+                        to = range.second
                     )
                 }
 
                 else -> {
-                    loadRemoteBranchReport(
+                    loadRemoteReport(
                         branchId = branchId,
-                        from = todayStart,
-                        to = now
+                        from = range.first,
+                        to = range.second
                     )
                 }
             }
+        }
+    }
+
+    fun loadMore(branchId: Int?) {
+        val state = _uiState.value
+        if (state.isLoadingMore || !state.hasMore) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+
+            val range = getMonthlyRange()
+            val nextPage = state.currentPage + 1
+
+            val result = reportRepository.getRestockPage(
+                branchId = branchId,
+                from = range.first,
+                to = range.second,
+                page = nextPage,
+                size = PAGE_SIZE
+            )
+
+            result.fold(
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items
+                        .groupBy { it.ingredientName }
+                        .map { (ingredientName, groupedItems) ->
+                            val totalQuantity = groupedItems.sumOf { it.quantityAdded }
+                            val count = groupedItems.size
+
+                            RestockFrequencyRow(
+                                ingredientName = ingredientName,
+                                restockCount = count,
+                                avgUnits = if (count > 0) totalQuantity / count.toDouble() else 0.0
+                            )
+                        }
+
+                    _uiState.update {
+                        it.copy(
+                            frequencyItems = it.frequencyItems + newRows,
+                            currentPage = nextPage,
+                            hasMore = pageResponse.hasNext,
+                            isLoadingMore = false
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMore = false,
+                            error = error.message
+                        )
+                    }
+                }
+            )
         }
     }
 
@@ -124,6 +172,7 @@ class RestockReportViewModel @Inject constructor(
                     totalToday = totalToday,
                     frequencyItems = frequencyItems,
                     isLoading = false,
+                    hasMore = false,
                     error = null
                 )
             }
@@ -137,128 +186,83 @@ class RestockReportViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadRemoteBranchReport(
-        branchId: Int,
+    private suspend fun loadRemoteReport(
+        branchId: Int?,
         from: Long,
         to: Long
     ) {
-        val result = reportRepository.getRestockReport(
+        val summaryResult = reportRepository.getRestockSummary(
             branchId = branchId,
             from = from,
             to = to
         )
 
-        result.fold(
-            onSuccess = { reportDto ->
-                applyRemoteItems(
-                    totalRestock = reportDto.totalRestockQuantity,
-                    items = reportDto.items
-                )
+        val pageResult = reportRepository.getRestockPage(
+            branchId = branchId,
+            from = from,
+            to = to,
+            page = 0,
+            size = PAGE_SIZE
+        )
+
+        summaryResult.fold(
+            onSuccess = { summary ->
+                _uiState.update {
+                    it.copy(totalToday = summary.totalRestockQuantity)
+                }
             },
-            onFailure = { exception ->
+            onFailure = { error ->
+                _uiState.update { it.copy(error = error.message) }
+            }
+        )
+
+        pageResult.fold(
+            onSuccess = { pageResponse ->
+                val frequencyRows = pageResponse.items
+                    .groupBy { it.ingredientName }
+                    .map { (ingredientName, groupedItems) ->
+                        val totalQuantity = groupedItems.sumOf { it.quantityAdded }
+                        val count = groupedItems.size
+
+                        RestockFrequencyRow(
+                            ingredientName = ingredientName,
+                            restockCount = count,
+                            avgUnits = if (count > 0) totalQuantity / count.toDouble() else 0.0
+                        )
+                    }
+                    .sortedByDescending { it.restockCount }
+
+                _uiState.update {
+                    it.copy(
+                        frequencyItems = frequencyRows,
+                        isLoading = false,
+                        currentPage = 0,
+                        hasMore = pageResponse.hasNext
+                    )
+                }
+            },
+            onFailure = { error ->
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = exception.message ?: "Failed to load remote restock report."
+                        error = it.error ?: error.message
                     )
                 }
             }
         )
     }
 
-    private suspend fun loadRemoteAllBranchesReport(
-        from: Long,
-        to: Long
-    ) {
-        try {
-            val branches = branchDao.getAllBranches()
-
-            if (branches.isEmpty()) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "No branches found."
-                    )
-                }
-                return
-            }
-
-            val allItems = mutableListOf<com.example.fruitylicious.data.remote.dto.RestockReportItemDto>()
-            var totalRestock = 0.0
-            var firstError: String? = null
-
-            for (branch in branches) {
-                val result = reportRepository.getRestockReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        totalRestock += report.totalRestockQuantity
-                        allItems.addAll(report.items)
-                    },
-                    onFailure = { exception ->
-                        if (firstError == null) {
-                            firstError = exception.message
-                        }
-                    }
-                )
-            }
-
-            applyRemoteItems(
-                totalRestock = totalRestock,
-                items = allItems,
-                warning = firstError
-            )
-        } catch (exception: Exception) {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    error = exception.message ?: "Failed to load combined restock report."
-                )
-            }
-        }
-    }
-
-    private fun applyRemoteItems(
-        totalRestock: Double,
-        items: List<com.example.fruitylicious.data.remote.dto.RestockReportItemDto>,
-        warning: String? = null
-    ) {
-        val frequencyRows = items
-            .groupBy { it.ingredientName }
-            .map { (ingredientName, groupedItems) ->
-                val totalQuantity = groupedItems.sumOf { it.quantityAdded }
-                val count = groupedItems.size
-
-                RestockFrequencyRow(
-                    ingredientName = ingredientName,
-                    restockCount = count,
-                    avgUnits = if (count > 0) {
-                        totalQuantity / count.toDouble()
-                    } else {
-                        0.0
-                    }
-                )
-            }
-            .sortedByDescending { it.restockCount }
-
-        _uiState.update {
-            it.copy(
-                totalToday = totalRestock,
-                frequencyItems = frequencyRows,
-                isLoading = false,
-                error = warning
-            )
-        }
+    private fun getMonthlyRange(): Pair<Long, Long> {
+        val start = Calendar.getInstance()
+        start.set(Calendar.DAY_OF_MONTH, 1)
+        start.set(Calendar.HOUR_OF_DAY, 0)
+        start.set(Calendar.MINUTE, 0)
+        start.set(Calendar.SECOND, 0)
+        start.set(Calendar.MILLISECOND, 0)
+        return start.timeInMillis to System.currentTimeMillis()
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }

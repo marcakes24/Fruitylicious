@@ -90,11 +90,11 @@ private data class AdminNavItem(
 )
 
 @Composable
-fun AdminSideBarContent(
+fun OwnerSideBarContent(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,
-    adminName: String,
+    ownerName: String,
     onLogout: () -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -106,7 +106,7 @@ fun AdminSideBarContent(
             .width(260.dp)
             .background(SidebarBg)
     ) {
-        AdminSidebarHeader()
+        OwnerSidebarHeader()
 
         Column(
             modifier = Modifier
@@ -114,10 +114,10 @@ fun AdminSideBarContent(
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 8.dp)
         ) {
-            AdminMainNavigation(
+            OwnerMainNavigation(
                 currentRoute = currentRoute,
                 onNavigate = { route ->
-                    adminNavigateTo(
+                    ownerNavigateTo(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
@@ -127,12 +127,12 @@ fun AdminSideBarContent(
                 }
             )
 
-            AdminSidebarSectionHeader("Management")
+            OwnerSidebarSectionHeader("Management")
 
-            AdminManagementNavigation(
+            OwnerManagementNavigation(
                 currentRoute = currentRoute,
                 onNavigate = { route ->
-                    adminNavigateTo(
+                    ownerNavigateTo(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
@@ -142,12 +142,12 @@ fun AdminSideBarContent(
                 }
             )
 
-            AdminSidebarSectionHeader("Reports")
+            OwnerSidebarSectionHeader("Reports")
 
-            AdminReportsNavigation(
+            OwnerReportsNavigation(
                 currentRoute = currentRoute,
                 onNavigate = { route ->
-                    adminNavigateTo(
+                    ownerNavigateTo(
                         navController = navController,
                         drawerState = drawerState,
                         scope = scope,
@@ -158,9 +158,11 @@ fun AdminSideBarContent(
             )
         }
 
-        AdminSidebarUserInfo(adminName = adminName)
+        OwnerSidebarUserInfo(
+            ownerName = ownerName
+        )
 
-        AdminSidebarLogout(
+        OwnerSidebarLogout(
             navController = navController,
             drawerState = drawerState,
             scope = scope,
@@ -170,7 +172,7 @@ fun AdminSideBarContent(
 }
 
 @Composable
-private fun AdminSidebarHeader() {
+private fun OwnerSidebarHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -194,7 +196,7 @@ private fun AdminSidebarHeader() {
 }
 
 @Composable
-private fun AdminMainNavigation(
+private fun OwnerMainNavigation(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
@@ -206,7 +208,7 @@ private fun AdminMainNavigation(
     )
 
     items.forEach { item ->
-        AdminSidebarNavItem(
+        OwnerSidebarNavItem(
             icon = item.icon,
             label = item.label,
             isActive = currentRoute == item.route,
@@ -216,7 +218,7 @@ private fun AdminMainNavigation(
 }
 
 @Composable
-private fun AdminManagementNavigation(
+private fun OwnerManagementNavigation(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
@@ -232,7 +234,7 @@ private fun AdminManagementNavigation(
     )
 
     items.forEach { item ->
-        AdminSidebarNavItem(
+        OwnerSidebarNavItem(
             icon = item.icon,
             label = item.label,
             isActive = currentRoute == item.route,
@@ -242,7 +244,7 @@ private fun AdminManagementNavigation(
 }
 
 @Composable
-private fun AdminReportsNavigation(
+private fun OwnerReportsNavigation(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
@@ -254,7 +256,7 @@ private fun AdminReportsNavigation(
     )
 
     items.forEach { item ->
-        AdminSidebarNavItem(
+        OwnerSidebarNavItem(
             icon = item.icon,
             label = item.label,
             isActive = currentRoute == item.route,
@@ -264,7 +266,7 @@ private fun AdminReportsNavigation(
 }
 
 @Composable
-private fun AdminSidebarSectionHeader(title: String) {
+private fun OwnerSidebarSectionHeader(title: String) {
     Spacer(modifier = Modifier.height(8.dp))
 
     Text(
@@ -282,7 +284,7 @@ private fun AdminSidebarSectionHeader(title: String) {
 }
 
 @Composable
-private fun AdminSidebarNavItem(
+private fun OwnerSidebarNavItem(
     icon: ImageVector,
     label: String,
     isActive: Boolean,
@@ -317,8 +319,8 @@ private fun AdminSidebarNavItem(
 }
 
 @Composable
-private fun AdminSidebarUserInfo(
-    adminName: String
+private fun OwnerSidebarUserInfo(
+    ownerName: String
 ) {
     HorizontalDivider(
         color = WhiteFaint,
@@ -339,7 +341,7 @@ private fun AdminSidebarUserInfo(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = adminName.firstOrNull()?.uppercaseChar()?.toString() ?: "A",
+                text = ownerName.firstOrNull()?.uppercaseChar()?.toString() ?: "O",
                 color = WhiteFull,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
@@ -350,7 +352,7 @@ private fun AdminSidebarUserInfo(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = adminName.ifBlank { "Admin User" },
+                text = ownerName.ifBlank { "Admin User" },
                 color = WhiteFull,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
@@ -366,7 +368,7 @@ private fun AdminSidebarUserInfo(
 }
 
 @Composable
-private fun AdminSidebarLogout(
+private fun OwnerSidebarLogout(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,
@@ -415,7 +417,7 @@ private fun AdminSidebarLogout(
     }
 }
 
-private fun adminNavigateTo(
+private fun ownerNavigateTo(
     navController: NavController,
     drawerState: DrawerState,
     scope: CoroutineScope,

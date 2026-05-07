@@ -4,7 +4,6 @@ import com.example.fruitylicious.data.repository.InventoryRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.BranchDao
-import com.example.fruitylicious.data.local.dao.StaffLogDao
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.SyncRepository
@@ -29,7 +28,8 @@ import kotlinx.coroutines.launch
 
 data class AdminDashboardUiState(
     val userName: String = "",
-    val selectedBranch: String = "B1",
+    val selectedBranchId: Int? = null,
+    val selectedBranchName: String = "All Branches",
     val isAdmin: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
@@ -44,8 +44,7 @@ data class AdminDashboardUiState(
     val error: String? = null,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
-    val syncError: String? = null,
-    val isClockedIn: Boolean = false
+    val syncError: String? = null
 )
 
 @HiltViewModel
@@ -58,27 +57,27 @@ class AdminDashboardViewModel @Inject constructor(
     private val reportRepository: ReportRepository,
     private val branchDao: BranchDao,
     private val logoutUseCase: LogoutUseCase,
-    private val syncRepository: SyncRepository,
-    private val staffLogDao: StaffLogDao
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private var salesJob: Job? = null
     private var notificationJob: Job? = null
 
-    private val userId: Int = sessionManager.getUserId()
     private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         AdminDashboardUiState(
-            userName = sessionManager.getUserName().ifBlank { "Admin User" },
-            selectedBranch = "B$localBranchId",
+            userName = sessionManager.getUserName().ifBlank { "Owner User" },
+            selectedBranchId = if (isAdminUser()) null else localBranchId,
+            selectedBranchName = if (isAdminUser()) "All Branches" else "Branch $localBranchId",
             isAdmin = isAdminUser(),
             localBranchId = localBranchId,
             userBranchId = "B$localBranchId",
             dateText = SimpleDateFormat(
                 "EEEE, MMMM dd, yyyy",
                 Locale.US
-            ).format(Date())
+            ).format(Date()),
+            canAccessCrossBranch = isAdminUser()
         )
     )
 
@@ -87,50 +86,43 @@ class AdminDashboardViewModel @Inject constructor(
     init {
         observeBranches()
         observeNetwork()
-        observeClockStatus()
         loadDashboard()
     }
 
-    private fun observeClockStatus() {
-        viewModelScope.launch {
-            staffLogDao.observeStaffLogsByUser(userId).collectLatest { logs ->
-                val isClockedIn = logs.any { it.clockOut == null }
-                _uiState.update { it.copy(isClockedIn = isClockedIn) }
-            }
-        }
-    }
-
-    fun onBranchSelected(branch: String) {
+    fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
-
-        val finalBranch = if (state.canAccessCrossBranch) {
-            branch
-        } else {
-            "B${state.localBranchId}"
+        val finalBranchId = if (state.canAccessCrossBranch) branchId else localBranchId
+        
+        val branchName = when (finalBranchId) {
+            null -> "All Branches"
+            else -> state.branches.find { it.branchId == finalBranchId }?.branchName ?: "Branch $finalBranchId"
         }
 
         _uiState.update {
-            it.copy(selectedBranch = finalBranch)
+            it.copy(
+                selectedBranchId = finalBranchId,
+                selectedBranchName = branchName
+            )
         }
-
         loadDashboard()
     }
 
     fun logout() {
-        if (_uiState.value.isClockedIn) {
-            _uiState.update { 
-                it.copy(error = "You must clock out before logging out.") 
-            }
-            return
-        }
         logoutUseCase()
     }
 
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
-                _uiState.update {
-                    it.copy(branches = branchList)
+                _uiState.update { state ->
+                    val updatedBranchName = when (val bid = state.selectedBranchId) {
+                        null -> "All Branches"
+                        else -> branchList.find { it.branchId == bid }?.branchName ?: "Branch $bid"
+                    }
+                    state.copy(
+                        branches = branchList,
+                        selectedBranchName = updatedBranchName
+                    )
                 }
 
                 loadDashboard()
@@ -159,9 +151,8 @@ class AdminDashboardViewModel @Inject constructor(
         salesJob = viewModelScope.launch {
             val state = _uiState.value
             val isOnline = networkMonitor.isOnline()
-            val selectedBranchId = selectedBranchToId(state.selectedBranch)
+            val selectedBranchId = state.selectedBranchId
 
-            // Prefer local data for the local branch to ensure immediate updates after transactions
             if (selectedBranchId == localBranchId) {
                 observeLocalWeeklySales()
             } else if (state.isAdmin && isOnline) {
@@ -174,30 +165,29 @@ class AdminDashboardViewModel @Inject constructor(
 
     private suspend fun observeLocalWeeklySales() {
         val weekRange = getCurrentWeekRange()
-        val branchId = localBranchId
+        val branchId = _uiState.value.selectedBranchId
 
-        transactionRepository.observeTransactionsByDateRange(
-            branchId = branchId,
-            from = weekRange.first,
-            to = weekRange.second
-        ).collectLatest { transactions ->
-            val completed = transactions.filter {
-                it.status.equals("completed", ignoreCase = true)
-            }
+        val flow = if (branchId == null) {
+            transactionRepository.observeAllTransactionsByDateRange(weekRange.first, weekRange.second)
+        } else {
+            transactionRepository.observeTransactionsByDateRange(branchId, weekRange.first, weekRange.second)
+        }
 
+        flow.collectLatest { transactions ->
             val salesPerDay = MutableList(7) { 0f }
+            val completed = transactions.filter { it.status.equals("completed", ignoreCase = true) }
 
             completed.forEach { transaction ->
                 val index = getMondayBasedDayIndex(transaction.dateTime)
-                salesPerDay[index] += transaction.totalAmount.toFloat()
+                if (index in 0..6) {
+                    salesPerDay[index] += transaction.totalAmount.toFloat()
+                }
             }
 
             _uiState.update {
                 it.copy(
                     weeklySalesData = salesPerDay,
-                    weeklyTotalSales = completed.sumOf { transaction ->
-                        transaction.totalAmount
-                    },
+                    weeklyTotalSales = completed.sumOf { it.totalAmount },
                     weeklyTransactionCount = completed.size,
                     error = null
                 )
@@ -206,7 +196,7 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private suspend fun loadRemoteWeeklySales() {
-        val branchId = selectedBranchToId(_uiState.value.selectedBranch)
+        val branchId = _uiState.value.selectedBranchId
         val weekStart = getCurrentWeekStartCalendar()
 
         val salesPerDay = MutableList(7) { 0f }
@@ -274,7 +264,8 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private suspend fun observeLocalNotifications() {
-        inventoryRepository.observeLowStockItems(localBranchId)
+        val branchId = _uiState.value.selectedBranchId ?: localBranchId
+        inventoryRepository.observeLowStockItems(branchId)
             .collectLatest { lowStockItems ->
                 _uiState.update {
                     it.copy(
@@ -285,16 +276,14 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private suspend fun loadRemoteNotifications() {
-        val branchId = selectedBranchToId(_uiState.value.selectedBranch)
+        val branchId = _uiState.value.selectedBranchId
 
         if (branchId == null) {
             val branches = branchDao.getAllBranches()
-
             var hasLowStock = false
 
             for (branch in branches) {
                 val result = reportRepository.getInventoryReport(branch.branchId)
-
                 result.onSuccess { report ->
                     if (report.items.any { it.isLowStock }) {
                         hasLowStock = true
@@ -368,19 +357,9 @@ class AdminDashboardViewModel @Inject constructor(
         }
     }
 
-    private fun selectedBranchToId(branch: String): Int? {
-        return when {
-            branch.equals("All", ignoreCase = true) -> null
-            branch.startsWith("B", ignoreCase = true) -> {
-                branch.removePrefix("B")
-                    .removePrefix("b")
-                    .toIntOrNull()
-            }
-            else -> localBranchId
-        }
-    }
-
     fun syncNow() {
+        if (_uiState.value.isSyncing) return
+
         viewModelScope.launch {
             if (!networkMonitor.isOnline()) {
                 _uiState.update {
@@ -419,7 +398,8 @@ class AdminDashboardViewModel @Inject constructor(
                 )
             }
 
-            loadDashboard()
+            // Removed loadDashboard() here because observers will trigger it
+            // if data actually changed during sync, avoiding redundant requests.
         }
     }
 
@@ -433,10 +413,6 @@ class AdminDashboardViewModel @Inject constructor(
     }
 
     private fun isAdminUser(): Boolean {
-        val role = sessionManager.getRole()
-
-        return role.equals("admin", ignoreCase = true) ||
-                role.equals("owner", ignoreCase = true)
+        return sessionManager.isAdmin()
     }
 }
-

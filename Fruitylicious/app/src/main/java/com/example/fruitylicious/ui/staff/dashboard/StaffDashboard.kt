@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fruitylicious.ADMIN_DASHBOARD
+import com.example.fruitylicious.STAFF_DASHBOARD
 import com.example.fruitylicious.STAFF_INVENTORY
 import com.example.fruitylicious.STAFF_NOTIFICATIONS
 import com.example.fruitylicious.STAFF_POS
@@ -56,7 +58,8 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.navigation.NavController
-import com.example.fruitylicious.ui.shared.StaffSideBarContent
+import com.example.fruitylicious.ui.shared.SharedDrawerContent
+import com.example.fruitylicious.ui.shared.SharedScreenMode
 import kotlinx.coroutines.launch
 
 private val StaffGreenPrimary = Color(0xFF2C8C44)
@@ -71,9 +74,18 @@ private val StaffTextSecondary = Color(0xFF757575)
 @Composable
 fun StaffDashboardScreen(
     navController: NavController,
+    mode: SharedScreenMode = SharedScreenMode.STAFF,
     viewModel: StaffDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.isAdmin) {
+        if (uiState.isAdmin) {
+            navController.navigate(ADMIN_DASHBOARD) {
+                popUpTo(STAFF_DASHBOARD) { inclusive = true }
+            }
+        }
+    }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -97,12 +109,14 @@ fun StaffDashboardScreen(
                 drawerContainerColor = Color.Transparent,
                 drawerTonalElevation = 0.dp
             ) {
-                StaffSideBarContent(
+                SharedDrawerContent(
+                    mode = if (uiState.isAdmin) SharedScreenMode.OWNER else mode,
                     navController = navController,
                     drawerState = drawerState,
                     scope = scope,
-                    staffName = uiState.userName.ifBlank { "Staff User" },
-                    branchName = uiState.branchName.ifBlank { "Branch 1" },
+                    userName = uiState.userName.ifBlank { "User" },
+                    branchName = uiState.branchName.ifBlank { "Branch" },
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = viewModel::logout
                 )
             }

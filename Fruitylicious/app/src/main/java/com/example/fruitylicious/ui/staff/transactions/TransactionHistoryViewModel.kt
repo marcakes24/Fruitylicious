@@ -34,7 +34,7 @@ class TransactionHistoryViewModel @Inject constructor(
     private val branchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(TransactionHistoryUiState(
-        isAdmin = sessionManager.getRole()?.equals("admin", ignoreCase = true) == true
+        isAdmin = sessionManager.isAdmin()
     ))
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
@@ -57,7 +57,7 @@ class TransactionHistoryViewModel @Inject constructor(
 
     fun voidTransaction(transactionId: String) {
         if (!_uiState.value.isAdmin) {
-            _uiState.update { it.copy(error = "Only admins can void transactions.") }
+            _uiState.update { it.copy(error = "Only owners can void transactions.") }
             return
         }
 

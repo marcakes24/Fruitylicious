@@ -105,7 +105,11 @@ interface TransactionDao {
     SELECT 
         p.productName AS productName,
         SUM(ti.quantity) AS qty,
-        SUM(ti.subtotal) AS totalAmount
+        SUM(ti.subtotal) AS totalAmount,
+        CAST(SUM(CASE WHEN t.branchId = 1 THEN ti.quantity ELSE 0 END) AS INTEGER) AS b1Qty,
+        CAST(SUM(CASE WHEN t.branchId = 2 THEN ti.quantity ELSE 0 END) AS INTEGER) AS b2Qty,
+        SUM(CASE WHEN t.branchId = 1 THEN ti.subtotal ELSE 0.0 END) AS b1Amount,
+        SUM(CASE WHEN t.branchId = 2 THEN ti.subtotal ELSE 0.0 END) AS b2Amount
     FROM transaction_items ti
     INNER JOIN transactions t ON ti.transactionId = t.transactionId
     INNER JOIN products p ON ti.productId = p.productId

@@ -73,6 +73,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.ui.shared.BranchSelector
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import kotlinx.coroutines.launch
@@ -89,7 +90,7 @@ private val IaRed = Color(0xFFB91C1C)
 @Composable
 fun InventoryAdjustmentScreen(
     navController: NavController,
-    mode: SharedScreenMode = SharedScreenMode.ADMIN,
+    mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
     onLogout: () -> Unit = {},
@@ -129,7 +130,16 @@ fun InventoryAdjustmentScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = Color.Transparent, drawerTonalElevation = 0.dp) {
-                SharedDrawerContent(mode, navController, drawerState, scope, userName, branchName, onLogout)
+                SharedDrawerContent(
+                    mode = mode,
+                    navController = navController,
+                    drawerState = drawerState,
+                    scope = scope,
+                    userName = userName,
+                    branchName = branchName,
+                    isClockedIn = true, // Simplified as this screen often requires clock-in
+                    onLogout = onLogout
+                )
             }
         }
     ) {
@@ -144,9 +154,21 @@ fun InventoryAdjustmentScreen(
                 onMenuClick = { scope.launch { drawerState.open() } }
             )
 
+            if (uiState.isAdmin && !uiState.isOnline) {
+                Text(
+                    text = "Offline mode: Only local branch adjustments are visible.",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -179,6 +201,20 @@ fun InventoryAdjustmentScreen(
                 }
 
                 item { RecentAdjustmentsCard(items = uiState.history) }
+
+                if (uiState.hasMore) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                            if (uiState.isLoadingMore) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
+                            } else {
+                                TextButton(onClick = { viewModel.loadMoreHistory() }) {
+                                    Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -210,24 +246,16 @@ private fun Header(
             IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, "Menu", tint = Color.White) }
             Text("ADJUSTMENTS", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (isAdmin) {
-                Row(modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xFFF5F5F5)).padding(4.dp)) {
-                    // if (isOnline) {
-                        BranchTab("All", selectedBranchId == null) { onBranchSelect(null) }
-                        branches.forEach { BranchTab("B${it.branchId}", selectedBranchId == it.branchId) { onBranchSelect(it.branchId) } }
-                    /* } else {
-                        BranchTab("B$localBranchId", true) { onBranchSelect(localBranchId) }
-                    } */
-                }
+                BranchSelector(
+                    selectedBranchId = selectedBranchId,
+                    branches = branches,
+                    isOnline = isOnline,
+                    onBranchSelected = onBranchSelect,
+                    activeColor = IaGreen,
+                    containerColor = Color(0xFFF5F5F5)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun BranchTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (selected) IaGreen else Color.Transparent)
-        .clickable { onClick() }.padding(horizontal = 12.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-        Text(label, color = if (selected) Color.White else Color(0xFF666E7A), fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
