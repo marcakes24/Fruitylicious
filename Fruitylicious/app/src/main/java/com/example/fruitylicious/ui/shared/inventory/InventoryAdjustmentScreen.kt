@@ -74,6 +74,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.FruityDateFilterField
+import com.example.fruitylicious.ui.shared.FruityDatePicker
+import com.example.fruitylicious.ui.shared.FruitySearchField
+import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import kotlinx.coroutines.launch
@@ -109,21 +113,16 @@ fun InventoryAdjustmentScreen(
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.setDateRange(datePickerState.selectedDateMillis, datePickerState.selectedDateMillis)
-                    showDatePicker = false
-                }) { Text("OK") }
+        FruityDatePicker(
+            state = datePickerState,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { millis ->
+                viewModel.setDateRange(millis, millis)
             },
-            dismissButton = {
-                TextButton(onClick = {
-                    viewModel.setDateRange(null, null)
-                    showDatePicker = false
-                }) { Text("Clear") }
+            onClear = {
+                viewModel.setDateRange(null, null)
             }
-        ) { DatePicker(state = datePickerState) }
+        )
     }
 
     ModalNavigationDrawer(
@@ -189,7 +188,8 @@ fun InventoryAdjustmentScreen(
                         searchQuery = uiState.searchQuery,
                         onSearchChange = { viewModel.setSearchQuery(it) },
                         selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true }
+                        onDateClick = { showDatePicker = true },
+                        onDateClear = { viewModel.setDateRange(null, null) }
                     )
                 }
 
@@ -252,7 +252,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = IaGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }
@@ -264,40 +265,21 @@ private fun FilterCard(
     searchQuery: String, 
     onSearchChange: (String) -> Unit,
     selectedDateText: String, 
-    onDateClick: () -> Unit
+    onDateClick: () -> Unit,
+    onDateClear: () -> Unit
 ) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 2.dp) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                value = searchQuery, 
-                onValueChange = onSearchChange, 
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search ingredient, reason, or user", color = Color.LightGray, fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.LightGray) },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedBorderColor = IaGreen
-                ),
-                singleLine = true
+            FruitySearchField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = "Search ingredient, reason, or user"
             )
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = selectedDateText, 
-                    onValueChange = {}, 
-                    readOnly = true, 
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("mm/dd/yyyy", color = Color.LightGray, fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Default.DateRange, null, tint = Color.LightGray) },
-                    trailingIcon = { Icon(Icons.Default.CalendarMonth, null, tint = Color.Black) },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFEEEEEE),
-                        focusedBorderColor = IaGreen
-                    )
-                )
-                Box(modifier = Modifier.matchParentSize().clickable { onDateClick() })
-            }
+            FruityDateFilterField(
+                selectedDateText = selectedDateText,
+                onClick = onDateClick,
+                onClear = onDateClear
+            )
         }
     }
 }
@@ -313,8 +295,18 @@ fun AdjustmentEntryDialog(
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    var dropdownWidth by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
+    var ingredientSearchQuery by remember { mutableStateOf("") }
+
+    val filteredIngredients = remember(ingredients, ingredientSearchQuery) {
+        if (ingredientSearchQuery.isEmpty()) {
+            ingredients
+        } else {
+            ingredients.filter {
+                it.ingredientName.contains(ingredientSearchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     val isFormValid = selectedIngredient != null && quantity.isNotBlank()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -336,35 +328,28 @@ fun AdjustmentEntryDialog(
                     }
                 }
                 
-                Column {
-                    Label("Select Ingredient")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = selectedIngredient?.ingredientName ?: "", onValueChange = {}, readOnly = true,
-                            modifier = Modifier.fillMaxWidth().onGloballyPositioned { dropdownWidth = with(density) { it.size.width.toDp() } },
-                            placeholder = { Text("Choose an ingredient", color = Color.LightGray) },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) }, 
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = Color(0xFFE2E8F0),
-                                focusedBorderColor = IaGreen
-                            )
-                        )
-                        Box(modifier = Modifier.matchParentSize().clickable { expanded = true })
-                        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.width(dropdownWidth).heightIn(max = 400.dp)) {
-                            ingredients.forEach { ing ->
-                                DropdownMenuItem(
-                                    text = { Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                                        Text(ing.ingredientName, fontSize = 14.sp, color = IaTextMain)
-                                        Text("${formatQuantity(ing.currentStock)} ${ing.unitType}", fontSize = 12.sp, color = Color.Gray)
-                                    }},
-                                    onClick = { selectedIngredient = ing; expanded = false }
-                                )
-                            }
+                FruitySearchableDropdown(
+                    value = ingredientSearchQuery.ifEmpty { selectedIngredient?.ingredientName ?: "" },
+                    onValueChange = {
+                        ingredientSearchQuery = it
+                        if (it.isEmpty()) selectedIngredient = null
+                    },
+                    options = filteredIngredients,
+                    onOptionClick = {
+                        selectedIngredient = it
+                        ingredientSearchQuery = it.ingredientName
+                    },
+                    label = "Select Ingredient",
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                    placeholder = "Choose an ingredient",
+                    itemContent = { ing ->
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                            Text(ing.ingredientName, fontSize = 14.sp, color = IaTextMain)
+                            Text("${formatQuantity(ing.currentStock)} ${ing.unitType}", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
-                }
+                )
 
                 if (selectedIngredient != null) {
                     CurrentStockCard(selectedIngredient!!)

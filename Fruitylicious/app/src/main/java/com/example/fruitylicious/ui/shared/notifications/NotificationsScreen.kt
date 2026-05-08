@@ -111,6 +111,7 @@ fun NotificationsScreen(
                 branches = uiState.branches,
                 isAdmin = uiState.isAdmin,
                 isOnline = uiState.isOnline,
+                localBranchId = uiState.localBranchId,
                 onBranchSelected = { viewModel.selectBranch(it) },
                 onMenuClick = {
                     scope.launch {
@@ -177,6 +178,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    localBranchId: Int,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -213,7 +215,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelected,
                     activeColor = NotifGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }

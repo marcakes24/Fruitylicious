@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SetMeal
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
@@ -55,6 +56,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.fruitylicious.ADMIN_ADJUSTMENT
 import com.example.fruitylicious.ADMIN_AUDIT_LOGS
+import com.example.fruitylicious.ADMIN_BRANCH_SETTINGS
 import com.example.fruitylicious.ADMIN_DASHBOARD
 import com.example.fruitylicious.ADMIN_INGREDIENTS
 import com.example.fruitylicious.ADMIN_INVENTORY
@@ -145,6 +147,21 @@ fun OwnerSideBarContent(
             OwnerSidebarSectionHeader("Reports")
 
             OwnerReportsNavigation(
+                currentRoute = currentRoute,
+                onNavigate = { route ->
+                    ownerNavigateTo(
+                        navController = navController,
+                        drawerState = drawerState,
+                        scope = scope,
+                        route = route,
+                        currentRoute = currentRoute
+                    )
+                }
+            )
+
+            OwnerSidebarSectionHeader("Settings")
+
+            OwnerSettingsNavigation(
                 currentRoute = currentRoute,
                 onNavigate = { route ->
                     ownerNavigateTo(
@@ -253,6 +270,25 @@ private fun OwnerReportsNavigation(
         AdminNavItem(Icons.Outlined.BarChart, "Reports", ADMIN_REPORTS_DASHBOARD),
         AdminNavItem(Icons.Outlined.AssignmentLate, "Audit Logs", ADMIN_AUDIT_LOGS),
         AdminNavItem(Icons.Outlined.Groups, "Staff Logs", ADMIN_STAFF_LOGS)
+    )
+
+    items.forEach { item ->
+        OwnerSidebarNavItem(
+            icon = item.icon,
+            label = item.label,
+            isActive = currentRoute == item.route,
+            onClick = { onNavigate(item.route) }
+        )
+    }
+}
+
+@Composable
+private fun OwnerSettingsNavigation(
+    currentRoute: String?,
+    onNavigate: (String) -> Unit
+) {
+    val items = listOf(
+        AdminNavItem(Icons.Outlined.Settings, "Branch Settings", ADMIN_BRANCH_SETTINGS)
     )
 
     items.forEach { item ->

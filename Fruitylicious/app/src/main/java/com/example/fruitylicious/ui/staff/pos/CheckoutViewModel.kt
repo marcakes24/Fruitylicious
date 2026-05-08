@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.staff.pos
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.repository.CartItem
 import com.example.fruitylicious.data.repository.CartRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
@@ -30,6 +31,11 @@ data class CheckoutUiState(
     val totalAmount: Double = 0.0,
     val receiptItems: List<CheckoutReceiptItem> = emptyList(),
     val transactionId: String = "",
+    val branchName: String = "",
+    val gcashAccountName: String? = null,
+    val gcashAccountNumber: String? = null,
+    val gcashQrImage: String? = null,
+    val gcashQrImageType: String? = null,
     val paymentType: String = "Cash",
     val receivedAmount: Double = 0.0,
     val change: Double = 0.0,
@@ -42,6 +48,7 @@ data class CheckoutUiState(
 class CheckoutViewModel @Inject constructor(
     private val cartRepository: CartRepository,
     private val transactionRepository: TransactionRepository,
+    private val branchDao: BranchDao,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
     private val autoSyncManager: AutoSyncManager
@@ -52,6 +59,24 @@ class CheckoutViewModel @Inject constructor(
 
     init {
         observeCart()
+        loadBranchInfo()
+    }
+
+    private fun loadBranchInfo() {
+        viewModelScope.launch {
+            val branch = branchDao.getBranchById(branchConfig.branchId)
+            if (branch != null) {
+                _uiState.update {
+                    it.copy(
+                        branchName = branch.branchName,
+                        gcashAccountName = branch.gcashAccountName,
+                        gcashAccountNumber = branch.gcashAccountNumber,
+                        gcashQrImage = branch.gcashQrImage,
+                        gcashQrImageType = branch.gcashQrImageType
+                    )
+                }
+            }
+        }
     }
 
     private fun observeCart() {
@@ -69,7 +94,8 @@ class CheckoutViewModel @Inject constructor(
 
     fun confirmPayment(
         paymentType: String,
-        receivedAmountText: String
+        receivedAmountText: String,
+        transactionName: String? = null
     ) {
         val state = _uiState.value
         val cartItems = state.cartItems
@@ -115,7 +141,8 @@ class CheckoutViewModel @Inject constructor(
                 userId = sessionManager.getUserId(),
                 branchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
                 cartItems = cartItems,
-                paymentType = cleanPaymentType
+                paymentType = cleanPaymentType,
+                transactionName = transactionName
             )
 
             result.fold(

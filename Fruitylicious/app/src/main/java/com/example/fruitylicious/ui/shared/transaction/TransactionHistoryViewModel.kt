@@ -45,6 +45,7 @@ data class TransactionHistoryItemRow(
 data class TransactionHistoryRow(
     val transactionId: String,
     val displayId: String,
+    val transactionName: String?,
     val staffName: String,
     val username: String,
     val branchId: Int,
@@ -156,6 +157,7 @@ class TransactionHistoryViewModel @Inject constructor(
                         TransactionHistoryRow(
                             transactionId = transaction.transactionId,
                             displayId = buildDisplayId(transaction.transactionId),
+                            transactionName = transaction.transactionName,
                             staffName = user?.name ?: "Unknown Staff",
                             username = user?.username ?: "unknown",
                             branchId = transaction.branchId,
@@ -386,6 +388,7 @@ class TransactionHistoryViewModel @Inject constructor(
         return TransactionHistoryRow(
             transactionId = transactionId,
             displayId = buildDisplayId(transactionId),
+            transactionName = transactionName,
             staffName = userName,
             username = "",
             branchId = branchId,

@@ -106,7 +106,8 @@ class TransactionRepository @Inject constructor(
         userId: Int,
         branchId: Int,
         cartItems: List<CartItem>,
-        paymentType: String
+        paymentType: String,
+        transactionName: String? = null
     ): Result<String> {
         if (cartItems.isEmpty()) {
             return Result.failure(IllegalArgumentException("Cart is empty."))
@@ -258,6 +259,7 @@ class TransactionRepository @Inject constructor(
                         userId = userId,
                         branchId = branchId,
                         totalAmount = totalAmount,
+                        transactionName = transactionName?.trim()?.ifBlank { null },
                         paymentType = paymentType.trim(),
 
                         // Important for Queue:

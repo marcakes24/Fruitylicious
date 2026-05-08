@@ -61,12 +61,27 @@ object DatabaseModule {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE branches ADD COLUMN gcashQrImage TEXT")
+                db.execSQL("ALTER TABLE branches ADD COLUMN gcashQrImageType TEXT")
+                db.execSQL("ALTER TABLE branches ADD COLUMN gcashAccountName TEXT")
+                db.execSQL("ALTER TABLE branches ADD COLUMN gcashAccountNumber TEXT")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN transaction_name TEXT")
+            }
+        }
+
         return Room.databaseBuilder(
             context,
             PosDatabase::class.java,
             "fruitylicious_pos.db"
         )
-            .addMigrations(MIGRATION_5_6)
+            .addMigrations(MIGRATION_5_6, MIGRATION_7_8, MIGRATION_8_9)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)

@@ -83,6 +83,7 @@ import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductRecipeEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.data.repository.CartItem
+import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
 import com.example.fruitylicious.util.ImageStorage
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -464,13 +465,11 @@ private fun ProductCustomizeDialog(
         mutableStateOf(mainProducts.find { it.productId == initialMixAddonId })
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
-    var dropdownWidth by remember { mutableStateOf(0.dp) }
+    var mixSearchQuery by remember { mutableStateOf("") }
     var selectedAddOns by remember(initialSelectedAddonsIds, addons) {
         mutableStateOf(addons.filter { it.productId in initialSelectedAddonsIds }.toSet())
     }
     var quantity by remember(initialQuantity) { mutableStateOf(initialQuantity) }
-
-    val density = LocalDensity.current
 
     val variant = selectedVariant
 
@@ -481,6 +480,16 @@ private fun ProductCustomizeDialog(
     val itemTotal = (basePrice + mixCost + addOnCost) * quantity
 
     val availableMixFlavors = mainProducts.filter { it.productId != product.productId }
+    
+    val filteredMixFlavors = remember(availableMixFlavors, mixSearchQuery) {
+        if (mixSearchQuery.isEmpty()) {
+            availableMixFlavors
+        } else {
+            availableMixFlavors.filter {
+                it.productName.contains(mixSearchQuery, ignoreCase = true)
+            }
+        }
+    }
     val availableAddons = addons.filter { it.productId != selectedFlavor?.productId }
     val paidAddons = availableAddons.filter { it.price > 0.0 }
     val freeAddons = availableAddons.filter { it.price == 0.0 }
@@ -736,86 +745,30 @@ private fun ProductCustomizeDialog(
                 if (mixFlavor) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onGloballyPositioned { coordinates ->
-                                    dropdownWidth = with(density) { coordinates.size.width.toDp() }
+                    FruitySearchableDropdown(
+                        value = mixSearchQuery.ifEmpty { selectedFlavor?.productName ?: "" },
+                        onValueChange = {
+                            mixSearchQuery = it
+                            if (it.isEmpty()) selectedFlavor = null
+                        },
+                        options = filteredMixFlavors,
+                        onOptionClick = {
+                            selectedFlavor = it
+                            mixSearchQuery = it.productName
+                            selectedAddOns = selectedAddOns
+                                .filterNot { addon ->
+                                    addon.productId == it.productId
                                 }
-                                .clickable {
-                                    dropdownExpanded = true
-                                },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color(0xFFEEEEEE)),
-                            colors = CardDefaults.cardColors(containerColor = Color.White)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = selectedFlavor?.productName ?: "Select fruit add-on",
-                                    fontSize = 14.sp,
-                                    color = if (selectedFlavor != null) {
-                                        Color.Black
-                                    } else {
-                                        Color.Gray
-                                    }
-                                )
-
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = Color.Gray
-                                )
-                            }
+                                .toSet()
+                            dropdownExpanded = false
+                        },
+                        expanded = dropdownExpanded,
+                        onExpandedChange = { dropdownExpanded = it },
+                        placeholder = "Select fruit add-on",
+                        itemContent = { addon ->
+                            Text(addon.productName)
                         }
-
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = {
-                                dropdownExpanded = false
-                            },
-                            modifier = Modifier
-                                .width(dropdownWidth)
-                                .background(Color.White)
-                        ) {
-                            if (availableMixFlavors.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "No other fruits available",
-                                            color = Color.Gray
-                                        )
-                                    },
-                                    onClick = {
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            } else {
-                                availableMixFlavors.forEach { addon ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(addon.productName)
-                                        },
-                                        onClick = {
-                                            selectedFlavor = addon
-                                            selectedAddOns = selectedAddOns
-                                                .filterNot {
-                                                    it.productId == addon.productId
-                                                }
-                                                .toSet()
-                                            dropdownExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

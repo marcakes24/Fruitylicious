@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fruitylicious.ui.shared.FruityPrimaryButton
+import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
 import com.example.fruitylicious.ui.shared.FruitySectionTitle
 import com.example.fruitylicious.ui.shared.FruityTextField
 
@@ -47,6 +48,17 @@ fun AdjustmentScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredIngredients = remember(uiState.ingredients, searchQuery) {
+        if (searchQuery.isEmpty()) {
+            uiState.ingredients
+        } else {
+            uiState.ingredients.filter {
+                it.ingredientName.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -78,43 +90,25 @@ fun AdjustmentScreen(
                 subtitle = "Use positive values to add and negative values to deduct"
             )
 
-            ExposedDropdownMenuBox(
+            FruitySearchableDropdown(
+                value = searchQuery.ifEmpty { uiState.selectedIngredientName },
+                onValueChange = {
+                    searchQuery = it
+                },
+                options = filteredIngredients,
+                onOptionClick = {
+                    viewModel.onIngredientSelected(it.ingredientId)
+                    searchQuery = it.ingredientName
+                    expanded = false
+                },
+                label = "Ingredient",
                 expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
-            ) {
-                OutlinedTextField(
-                    value = uiState.selectedIngredientName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Ingredient") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Inventory, contentDescription = "Ingredient")
-                    },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                    },
-                    modifier = Modifier.menuAnchor(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
-                    )
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    uiState.ingredients.forEach { ingredient ->
-                        DropdownMenuItem(
-                            text = { Text(ingredient.ingredientName) },
-                            onClick = {
-                                viewModel.onIngredientSelected(ingredient.ingredientId)
-                                expanded = false
-                            }
-                        )
-                    }
+                onExpandedChange = { expanded = it },
+                placeholder = "Select Ingredient",
+                itemContent = { ingredient ->
+                    Text(ingredient.ingredientName)
                 }
-            }
+            )
 
             FruityTextField(
                 value = uiState.adjustmentAmount,

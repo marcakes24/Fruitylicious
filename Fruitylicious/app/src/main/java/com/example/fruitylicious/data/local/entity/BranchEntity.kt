@@ -10,6 +10,10 @@ data class BranchEntity(
     val branchName: String,
     val address: String,
     val contactNumber: String,
+    val gcashQrImage: String? = null,
+    val gcashQrImageType: String? = null,
+    val gcashAccountName: String? = null,
+    val gcashAccountNumber: String? = null,
     val lastModified: Long,
     val isSynced: Boolean,
     val syncedAt: Long?

@@ -113,7 +113,7 @@ class QueueViewModel @Inject constructor(
                         transactionId = transaction.transactionId,
                         displayId = buildDisplayId(transaction.transactionId),
                         queueNumber = buildQueueNumber(transaction.transactionId),
-                        customerName = "Walk-in Customer",
+                        customerName = transaction.transactionName ?: "Walk-in Customer",
                         branchId = transaction.branchId,
                         paymentType = transaction.paymentType,
                         status = transaction.status.lowercase(),

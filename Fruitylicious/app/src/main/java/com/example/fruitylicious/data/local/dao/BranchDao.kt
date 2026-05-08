@@ -17,6 +17,9 @@ interface BranchDao {
     @Query("SELECT * FROM branches WHERE isSynced = 0")
     suspend fun getUnsyncedBranches(): List<BranchEntity>
 
+    @Query("SELECT * FROM branches WHERE branchId = :branchId")
+    suspend fun getBranchById(branchId: Int): BranchEntity?
+
     @Query("SELECT * FROM branches ORDER BY branchId ASC")
     fun observeAllBranches(): Flow<List<BranchEntity>>
 

@@ -1,7 +1,6 @@
 package com.example.fruitylicious.ui.admin.system
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +61,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.FruityDateFilterField
+import com.example.fruitylicious.ui.shared.FruityDatePicker
+import com.example.fruitylicious.ui.shared.FruitySearchField
 import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -190,150 +192,37 @@ fun AuditLogScreen(
                     )
                 }
 
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
+                    FruitySearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .background(Color.White, RoundedCornerShape(12.dp)),
-                        placeholder = {
-                            Text(
-                                text = "Search...",
-                                color = Color.LightGray,
-                                fontSize = 14.sp
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = Color.LightGray
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Clear search",
-                                        tint = Color.Gray
-                                    )
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedBorderColor = AuditGreenPrimary
-                        ),
-                        singleLine = true
+                        placeholder = "Search logs..."
                     )
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (selectedDateMillis != null) {
-                                    AuditGreenPrimary
-                                } else {
-                                    Color.White
-                                }
-                            )
-                            .clickable { showDatePicker = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CalendarToday,
-                            contentDescription = "Filter by date",
-                            tint = if (selectedDateMillis != null) Color.White else Color.Gray
-                        )
-                    }
+                    FruityDateFilterField(
+                        selectedDateText = if (selectedDateMillis != null) {
+                            SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(selectedDateMillis!!))
+                        } else "",
+                        onClick = { showDatePicker = true },
+                        onClear = { selectedDateMillis = null }
+                    )
                 }
 
-                if (selectedDateMillis != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = AuditGreenPrimary.copy(alpha = 0.1f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = 1.dp,
-                                color = AuditGreenPrimary
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = SimpleDateFormat(
-                                        "MMM dd, yyyy",
-                                        Locale.US
-                                    ).format(Date(selectedDateMillis!!)),
-                                    fontSize = 12.sp,
-                                    color = AuditGreenPrimary,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Spacer(modifier = Modifier.width(4.dp))
-
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear date",
-                                    tint = AuditGreenPrimary,
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clickable { selectedDateMillis = null }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (showDatePicker) {
-                    DatePickerDialog(
-                        onDismissRequest = { showDatePicker = false },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    selectedDateMillis = datePickerState.selectedDateMillis
-                                    showDatePicker = false
-                                }
-                            ) {
-                                Text("OK", color = AuditGreenPrimary)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDatePicker = false }) {
-                                Text("Cancel", color = AuditGreenPrimary)
-                            }
-                        }
-                    ) {
-                        DatePicker(
-                            state = datePickerState,
-                            colors = DatePickerDefaults.colors(
-                                todayContentColor = AuditGreenPrimary,
-                                todayDateBorderColor = AuditGreenPrimary,
-                                selectedDayContainerColor = AuditGreenPrimary,
-                                selectedDayContentColor = Color.White,
-                                selectedYearContainerColor = AuditGreenPrimary,
-                                selectedYearContentColor = Color.White
-                            )
-                        )
-                    }
-                }
+    if (showDatePicker) {
+        FruityDatePicker(
+            state = datePickerState,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { millis ->
+                selectedDateMillis = millis
+            },
+            onClear = {
+                selectedDateMillis = null
+            }
+        )
+    }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -425,7 +314,8 @@ private fun AuditHeader(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = AuditGreenPrimary,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }

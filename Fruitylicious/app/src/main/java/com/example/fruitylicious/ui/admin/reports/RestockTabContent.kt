@@ -14,12 +14,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -312,14 +316,51 @@ fun RestockTabContent(
                 color = RptTextMain
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (uiState.availableUnits.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedUnit == null,
+                            onClick = { viewModel.setUnitFilter(null) },
+                            label = { Text("All", fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RptGreen,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                    items(uiState.availableUnits) { unit ->
+                        FilterChip(
+                            selected = uiState.selectedUnit == unit,
+                            onClick = { viewModel.setUnitFilter(unit) },
+                            label = { Text(unit, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = RptGreen,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            val filteredIngredients = if (uiState.selectedUnit == null) {
+                uiState.topIngredients
+            } else {
+                uiState.topIngredients.filter { it.unitType == uiState.selectedUnit }
+            }
 
             if (uiState.isLoading) {
                 Text("Loading...", fontSize = 13.sp, color = RptTextSub)
-            } else if (uiState.topIngredients.isEmpty()) {
+            } else if (filteredIngredients.isEmpty()) {
                 Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
-                TopIngredientsChart(items = uiState.topIngredients.take(5))
+                TopIngredientsChart(items = filteredIngredients.take(5))
             }
         }
 

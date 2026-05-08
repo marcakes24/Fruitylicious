@@ -37,6 +37,7 @@ import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.ProductEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.ui.shared.OwnerSideBarContent
+import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalContext
@@ -591,9 +592,20 @@ private fun RecipeIngredientRow(
     onQuantityChanged: (String) -> Unit
 ) {
     var ingredientExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     val selectedIngredient = ingredients.firstOrNull {
         it.ingredientId == line.ingredientId
+    }
+
+    val filteredIngredients = remember(ingredients, searchQuery) {
+        if (searchQuery.isEmpty()) {
+            ingredients
+        } else {
+            ingredients.filter {
+                it.ingredientName.contains(searchQuery, ignoreCase = true)
+            }
+        }
     }
 
     Column {
@@ -602,48 +614,32 @@ private fun RecipeIngredientRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(modifier = Modifier.weight(1.8f)) {
-                OutlinedButton(
-                    onClick = { ingredientExpanded = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
-                ) {
-                    Text(
-                        text = selectedIngredient?.ingredientName ?: "Select",
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+            FruitySearchableDropdown(
+                value = searchQuery.ifEmpty { selectedIngredient?.ingredientName ?: "" },
+                onValueChange = {
+                    searchQuery = it
+                },
+                options = filteredIngredients,
+                onOptionClick = {
+                    onIngredientSelected(it)
+                    searchQuery = it.ingredientName
+                    ingredientExpanded = false
+                },
+                modifier = Modifier.weight(1.8f),
+                expanded = ingredientExpanded,
+                onExpandedChange = { ingredientExpanded = it },
+                placeholder = "Select",
+                itemContent = { ingredient ->
+                    Text(ingredient.ingredientName, fontSize = 13.sp)
                 }
-
-                DropdownMenu(
-                    expanded = ingredientExpanded,
-                    onDismissRequest = { ingredientExpanded = false },
-                    modifier = Modifier.background(Color.White)
-                ) {
-                    ingredients.forEach { ingredient ->
-                        DropdownMenuItem(
-                            text = { Text(ingredient.ingredientName, fontSize = 13.sp) },
-                            onClick = {
-                                onIngredientSelected(ingredient)
-                                ingredientExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
+            )
 
             OutlinedTextField(
                 value = line.quantity,
                 onValueChange = onQuantityChanged,
                 modifier = Modifier
                     .width(75.dp)
-                    .height(44.dp),
+                    .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 textStyle = TextStyle(fontSize = 13.sp),

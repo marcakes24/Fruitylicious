@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
@@ -30,15 +29,18 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,11 +58,15 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.FruityDateFilterField
+import com.example.fruitylicious.ui.shared.FruityDatePicker
+import com.example.fruitylicious.ui.shared.FruitySearchField
 import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import com.example.fruitylicious.util.ImageStorage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -70,6 +76,7 @@ private val SlPageBg = Color(0xFFFFEAA0)
 private val SlTextMain = Color(0xFF1E293B)
 private val SlTextSub = Color.Gray
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StaffLogScreen(
     navController: NavController,
@@ -84,13 +91,43 @@ fun StaffLogScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var expandedImagePath by remember { mutableStateOf<String?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDateMillis by remember { mutableLongStateOf(0L) }
+    val datePickerState = rememberDatePickerState()
 
-    val filteredLogs = remember(uiState.logs, searchQuery) {
+    val selectedDateText = remember(selectedDateMillis) {
+        if (selectedDateMillis == 0L) "" else SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date(selectedDateMillis))
+    }
+
+    val filteredLogs = remember(uiState.logs, searchQuery, selectedDateMillis) {
         uiState.logs.filter { log ->
-            log.staffName.contains(searchQuery, ignoreCase = true) ||
+            val matchesSearch = log.staffName.contains(searchQuery, ignoreCase = true) ||
                     log.username.contains(searchQuery, ignoreCase = true) ||
                     log.branchName.contains(searchQuery, ignoreCase = true)
+
+            val matchesDate = if (selectedDateMillis == 0L) {
+                true
+            } else {
+                val logCal = Calendar.getInstance().apply { timeInMillis = log.clockIn }
+                val filterCal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+                logCal.get(Calendar.YEAR) == filterCal.get(Calendar.YEAR) &&
+                        logCal.get(Calendar.DAY_OF_YEAR) == filterCal.get(Calendar.DAY_OF_YEAR)
+            }
+            matchesSearch && matchesDate
         }
+    }
+
+    if (showDatePicker) {
+        FruityDatePicker(
+            state = datePickerState,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { millis ->
+                selectedDateMillis = millis ?: 0L
+            },
+            onClear = {
+                selectedDateMillis = 0L
+            }
+        )
     }
 
     if (expandedImagePath != null) {
@@ -159,9 +196,12 @@ fun StaffLogScreen(
                 )
             }
 
-            SearchCard(
+            FilterCard(
                 searchQuery = searchQuery,
-                onSearchChange = { searchQuery = it }
+                onSearchChange = { searchQuery = it },
+                selectedDateText = selectedDateText,
+                onDateClick = { showDatePicker = true },
+                onDateClear = { selectedDateMillis = 0L }
             )
 
             LazyColumn(
@@ -257,7 +297,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = SlGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }
@@ -265,9 +306,12 @@ private fun Header(
 }
 
 @Composable
-private fun SearchCard(
+private fun FilterCard(
     searchQuery: String,
-    onSearchChange: (String) -> Unit
+    onSearchChange: (String) -> Unit,
+    selectedDateText: String,
+    onDateClick: () -> Unit,
+    onDateClear: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -277,32 +321,22 @@ private fun SearchCard(
         color = Color.White,
         shadowElevation = 2.dp
     ) {
-        TextField(
-            value = searchQuery,
-            onValueChange = onSearchChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    text = "Search staff name, username, or branch",
-                    color = Color.Gray,
-                    fontSize = 14.sp
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = Color.Gray
-                )
-            },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent
-            ),
-            singleLine = true
-        )
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FruitySearchField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = "Search staff name, username, or branch"
+            )
+
+            FruityDateFilterField(
+                selectedDateText = selectedDateText,
+                onClick = onDateClick,
+                onClear = onDateClear
+            )
+        }
     }
 }
 

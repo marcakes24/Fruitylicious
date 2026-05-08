@@ -112,6 +112,7 @@ fun ReportsScreen(
             canAccessCrossBranch = uiState.canAccessCrossBranch,
             isOnline = uiState.isOnline,
             branches = uiState.branches,
+            localBranchId = uiState.localBranchId,
             onBranchSelected = { viewModel.onBranchSelected(it) },
             onMenuClick = {
                 scope.launch {
@@ -176,6 +177,7 @@ private fun ReportsHeader(
     canAccessCrossBranch: Boolean,
     isOnline: Boolean,
     branches: List<BranchEntity>,
+    localBranchId: Int,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -212,7 +214,8 @@ private fun ReportsHeader(
                 isOnline = isOnline,
                 onBranchSelected = onBranchSelected,
                 activeColor = RptGreen,
-                containerColor = Color.White
+                containerColor = Color.White,
+                localBranchId = localBranchId
             )
         } else {
             // Display only local branch name if restricted

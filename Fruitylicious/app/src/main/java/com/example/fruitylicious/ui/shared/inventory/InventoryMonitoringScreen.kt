@@ -1,7 +1,6 @@
 package com.example.fruitylicious.ui.shared.inventory
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +15,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -30,12 +25,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -60,6 +51,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.FruitySearchField
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
@@ -90,66 +82,14 @@ fun InventoryMonitoringScreen(
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var selectedDateMillis by remember { mutableLongStateOf(0L) }
-
-    val datePickerState = rememberDatePickerState()
-
-    val selectedDateText = remember(selectedDateMillis) {
-        if (selectedDateMillis == 0L) {
-            ""
-        } else {
-            SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date(selectedDateMillis))
-        }
-    }
 
     val filteredRows = remember(
         uiState.rows,
-        searchQuery,
-        selectedDateMillis
+        searchQuery
     ) {
         uiState.rows.filter { row ->
-            val matchesSearch =
-                row.ingredientName.contains(searchQuery, ignoreCase = true) ||
-                        row.branchName.contains(searchQuery, ignoreCase = true)
-
-            val matchesDate = if (selectedDateMillis == 0L) {
-                true
-            } else {
-                isSameDay(row.lastModified, selectedDateMillis)
-            }
-
-            matchesSearch && matchesDate
-        }
-    }
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = {
-                showDatePicker = false
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        selectedDateMillis = datePickerState.selectedDateMillis ?: 0L
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        selectedDateMillis = 0L
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("Clear")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
+            row.ingredientName.contains(searchQuery, ignoreCase = true) ||
+                    row.branchName.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -227,10 +167,6 @@ fun InventoryMonitoringScreen(
                         searchQuery = searchQuery,
                         onSearchChange = {
                             searchQuery = it
-                        },
-                        selectedDateText = selectedDateText,
-                        onDateClick = {
-                            showDatePicker = true
                         }
                     )
                 }
@@ -327,7 +263,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = ImGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }
@@ -337,9 +274,7 @@ private fun Header(
 @Composable
 private fun FilterCard(
     searchQuery: String,
-    onSearchChange: (String) -> Unit,
-    selectedDateText: String,
-    onDateClick: () -> Unit
+    onSearchChange: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -351,74 +286,11 @@ private fun FilterCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedTextField(
+            FruitySearchField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        text = "Search ingredient or branch",
-                        color = Color.LightGray,
-                        fontSize = 14.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color.LightGray
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedBorderColor = ImGreen
-                ),
-                singleLine = true
+                placeholder = "Search ingredient or branch"
             )
-
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = selectedDateText,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "mm/dd/yyyy",
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                    )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = Color.LightGray
-                        )
-                    },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            tint = Color.Black
-                        )
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFEEEEEE),
-                        focusedBorderColor = ImGreen
-                    )
-                )
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable {
-                            onDateClick()
-                        }
-                )
-            }
         }
     }
 }
@@ -539,20 +411,4 @@ private fun formatQuantity(
     } else {
         String.format(Locale.US, "%.2f", value)
     }
-}
-
-private fun isSameDay(
-    firstMillis: Long,
-    secondMillis: Long
-): Boolean {
-    val first = Calendar.getInstance().apply {
-        timeInMillis = firstMillis
-    }
-
-    val second = Calendar.getInstance().apply {
-        timeInMillis = secondMillis
-    }
-
-    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
-            first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
 }

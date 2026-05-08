@@ -1,5 +1,8 @@
 package com.example.fruitylicious.ui.staff.pos
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -7,7 +10,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,10 +34,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -160,7 +166,8 @@ fun CheckoutScreen(
                                 } else {
                                     viewModel.confirmPayment(
                                         paymentType = selectedPaymentMethod,
-                                        receivedAmountText = amountReceived
+                                        receivedAmountText = amountReceived,
+                                        transactionName = customerName
                                     )
                                 }
                             }
@@ -169,12 +176,18 @@ fun CheckoutScreen(
 
                     CheckoutStep.GCASH_QR -> {
                         GCashQRView(
+                            branchName = uiState.branchName,
+                            gcashAccountName = uiState.gcashAccountName,
+                            gcashAccountNumber = uiState.gcashAccountNumber,
+                            gcashQrImage = uiState.gcashQrImage,
+                            gcashQrImageType = uiState.gcashQrImageType,
                             isLoading = uiState.isLoading,
                             error = uiState.error,
                             onConfirmPayment = {
                                 viewModel.confirmPayment(
                                     paymentType = selectedPaymentMethod,
-                                    receivedAmountText = amountReceived
+                                    receivedAmountText = amountReceived,
+                                    transactionName = customerName
                                 )
                             },
                             onBack = {
@@ -546,6 +559,11 @@ fun CheckoutForm(
 
 @Composable
 fun GCashQRView(
+    branchName: String,
+    gcashAccountName: String?,
+    gcashAccountNumber: String?,
+    gcashQrImage: String?,
+    gcashQrImageType: String?,
     isLoading: Boolean,
     error: String?,
     onConfirmPayment: () -> Unit,
@@ -554,87 +572,105 @@ fun GCashQRView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
             modifier = Modifier
-                .width(300.dp)
-                .shadow(8.dp, RoundedCornerShape(20.dp)),
-            shape = RoundedCornerShape(20.dp),
+                .fillMaxWidth()
+                .shadow(4.dp, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
             color = Color.White
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp, horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF007AFF)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "G",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                if (gcashQrImage != null) {
+                    val bitmap = remember(gcashQrImage) {
+                        decodeBase64ToBitmap(gcashQrImage)
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "GCash QR Code",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            contentScale = ContentScale.FillWidth
                         )
                     }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "Gcash",
-                        color = Color(0xFF007AFF),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(180.dp)
-                        .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.qrcode),
-                        contentDescription = "GCash QR Code",
-                        modifier = Modifier.fillMaxSize(0.8f),
-                        contentScale = ContentScale.Fit
-                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Outlined.CheckCircleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = Color.LightGray
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No QR Configured",
+                                color = Color.Gray,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "M*** N****",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    text = "Transfer fees may apply.",
+                    color = Color.Gray,
+                    fontSize = 13.sp
                 )
 
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Text(
-                    text = "09*********",
-                    color = Color.Gray,
-                    fontSize = 14.sp
+                    text = branchName.ifBlank { "Fruitylicious" },
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1976D2)
                 )
+
+                if (gcashAccountName != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = gcashAccountName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.DarkGray
+                    )
+                }
+
+                if (gcashAccountNumber != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Mobile No.: $gcashAccountNumber",
+                        fontSize = 14.sp,
+                        color = Color(0xFF1976D2).copy(alpha = 0.7f)
+                    )
+                }
             }
         }
 
         if (!error.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(12.dp))
-
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = error,
                 color = Color.Red,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 textAlign = TextAlign.Center
             )
         }
@@ -646,33 +682,49 @@ fun GCashQRView(
             enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp),
+                .height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = GreenHeader),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-            Text(
-                text = if (isLoading) "Processing..." else "Confirm Payment Received",
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = "Confirm Payment Received",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
         }
 
         TextButton(
             onClick = onBack,
-            enabled = !isLoading
+            enabled = !isLoading,
+            modifier = Modifier.padding(top = 8.dp)
         ) {
             Text(
                 text = "Go back",
-                color = Color.Gray
+                color = Color.Gray,
+                fontSize = 14.sp
             )
         }
+    }
+}
+
+private fun decodeBase64ToBitmap(base64Str: String): Bitmap? {
+    return try {
+        val imageBytes = Base64.decode(base64Str, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+    } catch (e: Exception) {
+        null
     }
 }
 

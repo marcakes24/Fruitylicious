@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,8 +30,27 @@ fun BranchSelector(
     modifier: Modifier = Modifier,
     activeColor: Color = Color(0xFF2E7D32), // Default Fruitylicious Green
     containerColor: Color = Color(0xFFF5F5F5),
-    contentColor: Color = Color(0xFF666E7A)
+    contentColor: Color = Color(0xFF666E7A),
+    localBranchId: Int? = null
 ) {
+    // Ensure displayBranches contains at least the local branch if provided
+    val displayBranches = remember(branches, localBranchId) {
+        if (localBranchId != null && branches.none { it.branchId == localBranchId }) {
+            val localBranch = BranchEntity(
+                branchId = localBranchId,
+                branchName = "Local Branch",
+                address = "",
+                contactNumber = "",
+                lastModified = 0L,
+                isSynced = true,
+                syncedAt = null
+            )
+            (branches + localBranch).sortedBy { it.branchId }
+        } else {
+            branches.sortedBy { it.branchId }
+        }
+    }
+
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -47,11 +67,11 @@ fun BranchSelector(
             onClick = { onBranchSelected(null) }
         )
 
-        branches.forEach { branch ->
+        displayBranches.forEach { branch ->
             BranchSelectorTab(
                 label = "B${branch.branchId}",
                 isSelected = selectedBranchId == branch.branchId,
-                enabled = isOnline,
+                enabled = isOnline || branch.branchId == localBranchId,
                 activeColor = activeColor,
                 contentColor = contentColor,
                 onClick = { onBranchSelected(branch.branchId) }

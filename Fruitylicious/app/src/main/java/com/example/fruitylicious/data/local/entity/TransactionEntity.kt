@@ -1,5 +1,6 @@
 package com.example.fruitylicious.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -36,6 +37,8 @@ data class TransactionEntity(
     val userId: Int,
     val branchId: Int,
     val totalAmount: Double,
+    @ColumnInfo(name = "transaction_name")
+    val transactionName: String?,
     val paymentType: String,
     val dateTime: Long,
     val status: String,

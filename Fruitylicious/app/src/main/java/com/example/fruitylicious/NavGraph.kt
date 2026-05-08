@@ -26,6 +26,7 @@ import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
 import com.example.fruitylicious.ui.admin.ingredients.ManageIngredientsScreen
 import com.example.fruitylicious.ui.admin.products.ManageProductsScreen
 import com.example.fruitylicious.ui.admin.recipes.RecipeManagementScreen
+import com.example.fruitylicious.ui.admin.settings.BranchSettingsScreen
 import com.example.fruitylicious.ui.admin.reports.ReportsScreen
 import com.example.fruitylicious.ui.admin.staffmanagement.StaffLogScreen as AdminStaffLogScreen
 import com.example.fruitylicious.ui.admin.system.AuditLogScreen
@@ -76,6 +77,7 @@ const val ADMIN_REPORTS_DASHBOARD = "admin_reports_dashboard"
 const val ADMIN_AUDIT_LOGS = "admin_audit_logs"
 const val ADMIN_QUEUE = "admin_queue"
 const val ADMIN_NOTIFICATIONS = "admin_notifications"
+const val ADMIN_BRANCH_SETTINGS = "admin_branch_settings"
 const val TRANSACTION_HISTORY = "transaction_history"
 const val GUEST_SCREEN = "guest_screen"
 
@@ -505,6 +507,17 @@ fun FruityliciousNavGraph(
                 mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                }
+            )
+        }
+
+        composable(ADMIN_BRANCH_SETTINGS) {
+            BranchSettingsScreen(
+                navController = navController,
+                adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
                     navController.navigate(LOGIN) { popUpTo(0) }

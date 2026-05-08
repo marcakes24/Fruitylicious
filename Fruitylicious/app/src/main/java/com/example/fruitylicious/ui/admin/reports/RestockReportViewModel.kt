@@ -35,6 +35,8 @@ data class RestockReportUiState(
     val staffActivity: List<StaffRestockRow> = emptyList(),
     val topIngredients: List<RestockIngredientRow> = emptyList(),
     val frequencyItems: List<RestockFrequencyRow> = emptyList(),
+    val selectedUnit: String? = null,
+    val availableUnits: List<String> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val currentPage: Int = 0,
@@ -63,7 +65,8 @@ class RestockReportViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 period = period,
-                selectedDate = System.currentTimeMillis()
+                selectedDate = System.currentTimeMillis(),
+                selectedUnit = null
             )
         }
         loadReport(branchId)
@@ -74,9 +77,13 @@ class RestockReportViewModel @Inject constructor(
         branchId: Int?
     ) {
         _uiState.update {
-            it.copy(selectedDate = date)
+            it.copy(selectedDate = date, selectedUnit = null)
         }
         loadReport(branchId)
+    }
+
+    fun setUnitFilter(unit: String?) {
+        _uiState.update { it.copy(selectedUnit = unit) }
     }
 
     fun navigatePeriod(
@@ -302,6 +309,7 @@ class RestockReportViewModel @Inject constructor(
                     staffActivity = finalStaffActivity.sortedByDescending { it.count },
                     topIngredients = finalTopIngredients.sortedByDescending { it.totalQuantity },
                     frequencyItems = finalFreq.sortedByDescending { it.restockCount },
+                    availableUnits = finalTopIngredients.map { it.unitType }.distinct().sorted(),
                     isLoading = false
                 )
             }
@@ -351,6 +359,7 @@ class RestockReportViewModel @Inject constructor(
                     staffActivity = staffActivity,
                     topIngredients = topIngredients,
                     frequencyItems = frequencyItems,
+                    availableUnits = topIngredients.map { it.unitType }.distinct().sorted(),
                     isLoading = false,
                     hasMore = false,
                     error = null
@@ -443,6 +452,7 @@ class RestockReportViewModel @Inject constructor(
                         staffActivity = staffRows,
                         topIngredients = ingredientRows,
                         frequencyItems = frequencyRows,
+                        availableUnits = ingredientRows.map { it.unitType }.distinct().sorted(),
                         isLoading = false,
                         currentPage = 0,
                         hasMore = pageResponse.hasNext

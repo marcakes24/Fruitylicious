@@ -77,6 +77,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.FruityDateFilterField
+import com.example.fruitylicious.ui.shared.FruityDatePicker
+import com.example.fruitylicious.ui.shared.FruitySearchField
+import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.DateTimeUtil
@@ -165,33 +169,16 @@ fun WasteManagementScreen(
     }
 
     if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = {
-                showDatePicker = false
+        FruityDatePicker(
+            state = datePickerState,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { millis ->
+                selectedDateMillis = millis ?: 0L
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        selectedDateMillis = datePickerState.selectedDateMillis ?: 0L
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        selectedDateMillis = 0L
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("Clear")
-                }
+            onClear = {
+                selectedDateMillis = 0L
             }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+        )
     }
 
     ModalNavigationDrawer(
@@ -305,6 +292,9 @@ fun WasteManagementScreen(
                         selectedDateText = selectedDateText,
                         onDateClick = {
                             showDatePicker = true
+                        },
+                        onDateClear = {
+                            selectedDateMillis = 0L
                         }
                     )
                 }
@@ -422,7 +412,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = WsGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             }
         }
@@ -434,7 +425,8 @@ private fun FilterCard(
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     selectedDateText: String,
-    onDateClick: () -> Unit
+    onDateClick: () -> Unit,
+    onDateClear: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -446,74 +438,17 @@ private fun FilterCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedTextField(
+            FruitySearchField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        text = "Search ingredient, reason, or branch",
-                        color = Color.LightGray,
-                        fontSize = 14.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color.LightGray
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color(0xFFEEEEEE),
-                    focusedBorderColor = WsGreen
-                ),
-                singleLine = true
+                placeholder = "Search ingredient, reason, or branch"
             )
 
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = selectedDateText,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            text = "mm/dd/yyyy",
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = Color.LightGray
-                        )
-                    },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            tint = Color.Black
-                        )
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color(0xFFEEEEEE),
-                        focusedBorderColor = WsGreen
-                    )
-                )
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable {
-                            onDateClick()
-                        }
-                )
-            }
+            FruityDateFilterField(
+                selectedDateText = selectedDateText,
+                onClick = onDateClick,
+                onClear = onDateClear
+            )
         }
     }
 }
@@ -714,9 +649,19 @@ private fun WasteEntryDialog(
     var quantity by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
-    var dropdownWidth by remember { mutableStateOf(0.dp) }
+    var ingredientSearchQuery by remember { mutableStateOf("") }
+
+    val filteredIngredients = remember(ingredients, ingredientSearchQuery) {
+        if (ingredientSearchQuery.isEmpty()) {
+            ingredients
+        } else {
+            ingredients.filter {
+                it.ingredientName.contains(ingredientSearchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     val context = LocalContext.current
-    val density = LocalDensity.current
 
     var selectedImageUri by remember {
         mutableStateOf<Uri?>(null)
@@ -780,92 +725,40 @@ private fun WasteEntryDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Ingredient",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF334155)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = selectedIngredient?.ingredientName ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onGloballyPositioned { coordinates ->
-                                dropdownWidth = with(density) { coordinates.size.width.toDp() }
-                            },
-                        placeholder = {
+                FruitySearchableDropdown(
+                    value = ingredientSearchQuery.ifEmpty { selectedIngredient?.ingredientName ?: "" },
+                    onValueChange = {
+                        ingredientSearchQuery = it
+                        if (it.isEmpty()) selectedIngredient = null
+                    },
+                    options = filteredIngredients,
+                    onOptionClick = {
+                        selectedIngredient = it
+                        ingredientSearchQuery = it.ingredientName
+                    },
+                    label = "Ingredient",
+                    expanded = dropdownExpanded,
+                    onExpandedChange = { dropdownExpanded = it },
+                    placeholder = "Choose an ingredient",
+                    itemContent = { ingredient ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "Choose an ingredient",
-                                color = Color.LightGray
+                                text = ingredient.ingredientName,
+                                fontSize = 14.sp,
+                                color = Color(0xFF334155)
                             )
-                        },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null
+
+                            Text(
+                                text = "${formatQuantity(ingredient.currentStock)} ${ingredient.unitType}",
+                                fontSize = 12.sp,
+                                color = Color.Gray
                             )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color(0xFFCBD5E1),
-                            focusedBorderColor = WsGreen
-                        )
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable {
-                                dropdownExpanded = true
-                            }
-                    )
-
-                    DropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = {
-                            dropdownExpanded = false
-                        },
-                        modifier = Modifier
-                            .width(dropdownWidth)
-                            .background(Color.White)
-                            .heightIn(max = 400.dp)
-                    ) {
-                        ingredients.forEach { ingredient ->
-                            key(ingredient.ingredientId) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = ingredient.ingredientName,
-                                                fontSize = 14.sp,
-                                                color = Color(0xFF334155)
-                                            )
-
-                                            Text(
-                                                text = "${formatQuantity(ingredient.currentStock)} ${ingredient.unitType}",
-                                                fontSize = 12.sp,
-                                                color = Color.Gray
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        selectedIngredient = ingredient
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
                         }
                     }
-                }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 

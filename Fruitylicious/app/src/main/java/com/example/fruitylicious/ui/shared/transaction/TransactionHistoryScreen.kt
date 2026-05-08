@@ -117,6 +117,7 @@ fun TransactionHistoryScreen(
         val matchesSearch =
             transaction.displayId.contains(searchQuery, ignoreCase = true) ||
                     transaction.transactionId.contains(searchQuery, ignoreCase = true) ||
+                    transaction.transactionName?.contains(searchQuery, ignoreCase = true) == true ||
                     transaction.staffName.contains(searchQuery, ignoreCase = true) ||
                     transaction.username.contains(searchQuery, ignoreCase = true)
 
@@ -192,6 +193,7 @@ fun TransactionHistoryScreen(
                 canAccessCrossBranch = uiState.canAccessCrossBranch,
                 isOnline = uiState.isOnline,
                 branches = uiState.branches,
+                localBranchId = uiState.localBranchId,
                 onBranchSelect = {
                     viewModel.onBranchSelected(it)
                     viewModel.clearMessages()
@@ -300,6 +302,7 @@ private fun Header(
     canAccessCrossBranch: Boolean,
     isOnline: Boolean,
     branches: List<BranchEntity>,
+    localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -332,7 +335,8 @@ private fun Header(
                     isOnline = isOnline,
                     onBranchSelected = onBranchSelect,
                     activeColor = ThGreen,
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = Color(0xFFF5F5F5),
+                    localBranchId = localBranchId
                 )
             } else {
                 selectedBranchId?.let { id ->
@@ -372,7 +376,7 @@ private fun FilterCard(
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
                     Text(
-                        text = "Search transaction or staff",
+                        text = "Search name, ID, or staff",
                         color = Color.LightGray,
                         fontSize = 14.sp
                     )
@@ -543,11 +547,19 @@ private fun TransactionListItem(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = transaction.displayId,
+                text = transaction.transactionName?.ifBlank { null } ?: transaction.displayId,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = ThTextMain
             )
+
+            if (!transaction.transactionName.isNullOrBlank()) {
+                Text(
+                    text = transaction.displayId,
+                    fontSize = 11.sp,
+                    color = ThTextSub
+                )
+            }
 
             Text(
                 text = if (isVoid) "Void" else "Completed",
@@ -640,11 +652,19 @@ private fun TransactionDetailsDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = transaction.displayId,
+                    text = transaction.transactionName?.ifBlank { null } ?: transaction.displayId,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = ThTextMain
                 )
+
+                if (!transaction.transactionName.isNullOrBlank()) {
+                    Text(
+                        text = transaction.displayId,
+                        fontSize = 12.sp,
+                        color = ThTextSub
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
