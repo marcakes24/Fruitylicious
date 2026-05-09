@@ -34,7 +34,7 @@ class UserRepository @Inject constructor(
     }
 
     suspend fun getUserByUsername(username: String): UserEntity? {
-        return userDao.getUserByUsername(username.trim())
+        return userDao.getUserByUsername(username.trim().lowercase())
     }
 
     suspend fun saveUser(
@@ -46,7 +46,7 @@ class UserRepository @Inject constructor(
     ): Result<Unit> {
         val cleanName = name.trim()
         val cleanRole = role.trim().lowercase()
-        val cleanUsername = username.trim()
+        val cleanUsername = username.trim().lowercase()
 
         if (cleanName.isBlank()) {
             return Result.failure(IllegalArgumentException("Name is required."))

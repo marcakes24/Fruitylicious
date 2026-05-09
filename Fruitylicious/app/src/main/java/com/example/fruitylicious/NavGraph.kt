@@ -212,8 +212,9 @@ fun FruityliciousNavGraph(
                     }
 
                     navController.navigate(destination) {
-                        popUpTo(STAFF_POS) {
-                            inclusive = true
+                        val popToRoute = if (sessionManager.isAdmin()) ADMIN_DASHBOARD else STAFF_DASHBOARD
+                        popUpTo(popToRoute) {
+                            inclusive = false
                         }
                         launchSingleTop = true
                     }

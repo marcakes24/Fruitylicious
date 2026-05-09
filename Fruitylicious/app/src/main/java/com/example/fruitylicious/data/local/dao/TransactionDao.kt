@@ -221,8 +221,9 @@ interface TransactionDao {
         to: Long
     ): Int
 
-    @Query("SELECT * FROM transactions ORDER BY dateTime DESC")
-    fun observeAllTransactions(): Flow<List<TransactionEntity>>
+    @Transaction
+    @Query("SELECT * FROM transactions ORDER BY dateTime DESC LIMIT 300")
+    fun observeRecentTransactionsWithItems(): Flow<List<TransactionWithItems>>
 
     @Query("SELECT * FROM transactions ORDER BY dateTime DESC LIMIT :limit OFFSET :offset")
     suspend fun getTransactionsPaged(limit: Int, offset: Int): List<TransactionEntity>

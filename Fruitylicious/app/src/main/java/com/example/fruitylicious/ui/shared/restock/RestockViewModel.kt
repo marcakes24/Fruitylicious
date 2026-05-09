@@ -32,7 +32,8 @@ data class RestockIngredientRow(
     val branchId: Int,
     val ingredientName: String,
     val currentStock: Double,
-    val unitType: String
+    val unitType: String,
+    val imagePath: String? = null
 )
 
 data class RestockHistoryRow(
@@ -43,7 +44,8 @@ data class RestockHistoryRow(
     val unitType: String,
     val branchId: Int,
     val branchName: String,
-    val dateTime: Long
+    val dateTime: Long,
+    val imagePath: String? = null
 )
 
 data class RestockUiState(
@@ -143,7 +145,8 @@ class RestockViewModel @Inject constructor(
                         branchId = localBranchId,
                         ingredientName = ingredient.ingredientName,
                         currentStock = inv?.currentStock ?: 0.0,
-                        unitType = ingredient.unitType
+                        unitType = ingredient.unitType,
+                        imagePath = ingredient.image
                     )
                 }.sortedBy { it.ingredientName.lowercase() }
 
@@ -173,7 +176,7 @@ class RestockViewModel @Inject constructor(
     private fun buildHistoryRows(entities: List<RestockLogEntity>, ingredients: List<IngredientEntity>): List<RestockHistoryRow> {
         val state = _uiState.value
         val ingredientMap = ingredients.associateBy { it.ingredientId }
-        
+
         return entities
             .filter { log ->
                 state.selectedBranchId == null || log.branchId == state.selectedBranchId
@@ -192,7 +195,8 @@ class RestockViewModel @Inject constructor(
                     unitType = ingredient?.unitType ?: "",
                     branchId = log.branchId,
                     branchName = branchName,
-                    dateTime = log.dateTime
+                    dateTime = log.dateTime,
+                    imagePath = ingredient?.image
                 )
             }
     }
@@ -333,7 +337,8 @@ class RestockViewModel @Inject constructor(
                             unitType = item.unitType,
                             branchId = item.branchId ?: state.selectedBranchId ?: 0,
                             branchName = branches.firstOrNull { it.branchId == item.branchId }?.branchName ?: "Remote Branch",
-                            dateTime = item.dateTime
+                            dateTime = item.dateTime,
+                            imagePath = item.image
                         )
                     }
 

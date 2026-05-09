@@ -85,7 +85,8 @@ data class RestockReportItemDto(
     val userId: Int,
     val userName: String,
     val branchId: Int? = null,
-    val dateTime: Long
+    val dateTime: Long,
+    val image: String? = null
 )
 
 data class TransactionReportDto(

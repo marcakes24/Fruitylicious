@@ -309,7 +309,7 @@ fun AdjustmentEntryDialog(
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .verticalScroll(rememberScrollState()), 
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
@@ -378,9 +378,9 @@ fun AdjustmentEntryDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = quantity, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) quantity = it },
-                        modifier = Modifier.fillMaxWidth(), 
+                        modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Enter quantity", color = Color.LightGray) },
-                        shape = RoundedCornerShape(12.dp), 
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color(0xFFE2E8F0),
                             focusedBorderColor = IaGreen
@@ -394,7 +394,7 @@ fun AdjustmentEntryDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = reason, onValueChange = { reason = it }, 
-                        modifier = Modifier.fillMaxWidth().height(90.dp), 
+                        modifier = Modifier.fillMaxWidth().height(90.dp),
                         placeholder = { Text("Enter reason for adjustment", color = Color.LightGray) },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -408,7 +408,7 @@ fun AdjustmentEntryDialog(
                     onClick = { selectedIngredient?.let { onSubmit(it, adjustmentType, quantity, reason) } },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = isFormValid,
-                    shape = RoundedCornerShape(12.dp), 
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = IaGreen,
                         disabledContainerColor = Color(0xFFCBD5E1)
@@ -422,11 +422,11 @@ fun AdjustmentEntryDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Submit Adjustment", 
+                        "Submit Adjustment",
                         color = if (isFormValid) Color.White else Color(0xFF94A3B8),
-                        fontSize = 15.sp, 
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
-                    ) 
+                    )
                 }
             }
         }
@@ -481,7 +481,7 @@ private fun AdjustmentTypeButton(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = label, textAlign = TextAlign.Center, fontSize = 13.sp, 
+                text = label, textAlign = TextAlign.Center, fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) selectedColor else Color.Gray, lineHeight = 16.sp
             )
@@ -496,8 +496,8 @@ private fun RecentAdjustmentsCard(items: List<AdjustmentHistoryRow>, isLoading: 
             Text("Adjustment History", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
             HorizontalDivider(color = Color(0xFFF1F5F9))
             if (isLoading && items.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { 
-                    androidx.compose.material3.CircularProgressIndicator(color = IaGreen) 
+                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
                 }
             } else if (items.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { Text("No records found", color = Color.Gray) }

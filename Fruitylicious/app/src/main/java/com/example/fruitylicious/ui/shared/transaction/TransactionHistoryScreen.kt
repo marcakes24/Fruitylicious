@@ -113,26 +113,35 @@ fun TransactionHistoryScreen(
         }
     }
 
-    val filteredTransactions = uiState.transactions.filter { transaction ->
-        val matchesSearch =
-            transaction.displayId.contains(searchQuery, ignoreCase = true) ||
-                    transaction.transactionId.contains(searchQuery, ignoreCase = true) ||
-                    transaction.transactionName?.contains(searchQuery, ignoreCase = true) == true ||
-                    transaction.staffName.contains(searchQuery, ignoreCase = true) ||
-                    transaction.username.contains(searchQuery, ignoreCase = true)
+    val filteredTransactions = remember(uiState.transactions, searchQuery, selectedBranchId, selectedDateMillis) {
+        val selectedDateCal = if (selectedDateMillis != 0L) {
+            Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+        } else null
 
-        val matchesBranch = when (selectedBranchId) {
-            null -> true // All
-            else -> transaction.branchId == selectedBranchId
+        uiState.transactions.filter { transaction ->
+            val matchesSearch = if (searchQuery.isBlank()) true else {
+                transaction.displayId.contains(searchQuery, ignoreCase = true) ||
+                        transaction.transactionId.contains(searchQuery, ignoreCase = true) ||
+                        transaction.transactionName?.contains(searchQuery, ignoreCase = true) == true ||
+                        transaction.staffName.contains(searchQuery, ignoreCase = true) ||
+                        transaction.username.contains(searchQuery, ignoreCase = true)
+            }
+
+            val matchesBranch = when (selectedBranchId) {
+                null -> true // All
+                else -> transaction.branchId == selectedBranchId
+            }
+
+            val matchesDate = if (selectedDateCal == null) {
+                true
+            } else {
+                val tCal = Calendar.getInstance().apply { timeInMillis = transaction.dateTime }
+                tCal.get(Calendar.YEAR) == selectedDateCal.get(Calendar.YEAR) &&
+                        tCal.get(Calendar.DAY_OF_YEAR) == selectedDateCal.get(Calendar.DAY_OF_YEAR)
+            }
+
+            matchesSearch && matchesBranch && matchesDate
         }
-
-        val matchesDate = if (selectedDateMillis == 0L) {
-            true
-        } else {
-            isSameDay(transaction.dateTime, selectedDateMillis)
-        }
-
-        matchesSearch && matchesBranch && matchesDate
     }
 
     if (showDatePicker) {
@@ -691,7 +700,11 @@ private fun TransactionDetailsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = Color(0xFFEEEEEE),
+                    thickness = 1.dp
+                )
 
                 DetailItem("Total Amount", "₱${String.format(Locale.US, "%,.2f", transaction.totalAmount)}", isAmount = true)
                 DetailItem("Payment Method", transaction.paymentType)
@@ -849,17 +862,4 @@ private fun formatDateTime(timestamp: Long): String {
 
 private fun formatFullDateTime(timestamp: Long): String {
     return SimpleDateFormat("MMMM dd, yyyy - hh:mm a", Locale.US).format(Date(timestamp))
-}
-
-private fun isSameDay(firstMillis: Long, secondMillis: Long): Boolean {
-    val first = Calendar.getInstance().apply {
-        timeInMillis = firstMillis
-    }
-
-    val second = Calendar.getInstance().apply {
-        timeInMillis = secondMillis
-    }
-
-    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
-            first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
 }

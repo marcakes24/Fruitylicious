@@ -21,7 +21,7 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE userId = :userId AND isDeleted = 0 LIMIT 1")
     suspend fun getUserById(userId: Int): UserEntity?
 
-    @Query("SELECT * FROM users WHERE username = :username AND isDeleted = 0 LIMIT 1")
+    @Query("SELECT * FROM users WHERE LOWER(username) = LOWER(:username) AND isDeleted = 0 LIMIT 1")
     suspend fun getUserByUsername(username: String): UserEntity?
 
     @Query("SELECT * FROM users WHERE role = :role AND isDeleted = 0 ORDER BY name ASC")
@@ -48,7 +48,7 @@ interface UserDao {
     @Query(
         """
     SELECT * FROM users
-    WHERE username = :username
+    WHERE LOWER(username) = LOWER(:username)
     AND password = :password
     AND isDeleted = 0
     LIMIT 1

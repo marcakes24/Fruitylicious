@@ -32,6 +32,8 @@ data class CheckoutUiState(
     val receiptItems: List<CheckoutReceiptItem> = emptyList(),
     val transactionId: String = "",
     val branchName: String = "",
+    val branchAddress: String = "",
+    val branchContact: String = "",
     val gcashAccountName: String? = null,
     val gcashAccountNumber: String? = null,
     val gcashQrImage: String? = null,
@@ -40,6 +42,7 @@ data class CheckoutUiState(
     val receivedAmount: Double = 0.0,
     val change: Double = 0.0,
     val completedAt: Long = 0L,
+    val servedBy: String = "",
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -60,6 +63,7 @@ class CheckoutViewModel @Inject constructor(
     init {
         observeCart()
         loadBranchInfo()
+        _uiState.update { it.copy(servedBy = sessionManager.getUserName()) }
     }
 
     private fun loadBranchInfo() {
@@ -69,6 +73,8 @@ class CheckoutViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         branchName = branch.branchName,
+                        branchAddress = branch.address,
+                        branchContact = branch.contactNumber,
                         gcashAccountName = branch.gcashAccountName,
                         gcashAccountNumber = branch.gcashAccountNumber,
                         gcashQrImage = branch.gcashQrImage,

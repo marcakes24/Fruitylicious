@@ -75,7 +75,7 @@ class LoginViewModel @Inject constructor(
 
     fun login() {
         val currentState = _uiState.value
-        val username = currentState.username.trim()
+        val username = currentState.username.trim().lowercase()
         val password = currentState.password
 
         val usernameError = if (username.isBlank()) {

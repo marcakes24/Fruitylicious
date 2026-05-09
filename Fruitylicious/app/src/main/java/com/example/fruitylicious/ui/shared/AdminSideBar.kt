@@ -53,7 +53,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.fruitylicious.ADMIN_ADJUSTMENT
 import com.example.fruitylicious.ADMIN_AUDIT_LOGS
@@ -467,11 +466,13 @@ private fun ownerNavigateTo(
 
     if (route == currentRoute) return
 
+    val isDashboard = route == ADMIN_DASHBOARD
+
     navController.navigate(route) {
-        popUpTo(navController.graph.findStartDestination().id) {
+        popUpTo(ADMIN_DASHBOARD) {
             saveState = true
         }
         launchSingleTop = true
-        restoreState = true
+        restoreState = !isDashboard
     }
 }

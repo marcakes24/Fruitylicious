@@ -123,7 +123,7 @@ fun WasteManagementScreen(
     val filteredHistory = remember(uiState.history, searchQuery, selectedDateMillis) {
         val query = searchQuery.trim()
         val hasDateFilter = selectedDateMillis != 0L
-        
+
         val range = if (hasDateFilter) {
             val cal = Calendar.getInstance().apply {
                 timeInMillis = selectedDateMillis
@@ -314,7 +314,7 @@ fun WasteManagementScreen(
                             .heightIn(max = 600.dp),
                         contentScale = androidx.compose.ui.layout.ContentScale.Fit
                     )
-                    
+
                     IconButton(
                         onClick = { expandedImageFile = null },
                         modifier = Modifier.padding(8.dp)
@@ -669,12 +669,12 @@ private fun WasteEntryDialog(
         selectedImageUri = uri
     }
 
-    val isFormValid by remember { 
-        derivedStateOf { 
-            selectedIngredient != null && 
-            quantity.isNotBlank() && 
-            selectedImageUri != null 
-        } 
+    val isFormValid by remember {
+        derivedStateOf {
+            selectedIngredient != null &&
+            quantity.isNotBlank() &&
+            selectedImageUri != null
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {

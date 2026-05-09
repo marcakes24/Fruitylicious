@@ -153,7 +153,7 @@ class WasteManagementViewModel @Inject constructor(
     private fun buildHistoryRows(entities: List<WasteLogEntity>, ingredients: List<IngredientEntity>): List<WasteHistoryRow> {
         val state = _uiState.value
         val ingredientMap = ingredients.associateBy { it.ingredientId }
-        
+
         return entities
             .filter { log ->
                 state.selectedBranchId == null || log.branchId == state.selectedBranchId

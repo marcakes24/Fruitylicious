@@ -59,7 +59,7 @@ class UserManagementViewModel @Inject constructor(
         role: String
     ) {
         val cleanName = name.trim()
-        val cleanUsername = username.trim()
+        val cleanUsername = username.trim().lowercase()
         val cleanRole = role.lowercase()
 
         if (cleanName.isBlank()) {

@@ -32,7 +32,7 @@ class AuthRepository @Inject constructor(
         username: String,
         password: String
     ): LoginResult = withContext(Dispatchers.IO) {
-        val trimmedUsername = username.trim()
+        val trimmedUsername = username.trim().lowercase()
 
         if (trimmedUsername.isBlank() || password.isBlank()) {
             return@withContext LoginResult.Error("Username and password are required.")

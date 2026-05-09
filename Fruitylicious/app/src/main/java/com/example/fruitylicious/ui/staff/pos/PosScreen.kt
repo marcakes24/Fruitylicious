@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -79,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.fruitylicious.STAFF_CHECKOUT
@@ -294,7 +296,7 @@ fun PosScreen(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(16.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -660,11 +662,17 @@ private fun ProductCustomizeDialog(
 
     val isStockAvailable = insufficientIngredients.isEmpty()
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = Color.White,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .imePadding()
         ) {
             Column(
                 modifier = Modifier
@@ -1136,6 +1144,8 @@ private fun ProductCustomizeDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1179,7 +1189,7 @@ private fun ProductCustomizeDialog(
                         modifier = Modifier
                             .height(54.dp)
                             .weight(1f)
-                            .padding(start = 24.dp),
+                            .padding(start = 20.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (hasRecipe && isStockAvailable) {
                                 GreenPrimary
@@ -1187,20 +1197,15 @@ private fun ProductCustomizeDialog(
                                 Color.LightGray
                             }
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
                         Text(
                             text = "Add to Order",
                             fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -1452,7 +1457,7 @@ private fun CartPanel(
         color = Color.White,
         shadowElevation = 8.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 0.dp)) {
             if (cartItems.isEmpty()) {
                 Column(
                     modifier = Modifier

@@ -316,7 +316,7 @@ class InventoryAdjustmentViewModel @Inject constructor(
         val state = _uiState.value
         val from = state.startDate ?: 0L
         val to = state.endDate ?: System.currentTimeMillis()
-        
+
         val items = if (state.selectedBranchId == null) {
             adjustmentDao.getAdjustmentsByDateRangeAllBranches(from, to)
         } else {

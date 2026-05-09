@@ -211,6 +211,10 @@ fun CheckoutScreen(
                             paymentMethod = uiState.paymentType,
                             transactionId = uiState.transactionId,
                             completedAt = uiState.completedAt,
+                            servedBy = uiState.servedBy,
+                            branchName = uiState.branchName,
+                            branchAddress = uiState.branchAddress,
+                            branchContact = uiState.branchContact,
                             onNewOrder = {
                                 onNavigate(STAFF_POS)
                             },
@@ -461,6 +465,7 @@ fun CheckoutForm(
                     listOf("100", "200", "500", "1000").forEach { value ->
                         AmountPresetButton(
                             label = "₱$value",
+                            isSelected = amountReceived == value,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 onAmountChange(value)
@@ -470,8 +475,8 @@ fun CheckoutForm(
 
                     AmountPresetButton(
                         label = "Exact",
+                        isSelected = amountReceived == totalAmount.toString() || (amountReceived.toDoubleOrNull() ?: -1.0) == totalAmount,
                         modifier = Modifier.weight(1f),
-                        isExact = true,
                         onClick = {
                             onAmountChange(totalAmount.toString())
                         }
@@ -738,6 +743,10 @@ fun PaymentSuccessView(
     paymentMethod: String,
     transactionId: String,
     completedAt: Long,
+    servedBy: String,
+    branchName: String = "",
+    branchAddress: String = "",
+    branchContact: String = "",
     onNewOrder: () -> Unit,
     onViewQueue: () -> Unit
 ) {
@@ -789,17 +798,17 @@ fun PaymentSuccessView(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "FRUITYLICIOUS",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 24.sp,
-                    color = RptGreen
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Fruitylicious Logo",
+                    modifier = Modifier.height(80.dp),
+                    contentScale = ContentScale.Fit
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text("Fruits and Shakes Station", fontSize = 12.sp, color = Color.Gray)
-                Text("Diliman, Quezon City", fontSize = 11.sp, color = Color.Gray)
+                Text(branchName.ifBlank { "Fruits and Shakes Station" }, fontSize = 12.sp, color = Color.Gray)
+                Text(branchAddress.ifBlank { "Diliman, Quezon City" }, fontSize = 11.sp, color = Color.Gray)
 
                 Text(
                     text = SimpleDateFormat("M/dd/yyyy • h:mm a", Locale.US).format(
@@ -819,7 +828,7 @@ fun PaymentSuccessView(
                     )
                 }
 
-                Text("Tel: 091-237577", fontSize = 11.sp, color = Color.Gray)
+                Text("Tel: ${branchContact.ifBlank { "091-237577" }}", fontSize = 11.sp, color = Color.Gray)
 
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = Color(0xFFEEEEEE))
@@ -882,7 +891,7 @@ fun PaymentSuccessView(
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                Text("Served by: Staff User", fontSize = 11.sp, color = Color.Gray)
+                Text("Served by: $servedBy", fontSize = 11.sp, color = Color.Gray)
 
                 Text(
                     text = "Thank you for choosing Fruitylicious!",
@@ -1041,8 +1050,8 @@ fun PaymentMethodButton(
 @Composable
 fun AmountPresetButton(
     label: String,
+    isSelected: Boolean,
     modifier: Modifier = Modifier,
-    isExact: Boolean = false,
     onClick: () -> Unit
 ) {
     Surface(
@@ -1050,10 +1059,10 @@ fun AmountPresetButton(
             .height(38.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
-        color = if (isExact) RptGreenLight else Color.White,
+        color = if (isSelected) RptGreenLight else Color.White,
         border = BorderStroke(
             width = 1.dp,
-            color = if (isExact) GreenHeader else Color(0xFFEEEEEE)
+            color = if (isSelected) GreenHeader else Color(0xFFEEEEEE)
         )
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -1061,7 +1070,7 @@ fun AmountPresetButton(
                 text = label,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isExact) GreenHeader else Color.DarkGray
+                color = if (isSelected) GreenHeader else Color.DarkGray
             )
         }
     }

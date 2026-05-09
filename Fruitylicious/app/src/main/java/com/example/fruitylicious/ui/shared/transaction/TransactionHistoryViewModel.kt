@@ -9,14 +9,12 @@ import com.example.fruitylicious.data.local.dao.ProductDao
 import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
+import com.example.fruitylicious.data.local.dao.TransactionWithItems
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.ProductEntity
-import com.example.fruitylicious.data.local.entity.TransactionEntity
-import com.example.fruitylicious.data.local.entity.TransactionItemAddonEntity
-import com.example.fruitylicious.data.local.entity.TransactionItemEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.BranchConfig
@@ -31,9 +29,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 data class TransactionHistoryItemRow(
     val transactionItemId: String,
@@ -79,8 +79,6 @@ data class TransactionHistoryUiState(
 class TransactionHistoryViewModel @Inject constructor(
     private val database: PosDatabase,
     private val transactionDao: TransactionDao,
-    private val transactionItemDao: TransactionItemDao,
-    private val transactionItemAddonDao: TransactionItemAddonDao,
     private val productDao: ProductDao,
     private val userDao: UserDao,
     private val auditLogDao: AuditLogDao,
@@ -91,7 +89,7 @@ class TransactionHistoryViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
 
     private val _uiState = MutableStateFlow(
         TransactionHistoryUiState(
@@ -138,17 +136,17 @@ class TransactionHistoryViewModel @Inject constructor(
     private fun observeLocalData() {
         viewModelScope.launch {
             combine(
-                transactionDao.observeAllTransactions(),
-                transactionItemDao.observeAllTransactionItems(),
-                transactionItemAddonDao.observeAllTransactionItemAddons(),
-                productDao.observeProducts(),
-                userDao.observeUsers()
-            ) { transactions, items, addons, products, users ->
-                buildHistoryRows(transactions, items, addons, products, users)
-            }.combine(refreshTrigger) { rows, _ ->
-                rows
-            }.collect { rows ->
+                transactionDao.observeRecentTransactionsWithItems(),
+                productDao.observeProducts().distinctUntilChanged(),
+                userDao.observeUsers().distinctUntilChanged(),
+                refreshTrigger
+            ) { transactionsWithItems, products, users, _ ->
+                Triple(transactionsWithItems, products, users)
+            }
+            .flowOn(Dispatchers.Default)
+            .collect { (transactionsWithItems, products, users) ->
                 val state = _uiState.value
+                val rows = buildHistoryRows(transactionsWithItems, products, users)
                 
                 // Show local data if:
                 // 1. Local branch selected
@@ -169,46 +167,40 @@ class TransactionHistoryViewModel @Inject constructor(
     }
 
     private fun buildHistoryRows(
-        transactions: List<TransactionEntity>,
-        items: List<TransactionItemEntity>,
-        addons: List<TransactionItemAddonEntity>,
+        transactionsWithItems: List<TransactionWithItems>,
         products: List<ProductEntity>,
         users: List<UserEntity>
     ): List<TransactionHistoryRow> {
         val state = _uiState.value
         val userMap = users.associateBy { it.userId }
         val productMap = products.associateBy { it.productId }
-        val itemsByTransaction = items.groupBy { it.transactionId }
-        val addonsByItem = addons.groupBy { it.transactionItemId }
 
-        return transactions
-            .filter { transaction ->
-                state.selectedBranchId == null || transaction.branchId == state.selectedBranchId
+        return transactionsWithItems
+            .filter { twi ->
+                state.selectedBranchId == null || twi.transaction.branchId == state.selectedBranchId
             }
             .take(PAGE_SIZE + (state.currentPage * PAGE_SIZE))
-            .map { transaction ->
+            .map { twi ->
+                val transaction = twi.transaction
                 val user = userMap[transaction.userId]
 
-                val itemRows = itemsByTransaction[transaction.transactionId]
-                    .orEmpty()
-                    .map { item ->
-                        val product = productMap[item.productId]
+                val itemRows = twi.items.map { iwa ->
+                    val item = iwa.item
+                    val product = productMap[item.productId]
 
-                        val addonNames = addonsByItem[item.transactionItemId]
-                            .orEmpty()
-                            .mapNotNull { addon ->
-                                productMap[addon.addonProductId]?.productName
-                            }
-
-                        TransactionHistoryItemRow(
-                            transactionItemId = item.transactionItemId,
-                            productName = product?.productName ?: "Unknown Product",
-                            sizeName = item.sizeName ?: "",
-                            quantity = item.quantity,
-                            subtotal = item.subtotal,
-                            addons = addonNames
-                        )
+                    val addonNames = iwa.addons.mapNotNull { addon ->
+                        productMap[addon.addonProductId]?.productName
                     }
+
+                    TransactionHistoryItemRow(
+                        transactionItemId = item.transactionItemId,
+                        productName = product?.productName ?: "Unknown Product",
+                        sizeName = item.sizeName ?: "",
+                        quantity = item.quantity,
+                        subtotal = item.subtotal,
+                        addons = addonNames
+                    )
+                }
 
                 TransactionHistoryRow(
                     transactionId = transaction.transactionId,
