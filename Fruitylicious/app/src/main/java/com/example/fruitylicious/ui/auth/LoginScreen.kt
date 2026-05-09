@@ -217,7 +217,49 @@ fun LoginScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = "By logging in, you agree to our Terms and Conditions and Privacy Policy. All data entered is confidential and used solely for business record keeping purposes. Unauthorized use of this system is strictly prohibited.",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        lineHeight = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Checkbox(
+                            checked = uiState.agreedToTerms,
+                            onCheckedChange = viewModel::onTermsAgreedChanged,
+                            colors = CheckboxDefaults.colors(checkedColor = GreenDark)
+                        )
+                        Text(
+                            text = "I have read and agree to the Terms and Conditions",
+                            fontSize = 12.sp,
+                            color = BrownText,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    val termsError = uiState.termsError
+                    if (!termsError.isNullOrBlank()) {
+                        Text(
+                            text = termsError,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 11.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
                         onClick = viewModel::login,

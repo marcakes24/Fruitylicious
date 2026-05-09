@@ -14,6 +14,9 @@ import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Calendar
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +60,7 @@ class RestockReportViewModel @Inject constructor(
     val uiState: StateFlow<RestockReportUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 50
+    private var reportJob: kotlinx.coroutines.Job? = null
 
     fun setPeriod(
         period: String,
@@ -106,7 +110,10 @@ class RestockReportViewModel @Inject constructor(
     fun loadReport(
         branchId: Int?
     ) {
-        viewModelScope.launch {
+        reportJob?.cancel()
+        reportJob = viewModelScope.launch {
+            delay(300) // Debounce branch selection
+            
             val state = _uiState.value
             val range = getRange(state.period, state.selectedDate)
 
@@ -379,20 +386,27 @@ class RestockReportViewModel @Inject constructor(
         branchId: Int?,
         from: Long,
         to: Long
-    ) {
-        val summaryResult = reportRepository.getRestockSummary(
-            branchId = branchId,
-            from = from,
-            to = to
-        )
+    ) = coroutineScope {
+        val summaryDeferred = async {
+            reportRepository.getRestockSummary(
+                branchId = branchId,
+                from = from,
+                to = to
+            )
+        }
 
-        val pageResult = reportRepository.getRestockPage(
-            branchId = branchId,
-            from = from,
-            to = to,
-            page = 0,
-            size = PAGE_SIZE
-        )
+        val pageDeferred = async {
+            reportRepository.getRestockPage(
+                branchId = branchId,
+                from = from,
+                to = to,
+                page = 0,
+                size = PAGE_SIZE
+            )
+        }
+
+        val summaryResult = summaryDeferred.await()
+        val pageResult = pageDeferred.await()
 
         summaryResult.fold(
             onSuccess = { summary ->

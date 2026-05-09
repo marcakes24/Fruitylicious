@@ -84,6 +84,7 @@ data class RestockReportItemDto(
     val supplier: String,
     val userId: Int,
     val userName: String,
+    val branchId: Int? = null,
     val dateTime: Long
 )
 
@@ -187,6 +188,7 @@ data class InventoryAdjustmentReportItemDto(
     val reason: String,
     val userId: Int,
     val userName: String,
+    val branchId: Int? = null,
     val dateTime: Long
 )
 

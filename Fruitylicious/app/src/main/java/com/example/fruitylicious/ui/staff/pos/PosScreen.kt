@@ -34,9 +34,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,30 +46,33 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,9 +89,12 @@ import com.example.fruitylicious.data.local.entity.ProductRecipeEntity
 import com.example.fruitylicious.data.local.entity.ProductVariantEntity
 import com.example.fruitylicious.data.repository.CartItem
 import com.example.fruitylicious.ui.shared.FruitySearchableDropdown
+import com.example.fruitylicious.ui.shared.SharedDrawerContent
+import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val GreenPrimary = Color(0xFF2E7D32)
 private val AmberAccent = Color(0xFFFFC107)
@@ -96,15 +104,25 @@ private val PageBg = Color(0xFFFFEAA0)
 
 @Composable
 fun PosScreen(
+    navController: androidx.navigation.NavController,
+    mode: SharedScreenMode = SharedScreenMode.STAFF,
+    userName: String = "User",
+    branchName: String = "",
+    onLogout: () -> Unit = {},
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
     viewModel: PosViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
     var selectedProduct by remember { mutableStateOf<ProductEntity?>(null) }
     var cartExpanded by remember { mutableStateOf(false) }
     var addedToCartMsg by remember { mutableStateOf(false) }
+    var itemToRemove by remember { mutableStateOf<CartItem?>(null) }
+    var showClearConfirmation by remember { mutableStateOf(false) }
 
     val cartItems = uiState.cartItems
     val cartTotal = uiState.totalAmount
@@ -175,6 +193,30 @@ fun PosScreen(
         )
     }
 
+    itemToRemove?.let { item ->
+        RemoveConfirmationDialog(
+            title = "Remove Item",
+            message = "Are you sure you want to remove\n${item.productName} from the cart?",
+            onDismiss = { itemToRemove = null },
+            onConfirm = {
+                viewModel.removeItem(item.cartLineId)
+                itemToRemove = null
+            }
+        )
+    }
+
+    if (showClearConfirmation) {
+        RemoveConfirmationDialog(
+            title = "Clear Cart",
+            message = "Are you sure you want to remove\nALL items from the cart?",
+            onDismiss = { showClearConfirmation = false },
+            onConfirm = {
+                viewModel.clearCart()
+                showClearConfirmation = false
+            }
+        )
+    }
+
     if (!uiState.isClockedIn) {
         Dialog(onDismissRequest = { onBack() }) {
             Surface(
@@ -214,117 +256,146 @@ fun PosScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PageBg)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            PosHeader(onBack = onBack)
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp)
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Color.Transparent,
+                drawerTonalElevation = 0.dp
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                SharedDrawerContent(
+                    mode = mode,
+                    navController = navController,
+                    drawerState = drawerState,
+                    scope = scope,
+                    userName = userName,
+                    branchName = branchName,
+                    isClockedIn = uiState.isClockedIn,
+                    onLogout = onLogout
+                )
+            }
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PageBg)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                PosHeader(
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
+                    },
+                    onBack = onBack
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Select Product",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1B1B1B)
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(AmberAccent)
-                            .padding(horizontal = 12.dp, vertical = 5.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${uiState.products.size} Products",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Select Product",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B1B1B)
                         )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (uiState.products.isEmpty() && !uiState.isLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No products found.\nAdd products first in admin.",
-                            textAlign = TextAlign.Center,
-                            color = Color.Gray
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(
-                            items = uiState.products,
-                            key = { it.productId }
-                        ) { product ->
-                            ProductGridItem(
-                                product = product,
-                                onClick = {
-                                    selectedProduct = product
-                                }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(AmberAccent)
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "${uiState.products.size} Products",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                }
-            }
 
-            CartBottomSection(
-                addedToCartMsg = addedToCartMsg,
-                onAddedMessageConsumed = {
-                    addedToCartMsg = false
-                },
-                cartExpanded = cartExpanded,
-                onCartToggle = {
-                    cartExpanded = !cartExpanded
-                },
-                cartCount = cartCount,
-                cartTotal = cartTotal,
-                cartItems = cartItems,
-                onQuantityChange = { item, delta ->
-                    viewModel.updateQuantity(item.cartLineId, delta)
-                },
-                onRemove = { item ->
-                    viewModel.removeItem(item.cartLineId)
-                },
-                onClear = {
-                    viewModel.clearCart()
-                },
-                onCheckout = {
-                    onNavigate(STAFF_CHECKOUT)
-                },
-                onItemClick = { item ->
-                    editingCartItem = item
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (uiState.products.isEmpty() && !uiState.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No products found.\nAdd products first in admin.",
+                                textAlign = TextAlign.Center,
+                                color = Color.Gray
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(
+                                items = uiState.products,
+                                key = { it.productId }
+                            ) { product ->
+                                ProductGridItem(
+                                    product = product,
+                                    onClick = {
+                                        selectedProduct = product
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
-            )
+
+                CartBottomSection(
+                    addedToCartMsg = addedToCartMsg,
+                    onAddedMessageConsumed = {
+                        addedToCartMsg = false
+                    },
+                    cartExpanded = cartExpanded,
+                    onCartToggle = {
+                        cartExpanded = !cartExpanded
+                    },
+                    cartCount = cartCount,
+                    cartTotal = cartTotal,
+                    cartItems = cartItems,
+                    onQuantityChange = { item, delta ->
+                        viewModel.updateQuantity(item.cartLineId, delta)
+                    },
+                    onRemove = { item ->
+                        itemToRemove = item
+                    },
+                    onClear = {
+                        showClearConfirmation = true
+                    },
+                    onCheckout = {
+                        onNavigate(STAFF_CHECKOUT)
+                    },
+                    onItemClick = { item ->
+                        editingCartItem = item
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun PosHeader(
+    onMenuClick: () -> Unit,
     onBack: () -> Unit
 ) {
     Box(
@@ -333,24 +404,36 @@ private fun PosHeader(
             .background(GreenPrimary)
             .padding(start = 20.dp, end = 20.dp, top = 48.dp, bottom = 16.dp)
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.CenterStart)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.White
-            )
-        }
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Menu",
+                    tint = Color.White
+                )
+            }
 
-        Text(
-            text = "POS",
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Center)
-        )
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "POS",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+        }
     }
 }
 
@@ -1258,6 +1341,100 @@ private fun getMixIngredientQuantity(sizeName: String): Double {
         220.0
     } else {
         150.0
+    }
+}
+
+@Composable
+private fun RemoveConfirmationDialog(
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(28.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(RedRemove),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1B1B1B)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = message,
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = RedRemove),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "Remove",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

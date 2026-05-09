@@ -21,34 +21,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -66,8 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruityDateFilterField
 import com.example.fruitylicious.ui.shared.FruityDatePicker
 import com.example.fruitylicious.ui.shared.FruitySearchField
@@ -93,6 +82,7 @@ import kotlinx.coroutines.launch
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.example.fruitylicious.util.ImageStorage
@@ -201,112 +191,106 @@ fun WasteManagementScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(WsPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId,
-                onBranchSelect = onBranchSelect,
-                onMenuClick = onMenuClick
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch waste history is visible.",
-                    color = WsTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
-            LazyColumn(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(WsPageBg)
             ) {
-                item {
-                    val containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
-                    Button(
-                        onClick = onEntryClick,
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = onBranchSelect,
+                    onMenuClick = onMenuClick
+                )
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch waste history is visible.",
+                        color = WsTextSub,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
-                            .shadow(2.dp, RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = containerColor)
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Text(
-                            text = if (uiState.isClockedIn) "Waste Entry" else "Clock in required",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                    )
                 }
 
-                if (!uiState.error.isNullOrBlank()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     item {
-                        Text(
-                            text = uiState.error ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                        val containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
+                        Button(
+                            onClick = onEntryClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .shadow(2.dp, RoundedCornerShape(12.dp)),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = containerColor)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isClockedIn) Icons.Default.Add else Icons.Default.History,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
 
-                if (!uiState.successMessage.isNullOrBlank()) {
-                    item {
-                        Text(
-                            text = uiState.successMessage ?: "",
-                            color = WsGreen,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                item {
-                    FilterCard(
-                        searchQuery = searchQuery,
-                        onSearchChange = {
-                            searchQuery = it
-                        },
-                        selectedDateText = selectedDateText,
-                        onDateClick = {
-                            showDatePicker = true
-                        },
-                        onDateClear = {
-                            selectedDateMillis = 0L
+                            Text(
+                                text = if (uiState.isClockedIn) "Waste Entry" else "Clock in required",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                    )
-                }
+                    }
 
-                item {
-                    WasteHistoryCard(
-                        items = filteredHistory,
-                        isLoadingMore = uiState.isLoadingMore,
-                        hasMore = uiState.hasMore,
-                        onImageClick = { file -> expandedImageFile = file },
-                        onLoadMore = { viewModel.loadMore() }
-                    )
+                    if (!uiState.successMessage.isNullOrBlank()) {
+                        item {
+                            Text(
+                                text = uiState.successMessage ?: "",
+                                color = WsGreen,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    item {
+                        FilterCard(
+                            searchQuery = searchQuery,
+                            onSearchChange = {
+                                searchQuery = it
+                            },
+                            selectedDateText = selectedDateText,
+                            onDateClick = {
+                                showDatePicker = true
+                            },
+                            onDateClear = {
+                                selectedDateMillis = 0L
+                            }
+                        )
+                    }
+
+                    item {
+                        WasteHistoryCard(
+                            items = filteredHistory,
+                            isLoading = uiState.isLoading,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMore = uiState.hasMore,
+                            onImageClick = { file -> expandedImageFile = file },
+                            onLoadMore = { viewModel.loadMore() }
+                        )
+                    }
                 }
             }
         }
@@ -375,6 +359,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -410,6 +395,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = WsGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -456,9 +442,10 @@ private fun FilterCard(
 @Composable
 private fun WasteHistoryCard(
     items: List<WasteHistoryRow>,
+    isLoading: Boolean,
     isLoadingMore: Boolean,
     hasMore: Boolean,
-    onImageClick: (File) -> Unit,
+    onImageClick: (java.io.File) -> Unit,
     onLoadMore: () -> Unit
 ) {
     Surface(
@@ -498,7 +485,16 @@ private fun WasteHistoryCard(
 
             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
-            if (items.isEmpty()) {
+            if (isLoading && items.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(color = WsGreen)
+                }
+            } else if (items.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -513,7 +509,7 @@ private fun WasteHistoryCard(
                 }
             } else {
                 items.forEachIndexed { index, entry ->
-                    key(entry.wasteId) {
+                    androidx.compose.runtime.key(entry.wasteId) {
                         WasteRecordRow(
                             entry = entry,
                             onImageClick = onImageClick
@@ -563,8 +559,8 @@ private fun WasteRecordRow(
                 .clickable(enabled = imageFile != null && imageFile.exists()) {
                     imageFile?.let { onImageClick(it) }
                 },
-            shape = RoundedCornerShape(10.dp),
-            color = Color(0xFFF8FAFC)
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFFE8F5E9)
         ) {
             if (imageFile != null && imageFile.exists()) {
                 AsyncImage(

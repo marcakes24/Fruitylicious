@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,26 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
@@ -60,11 +50,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruityDateFilterField
 import com.example.fruitylicious.ui.shared.FruityDatePicker
 import com.example.fruitylicious.ui.shared.FruitySearchField
@@ -142,35 +130,35 @@ fun InventoryAdjustmentScreen(
             }
         }
     ) {
-        Column(modifier = Modifier.fillMaxSize().background(IaPageBg)) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId, 
-                onBranchSelect = { viewModel.selectBranch(it) },
-                onMenuClick = { scope.launch { drawerState.open() } }
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch adjustments are visible.",
-                    color = Color.Gray,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().background(IaPageBg)) {
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId, 
+                    onBranchSelect = { viewModel.selectBranch(it) },
+                    onMenuClick = { scope.launch { drawerState.open() } }
                 )
-            }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
+                ErrorWarning(message = uiState.error)
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch adjustments are visible.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                    )
+                }
+
+                // Fixed Controls area
+                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
                     Button(
                         onClick = { showEntryDialog = true; viewModel.clearMessages() },
                         modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
@@ -181,9 +169,9 @@ fun InventoryAdjustmentScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("New Adjustment", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
-                }
 
-                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     FilterCard(
                         searchQuery = uiState.searchQuery,
                         onSearchChange = { viewModel.setSearchQuery(it) },
@@ -193,23 +181,28 @@ fun InventoryAdjustmentScreen(
                     )
                 }
 
-                if (!uiState.error.isNullOrBlank()) {
-                    item { Text(text = uiState.error!!, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
-                }
-                if (!uiState.successMessage.isNullOrBlank()) {
-                    item { Text(text = uiState.successMessage!!, color = IaGreen, fontSize = 13.sp) }
-                }
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (!uiState.successMessage.isNullOrBlank()) {
+                            item { Text(text = uiState.successMessage!!, color = IaGreen, fontSize = 13.sp) }
+                        }
 
-                item { RecentAdjustmentsCard(items = uiState.history) }
+                        item { RecentAdjustmentsCard(items = uiState.history, isLoading = uiState.isLoading) }
 
-                if (uiState.hasMore) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                            if (uiState.isLoadingMore) {
-                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
-                            } else {
-                                TextButton(onClick = { viewModel.loadMoreHistory() }) {
-                                    Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
+                        if (uiState.hasMore) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                                    if (uiState.isLoadingMore) {
+                                        androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
+                                    } else {
+                                        TextButton(onClick = { viewModel.loadMoreHistory() }) {
+                                            Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -237,6 +230,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -250,6 +244,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = IaGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -495,12 +490,16 @@ private fun AdjustmentTypeButton(
 }
 
 @Composable
-private fun RecentAdjustmentsCard(items: List<AdjustmentHistoryRow>) {
+private fun RecentAdjustmentsCard(items: List<AdjustmentHistoryRow>, isLoading: Boolean) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 2.dp) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Adjustment History", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
             HorizontalDivider(color = Color(0xFFF1F5F9))
-            if (items.isEmpty()) {
+            if (isLoading && items.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { 
+                    androidx.compose.material3.CircularProgressIndicator(color = IaGreen) 
+                }
+            } else if (items.isEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { Text("No records found", color = Color.Gray) }
             } else {
                 items.forEachIndexed { index, item ->

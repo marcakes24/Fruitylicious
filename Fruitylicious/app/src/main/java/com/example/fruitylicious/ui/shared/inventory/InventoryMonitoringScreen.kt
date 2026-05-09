@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -31,7 +30,6 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,13 +49,11 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruitySearchField
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -113,56 +109,45 @@ fun InventoryMonitoringScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(ImPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId,
-                onBranchSelect = { branchId ->
-                    viewModel.selectBranch(branchId)
-                },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
-                }
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch inventory is available.",
-                    color = ImTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
-            if (!uiState.error.isNullOrBlank()) {
-                Text(
-                    text = uiState.error ?: "",
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            LazyColumn(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 20.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(ImPageBg)
             ) {
-                item {
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = { branchId ->
+                        viewModel.selectBranch(branchId)
+                    },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
+                    }
+                )
+
+                ErrorWarning(message = uiState.error)
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch inventory is available.",
+                        color = ImTextSub,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                    )
+                }
+
+                // Move FilterCard out to be fixed at the top
+                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                     FilterCard(
                         searchQuery = searchQuery,
                         onSearchChange = {
@@ -171,43 +156,58 @@ fun InventoryMonitoringScreen(
                     )
                 }
 
-                item {
-                    Text(
-                        text = "Ingredient List",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF333333),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-
-                item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            when {
-                                uiState.isLoading -> {
-                                    EmptyInventoryText("Loading inventory...")
-                                }
+                        item {
+                            Text(
+                                text = "Ingredient List",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF333333),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
 
-                                filteredRows.isEmpty() -> {
-                                    EmptyInventoryText("No ingredients found")
-                                }
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                                    when {
+                                        uiState.isLoading && uiState.rows.isEmpty() -> {
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                androidx.compose.material3.CircularProgressIndicator(color = ImGreen)
+                                            }
+                                        }
 
-                                else -> {
-                                    filteredRows.forEachIndexed { index, item ->
-                                        InventoryListItem(item)
+                                        filteredRows.isEmpty() -> {
+                                            EmptyInventoryText("No ingredients found")
+                                        }
 
-                                        if (index < filteredRows.size - 1) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.padding(horizontal = 16.dp),
-                                                color = Color(0xFFF1F5F9),
-                                                thickness = 1.dp
-                                            )
+                                        else -> {
+                                            filteredRows.forEachIndexed { index, item ->
+                                                InventoryListItem(item)
+
+                                                if (index < filteredRows.size - 1) {
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                                        color = Color(0xFFF1F5F9),
+                                                        thickness = 1.dp
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -226,6 +226,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -261,6 +262,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = ImGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -336,8 +338,8 @@ private fun InventoryListItem(
         Box(
             modifier = Modifier
                 .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFF5F5F5)),
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFFE8F5E9)),
             contentAlignment = Alignment.Center
         ) {
             if (imageFile != null && imageFile.exists()) {

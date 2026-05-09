@@ -37,6 +37,7 @@ data class RecipeManagementUiState(
     val packagingLines: List<RecipeLineUi> = emptyList(),
     val recipeLines: List<RecipeLineUi> = emptyList(),
     val isLoading: Boolean = true,
+    val isRecipesLoaded: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -63,7 +64,10 @@ class RecipeManagementViewModel @Inject constructor(
         viewModelScope.launch {
             productRecipeDao.observeRecipes().collectLatest { recipes ->
                 val ids = recipes.map { it.productId }.toSet()
-                _uiState.update { it.copy(productIdsWithRecipes = ids) }
+                _uiState.update { it.copy(
+                    productIdsWithRecipes = ids,
+                    isRecipesLoaded = true
+                ) }
             }
         }
     }

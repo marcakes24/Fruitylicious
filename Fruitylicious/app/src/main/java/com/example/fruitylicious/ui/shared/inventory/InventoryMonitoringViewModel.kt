@@ -14,10 +14,17 @@ import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -56,6 +63,7 @@ data class InventoryMonitoringUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
+    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -78,70 +86,146 @@ class InventoryMonitoringViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         InventoryMonitoringUiState(
             isAdmin = isAdminUser(),
-            selectedBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
-            localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
-            userBranchId = "B${sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId}"
+            selectedBranchId = localBranchId,
+            localBranchId = localBranchId,
+            userBranchId = "B$localBranchId"
         )
     )
 
     val uiState: StateFlow<InventoryMonitoringUiState> = _uiState.asStateFlow()
 
-    private var localInventoryItems: List<InventoryEntity> = emptyList()
-    private var localIngredients: List<IngredientEntity> = emptyList()
     private var branches: List<BranchEntity> = emptyList()
+    private var lockoutJob: kotlinx.coroutines.Job? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
+    private val refreshTrigger = MutableStateFlow(0)
 
     init {
         observeBranches()
         observeNetwork()
-        observeInventory()
-        observeIngredients()
+        observeLocalData()
+        
+        // Reactive history loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                delay(300) // Debounce branch selection
+                loadRows()
+            }
+        }
+    }
+
+    private fun observeLocalData() {
+        viewModelScope.launch {
+            combine(
+                inventoryDao.observeAllInventory(),
+                ingredientDao.observeIngredients(),
+                refreshTrigger
+            ) { inventory, ingredients, _ ->
+                Triple(inventory, ingredients, Unit)
+            }.collect { (inventory, ingredients, _) ->
+                val state = _uiState.value
+                val rows = buildInventoryRows(inventory, ingredients)
+
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                    _uiState.update {
+                        it.copy(
+                            rows = rows,
+                            isLoading = false,
+                            error = state.error
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildInventoryRows(
+        inventory: List<InventoryEntity>,
+        ingredients: List<IngredientEntity>
+    ): List<InventoryMonitoringRow> {
+        val state = _uiState.value
+        val ingredientMap = ingredients.associateBy { it.ingredientId }
+        
+        val filteredInventory = if (state.selectedBranchId == null) {
+            // Aggregate inventory items by ingredientId if "All Branches" selected
+            inventory.groupBy { it.ingredientId }.map { (ingredientId, items) ->
+                val totalStock = items.sumOf { it.currentStock }
+                val latestModified = items.maxOfOrNull { it.lastModified } ?: 0L
+                // Return a virtual inventory entity for aggregation
+                InventoryEntity(
+                    ingredientId = ingredientId,
+                    branchId = 0, // Virtual ID for all
+                    currentStock = totalStock,
+                    lastModified = latestModified,
+                    isSynced = true,
+                    syncedAt = null
+                )
+            }
+        } else {
+            inventory.filter { it.branchId == state.selectedBranchId }
+        }
+
+        return filteredInventory.mapNotNull { inv ->
+            val ingredient = ingredientMap[inv.ingredientId] ?: return@mapNotNull null
+            val branchName = if (inv.branchId == 0) "All Branches" 
+                else branches.firstOrNull { it.branchId == inv.branchId }?.branchName ?: "Branch ${inv.branchId}"
+
+            InventoryMonitoringRow(
+                ingredientId = inv.ingredientId,
+                branchId = inv.branchId,
+                branchName = branchName,
+                ingredientName = ingredient.ingredientName,
+                currentStock = inv.currentStock,
+                unitType = ingredient.unitType,
+                lowStockThreshold = ingredient.lowStockThreshold,
+                lastModified = inv.lastModified,
+                image = ingredient.image
+            )
+        }.sortedBy { it.ingredientName.lowercase() }
     }
 
     fun selectBranch(branchId: Int?) {
         val state = _uiState.value
-
         val finalBranchId = if (state.isAdmin && state.isOnline) {
             branchId
         } else {
             localBranchId
         }
 
+        if (state.selectedBranchId == finalBranchId) return
+
         _uiState.update {
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
-                error = null
+                error = null,
+                rows = emptyList()
             )
         }
-
-        loadRows()
     }
 
     fun refresh() {
         _uiState.update {
             it.copy(
                 isLoading = true,
-                error = null
+                error = null,
+                rows = emptyList()
             )
         }
 
-        loadRows()
+        refreshTrigger.value += 1
     }
 
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
-                val finalBranches = ensureLocalBranchExists(branchList)
-
-                branches = finalBranches
-
-                _uiState.update {
-                    it.copy(
-                        branches = finalBranches
-                    )
-                }
-
-                loadRows()
+                branches = ensureLocalBranchExists(branchList)
+                _uiState.update { it.copy(branches = branches) }
             }
         }
     }
@@ -161,277 +245,172 @@ class InventoryMonitoringViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
-
-                loadRows()
-            }
-        }
-    }
-
-    private fun observeInventory() {
-        viewModelScope.launch {
-            inventoryDao.observeInventoryByBranch(localBranchId).collectLatest { items ->
-                localInventoryItems = items
-                loadRows()
-            }
-        }
-    }
-
-    private fun observeIngredients() {
-        viewModelScope.launch {
-            ingredientDao.observeIngredients().collectLatest { items ->
-                localIngredients = items
-                loadRows()
             }
         }
     }
 
     private fun loadRows() {
         val state = _uiState.value
-        val selectedBranchId = state.selectedBranchId
+        loadJob?.cancel()
 
-        when {
-            !state.isAdmin -> {
-                loadLocalRows(localBranchId)
-            }
-
-            !state.isOnline -> {
-                loadLocalRows(localBranchId)
-            }
-
-            selectedBranchId == localBranchId -> {
-                loadLocalRows(localBranchId)
-            }
-
-            selectedBranchId == null -> {
-                loadRemoteAllBranches()
-            }
-
-            else -> {
-                loadRemoteBranch(selectedBranchId)
-            }
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadJob = loadRemoteRows()
+        } else {
+            // Local load handled by observeLocalData
         }
     }
 
-    private fun loadLocalRows(branchId: Int) {
-        val ingredientMap = localIngredients.associateBy {
-            it.ingredientId
-        }
+    private fun loadRemoteRows() = viewModelScope.launch {
+        val state = _uiState.value
+        _uiState.update { it.copy(isLoading = true, error = null) }
 
-        val branchName = branches.firstOrNull {
-            it.branchId == branchId
-        }?.branchName ?: branchConfig.branchName.ifBlank {
-            "Branch $branchId"
-        }
-
-        val rows = localInventoryItems
-            .filter {
-                it.branchId == branchId
-            }
-            .mapNotNull { inventory ->
-                val ingredient = ingredientMap[inventory.ingredientId]
-                    ?: return@mapNotNull null
-
-                InventoryMonitoringRow(
-                    ingredientId = inventory.ingredientId,
-                    branchId = inventory.branchId,
-                    branchName = branchName,
-                    ingredientName = ingredient.ingredientName,
-                    currentStock = inventory.currentStock,
-                    unitType = ingredient.unitType,
-                    lowStockThreshold = ingredient.lowStockThreshold,
-                    lastModified = inventory.lastModified,
-                    image = ingredient.image
-                )
-            }
-            .sortedBy {
-                it.ingredientName.lowercase()
-            }
-
-        _uiState.update {
-            it.copy(
-                rows = rows,
-                isLoading = false,
-                error = null
-            )
+        if (state.selectedBranchId == null) {
+            loadRemoteAllBranches()
+        } else {
+            loadRemoteBranch(state.selectedBranchId)
         }
     }
 
-    private fun loadRemoteBranch(branchId: Int) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoading = true,
-                    error = null
-                )
+    private suspend fun loadRemoteBranch(branchId: Int) {
+        val result = reportRepository.getInventoryReport(branchId = branchId)
+
+        result.fold(
+            onSuccess = { report ->
+                val rows = report.items.map { item ->
+                    InventoryMonitoringRow(
+                        ingredientId = item.ingredientId,
+                        branchId = report.branchId ?: branchId,
+                        branchName = report.branchName ?: "Branch $branchId",
+                        ingredientName = item.ingredientName,
+                        currentStock = item.currentStock,
+                        unitType = item.unitType,
+                        lowStockThreshold = item.lowStockThreshold,
+                        lastModified = report.generatedAt,
+                        image = null // Images are local only or handled by UI
+                    )
+                }.sortedBy { it.ingredientName.lowercase() }
+
+                _uiState.update {
+                    it.copy(
+                        rows = rows,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            },
+            onFailure = { error ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = error.message ?: "Failed to load remote inventory.",
+                        isRemoteAccessLocked = true
+                    )
+                }
+                startLockoutTimer()
+                refreshTrigger.value += 1
             }
+        )
+    }
 
-            val result = reportRepository.getInventoryReport(
-                branchId = branchId
-            )
+    private suspend fun loadRemoteAllBranches() = coroutineScope {
+        val deferredResults = branches.map { branch ->
+            async {
+                branch to reportRepository.getInventoryReport(branchId = branch.branchId)
+            }
+        }
 
+        val results = deferredResults.awaitAll()
+        val allRows = mutableListOf<InventoryMonitoringRow>()
+        var firstError: String? = null
+
+        results.forEach { (branch, result) ->
             result.fold(
                 onSuccess = { report ->
-                    val rows = report.items
-                        .map { item ->
-                            val localImage = localIngredients.find { it.ingredientId == item.ingredientId }?.image
-
-                            InventoryMonitoringRow(
-                                ingredientId = item.ingredientId,
-                                branchId = report.branchId ?: branchId,
-                                branchName = report.branchName ?: "Branch $branchId",
-                                ingredientName = item.ingredientName,
-                                currentStock = item.currentStock,
-                                unitType = item.unitType,
-                                lowStockThreshold = item.lowStockThreshold,
-                                lastModified = report.generatedAt,
-                                image = localImage
-                            )
-                        }
-                        .sortedBy {
-                            it.ingredientName.lowercase()
-                        }
-
-                    _uiState.update {
-                        it.copy(
-                            rows = rows,
-                            isLoading = false,
-                            error = null
+                    allRows.addAll(report.items.map { item ->
+                        InventoryMonitoringRow(
+                            ingredientId = item.ingredientId,
+                            branchId = branch.branchId,
+                            branchName = branch.branchName,
+                            ingredientName = item.ingredientName,
+                            currentStock = item.currentStock,
+                            unitType = item.unitType,
+                            lowStockThreshold = item.lowStockThreshold,
+                            lastModified = report.generatedAt,
+                            image = null
                         )
-                    }
+                    })
                 },
                 onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            rows = emptyList(),
-                            isLoading = false,
-                            error = error.message ?: "Failed to load remote inventory."
-                        )
-                    }
+                    if (firstError == null) firstError = error.message
                 }
             )
         }
-    }
 
-    private fun loadRemoteAllBranches() {
-        viewModelScope.launch {
+        if (allRows.isNotEmpty()) {
+            val aggregated = aggregateRows(allRows)
             _uiState.update {
                 it.copy(
-                    isLoading = true,
-                    error = null
-                )
-            }
-
-            val branchList = ensureLocalBranchExists(branches)
-
-            val allRows = mutableListOf<InventoryMonitoringRow>()
-            var firstError: String? = null
-
-            for (branch in branchList) {
-                val result = reportRepository.getInventoryReport(
-                    branchId = branch.branchId
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        val rows = report.items.map { item ->
-                            val localImage = localIngredients.find { it.ingredientId == item.ingredientId }?.image
-
-                            InventoryMonitoringRow(
-                                ingredientId = item.ingredientId,
-                                branchId = report.branchId ?: branch.branchId,
-                                branchName = report.branchName ?: branch.branchName,
-                                ingredientName = item.ingredientName,
-                                currentStock = item.currentStock,
-                                unitType = item.unitType,
-                                lowStockThreshold = item.lowStockThreshold,
-                                lastModified = report.generatedAt,
-                                image = localImage
-                            )
-                        }
-
-                        allRows.addAll(rows)
-                    },
-                    onFailure = { error ->
-                        if (firstError == null) {
-                            firstError = error.message
-                        }
-                    }
-                )
-            }
-
-            val aggregatedRows = aggregateInventoryRows(allRows)
-
-            _uiState.update {
-                it.copy(
-                    rows = aggregatedRows,
+                    rows = aggregated,
                     isLoading = false,
-                    error = firstError
+                    error = firstError,
+                    isRemoteAccessLocked = firstError != null
                 )
             }
+        } else {
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = firstError ?: "Failed to load remote inventory.",
+                    isRemoteAccessLocked = true
+                )
+            }
+            startLockoutTimer()
+            refreshTrigger.value += 1
         }
     }
 
-    private fun aggregateInventoryRows(
-        rows: List<InventoryMonitoringRow>
-    ): List<InventoryMonitoringRow> {
-        return rows
-            .groupBy {
-                it.ingredientId
-            }
-            .map { (_, groupedRows) ->
-                val first = groupedRows.first()
-                val totalStock = groupedRows.sumOf {
-                    it.currentStock
-                }
-                val latestModified = groupedRows.maxOfOrNull {
-                    it.lastModified
-                } ?: first.lastModified
+    private fun aggregateRows(rows: List<InventoryMonitoringRow>): List<InventoryMonitoringRow> {
+        return rows.groupBy { it.ingredientId }.map { (ingredientId, items) ->
+            val first = items.first()
+            val totalStock = items.sumOf { it.currentStock }
+            val latestModified = items.maxOfOrNull { it.lastModified } ?: 0L
 
-                InventoryMonitoringRow(
-                    ingredientId = first.ingredientId,
-                    branchId = 0,
-                    branchName = "All Branches",
-                    ingredientName = first.ingredientName,
-                    currentStock = totalStock,
-                    unitType = first.unitType,
-                    lowStockThreshold = first.lowStockThreshold,
-                    lastModified = latestModified,
-                    image = first.image
-                )
-            }
-            .sortedBy {
-                it.ingredientName.lowercase()
-            }
+            InventoryMonitoringRow(
+                ingredientId = ingredientId,
+                branchId = 0,
+                branchName = "All Branches",
+                ingredientName = first.ingredientName,
+                currentStock = totalStock,
+                unitType = first.unitType,
+                lowStockThreshold = first.lowStockThreshold,
+                lastModified = latestModified,
+                image = null
+            )
+        }.sortedBy { it.ingredientName.lowercase() }
     }
 
-    private fun ensureLocalBranchExists(
-        branchList: List<BranchEntity>
-    ): List<BranchEntity> {
-        val hasLocalBranch = branchList.any {
-            it.branchId == localBranchId
+    private fun startLockoutTimer() {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
+    }
 
-        if (hasLocalBranch) {
-            return branchList.sortedBy {
-                it.branchId
-            }
-        }
+    private fun ensureLocalBranchExists(branchList: List<BranchEntity>): List<BranchEntity> {
+        val hasLocal = branchList.any { it.branchId == localBranchId }
+        if (hasLocal) return branchList.sortedBy { it.branchId }
 
-        val localBranch = BranchEntity(
+        val local = BranchEntity(
             branchId = localBranchId,
-            branchName = branchConfig.branchName.ifBlank {
-                "Branch $localBranchId"
-            },
+            branchName = branchConfig.branchName.ifBlank { "Branch $localBranchId" },
             address = "",
             contactNumber = "",
             lastModified = 0L,
             isSynced = true,
             syncedAt = null
         )
-
-        return (branchList + localBranch).sortedBy {
-            it.branchId
-        }
+        return (branchList + local).sortedBy { it.branchId }
     }
 
     private fun isAdminUser(): Boolean {

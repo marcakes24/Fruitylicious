@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -401,20 +403,15 @@ fun FruityDateFilterField(
                 )
             },
             trailingIcon = {
-                if (selectedDateText.isNotEmpty() && onClear != null) {
-                    IconButton(onClick = onClear) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Clear date",
-                            tint = Color.Gray
-                        )
-                    }
-                } else {
+                if (selectedDateText.isEmpty() || onClear == null) {
                     Icon(
                         imageVector = Icons.Default.CalendarMonth,
                         contentDescription = null,
                         tint = Color.Black
                     )
+                } else {
+                    // Spacer for the clear button
+                    Spacer(modifier = Modifier.size(24.dp))
                 }
             },
             shape = RoundedCornerShape(16.dp),
@@ -429,10 +426,26 @@ fun FruityDateFilterField(
         Box(
             modifier = Modifier
                 .matchParentSize()
+                .padding(end = if (selectedDateText.isNotEmpty() && onClear != null) 48.dp else 0.dp)
                 .clickable {
                     onClick()
                 }
         )
+
+        if (selectedDateText.isNotEmpty() && onClear != null) {
+            IconButton(
+                onClick = onClear,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Clear date",
+                    tint = Color.Gray
+                )
+            }
+        }
     }
 }
 
@@ -483,6 +496,7 @@ fun FruitySearchField(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> FruitySearchableDropdown(
     value: String,
@@ -496,13 +510,11 @@ fun <T> FruitySearchableDropdown(
     onExpandedChange: (Boolean) -> Unit,
     itemContent: @Composable (T) -> Unit
 ) {
-    val density = LocalDensity.current
-    var fieldWidth by remember { mutableStateOf(0.dp) }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
     LaunchedEffect(isPressed) {
-        if (isPressed) onExpandedChange(true)
+        if (isPressed && !expanded) onExpandedChange(true)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -517,20 +529,22 @@ fun <T> FruitySearchableDropdown(
             Spacer(modifier = Modifier.heightIn(8.dp))
         }
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = onExpandedChange,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             OutlinedTextField(
                 value = value,
                 onValueChange = {
                     onValueChange(it)
-                    onExpandedChange(true)
+                    if (!expanded) onExpandedChange(true)
                 },
                 modifier = Modifier
+                    .menuAnchor()
                     .fillMaxWidth()
-                    .onGloballyPositioned { coords ->
-                        fieldWidth = with(density) { coords.size.width.toDp() }
-                    }
                     .onFocusChanged { focusState ->
-                        if (focusState.isFocused) {
+                        if (focusState.isFocused && !expanded) {
                             onExpandedChange(true)
                         }
                     },
@@ -541,10 +555,25 @@ fun <T> FruitySearchableDropdown(
                     )
                 },
                 trailingIcon = {
-                    IconButton(onClick = { onExpandedChange(!expanded) }) {
+                    IconButton(
+                        onClick = {
+                            if (value.isNotEmpty()) {
+                                onValueChange("")
+                                if (!expanded) onExpandedChange(true)
+                            } else {
+                                onExpandedChange(!expanded)
+                            }
+                        }
+                    ) {
+                        val icon = when {
+                            value.isNotEmpty() -> Icons.Default.Close
+                            expanded -> Icons.Default.Close
+                            else -> Icons.Default.ArrowDropDown
+                        }
                         Icon(
-                            imageVector = if (expanded) Icons.Default.Close else Icons.Default.ArrowDropDown,
-                            contentDescription = null
+                            imageVector = icon,
+                            contentDescription = if (value.isNotEmpty()) "Clear" else "Toggle",
+                            tint = Color.Gray
                         )
                     }
                 },
@@ -561,10 +590,9 @@ fun <T> FruitySearchableDropdown(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
                 modifier = Modifier
-                    .width(fieldWidth)
+                    .exposedDropdownSize()
                     .background(Color.White)
-                    .heightIn(max = 300.dp),
-                offset = DpOffset(0.dp, 4.dp),
+                    .heightIn(max = 280.dp),
                 properties = PopupProperties(focusable = false)
             ) {
                 if (options.isEmpty()) {

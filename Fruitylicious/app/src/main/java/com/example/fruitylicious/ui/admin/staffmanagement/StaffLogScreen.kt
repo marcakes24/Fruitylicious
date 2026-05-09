@@ -33,8 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -50,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -58,6 +55,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruityDateFilterField
 import com.example.fruitylicious.ui.shared.FruityDatePicker
 import com.example.fruitylicious.ui.shared.FruitySearchField
@@ -154,94 +152,96 @@ fun StaffLogScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SlPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId,
-                onBranchSelect = { branchId ->
-                    viewModel.selectBranch(branchId)
-                },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
-                }
-            )
-
-            if (!uiState.error.isNullOrBlank()) {
-                Text(
-                    text = uiState.error ?: "",
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch staff logs are available.",
-                    color = SlTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
-            FilterCard(
-                searchQuery = searchQuery,
-                onSearchChange = { searchQuery = it },
-                selectedDateText = selectedDateText,
-                onDateClick = { showDatePicker = true },
-                onDateClear = { selectedDateMillis = 0L }
-            )
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(SlPageBg)
             ) {
-                when {
-                    uiState.isLoading && filteredLogs.isEmpty() -> {
-                        item {
-                            EmptyStaffLogText("Loading staff logs...")
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = { branchId ->
+                        viewModel.selectBranch(branchId)
+                    },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
                         }
                     }
+                )
 
-                    filteredLogs.isEmpty() -> {
+                ErrorWarning(message = uiState.error)
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (uiState.isAdmin && !uiState.isOnline) {
                         item {
-                            EmptyStaffLogText("No staff logs found")
-                        }
-                    }
-
-                    else -> {
-                        items(
-                            items = filteredLogs,
-                            key = { it.logId }
-                        ) { log ->
-                            StaffLogCard(
-                                log = log,
-                                onImageClick = { path -> expandedImagePath = path }
+                            Text(
+                                text = "Offline mode: Only local branch staff logs are available.",
+                                color = SlTextSub,
+                                fontSize = 12.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
                             )
                         }
+                    }
 
-                        if (uiState.hasMore) {
+                    item {
+                        FilterCard(
+                            searchQuery = searchQuery,
+                            onSearchChange = { searchQuery = it },
+                            selectedDateText = selectedDateText,
+                            onDateClick = { showDatePicker = true },
+                            onDateClear = { selectedDateMillis = 0L }
+                        )
+                    }
+
+                    when {
+                        uiState.isLoading && filteredLogs.isEmpty() -> {
                             item {
-                                Button(
-                                    onClick = { viewModel.loadMore() },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !uiState.isLoadingMore,
-                                    colors = ButtonDefaults.buttonColors(containerColor = SlGreen)
-                                ) {
-                                    Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = SlGreen)
+                                }
+                            }
+                        }
+
+                        filteredLogs.isEmpty() -> {
+                            item {
+                                EmptyStaffLogText("No staff logs found")
+                            }
+                        }
+
+                        else -> {
+                            items(
+                                items = filteredLogs,
+                                key = { it.logId }
+                            ) { log ->
+                                StaffLogCard(
+                                    log = log,
+                                    onImageClick = { path -> expandedImagePath = path }
+                                )
+                            }
+
+                            if (uiState.hasMore) {
+                                item {
+                                    Button(
+                                        onClick = { viewModel.loadMore() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !uiState.isLoadingMore,
+                                        colors = ButtonDefaults.buttonColors(containerColor = SlGreen)
+                                    ) {
+                                        Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                    }
                                 }
                             }
                         }
@@ -258,6 +258,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -295,6 +296,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = SlGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -314,10 +316,8 @@ private fun FilterCard(
     onDateClear: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
         color = Color.White,
         shadowElevation = 2.dp
     ) {

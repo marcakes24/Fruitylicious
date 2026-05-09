@@ -21,33 +21,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -60,13 +50,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -74,6 +60,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruityDateFilterField
 import com.example.fruitylicious.ui.shared.FruityDatePicker
 import com.example.fruitylicious.ui.shared.FruitySearchField
@@ -175,135 +162,131 @@ fun RestockScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(RsPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId,
-                onBranchSelect = { branchId ->
-                    viewModel.selectBranch(branchId)
-                },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
-                }
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch restock history is visible.",
-                    color = RsTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
-            LazyColumn(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(RsPageBg)
             ) {
-                item {
-                    Button(
-                        onClick = {
-                            if (uiState.isClockedIn) {
-                                viewModel.clearMessages()
-                                showRestockEntry = true
-                            }
-                        },
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = { branchId ->
+                        viewModel.selectBranch(branchId)
+                    },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
+                    }
+                )
+
+                ErrorWarning(message = uiState.error)
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch restock history is visible.",
+                        color = RsTextSub,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
-                            .shadow(2.dp, RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (uiState.isClockedIn) {
-                                RsGreen
-                            } else {
-                                Color.LightGray
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                    )
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Button(
+                            onClick = {
+                                if (uiState.isClockedIn) {
+                                    viewModel.clearMessages()
+                                    showRestockEntry = true
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .shadow(2.dp, RoundedCornerShape(12.dp)),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (uiState.isClockedIn) {
+                                    RsGreen
+                                } else {
+                                    Color.LightGray
+                                }
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isClockedIn) {
+                                    Icons.Default.Add
+                                } else {
+                                    Icons.Default.History
+                                },
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Text(
+                                text = if (uiState.isClockedIn) {
+                                    "Restock Entry"
+                                } else {
+                                    "Clock in required"
+                                },
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (!uiState.successMessage.isNullOrBlank()) {
+                        item {
+                            Text(
+                                text = uiState.successMessage ?: "",
+                                color = RsGreen,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    item {
+                        FilterCard(
+                            searchQuery = searchQuery,
+                            onSearchChange = {
+                                searchQuery = it
+                            },
+                            selectedDateText = selectedDateText,
+                            onDateClick = {
+                                showDatePicker = true
+                            },
+                            onDateClear = {
+                                selectedDateMillis = 0L
                             }
                         )
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.isClockedIn) {
-                                Icons.Default.Add
-                            } else {
-                                Icons.Default.History
-                            },
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        Text(
-                            text = if (uiState.isClockedIn) {
-                                "Restock Entry"
-                            } else {
-                                "Clock in required"
-                            },
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
-                }
 
-                if (!uiState.error.isNullOrBlank()) {
                     item {
-                        Text(
-                            text = uiState.error ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 13.sp
+                        RestockHistoryCard(
+                            items = filteredHistory,
+                            isLoading = uiState.isLoading,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMore = uiState.hasMore,
+                            onLoadMore = { viewModel.loadMore() }
                         )
                     }
-                }
-
-                if (!uiState.successMessage.isNullOrBlank()) {
-                    item {
-                        Text(
-                            text = uiState.successMessage ?: "",
-                            color = RsGreen,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-
-                item {
-                    FilterCard(
-                        searchQuery = searchQuery,
-                        onSearchChange = {
-                            searchQuery = it
-                        },
-                        selectedDateText = selectedDateText,
-                        onDateClick = {
-                            showDatePicker = true
-                        },
-                        onDateClear = {
-                            selectedDateMillis = 0L
-                        }
-                    )
-                }
-
-                item {
-                    RestockHistoryCard(
-                        items = filteredHistory,
-                        isLoadingMore = uiState.isLoadingMore,
-                        hasMore = uiState.hasMore,
-                        onLoadMore = { viewModel.loadMore() }
-                    )
                 }
             }
         }
@@ -333,6 +316,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -368,6 +352,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = RsGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -414,6 +399,7 @@ private fun FilterCard(
 @Composable
 private fun RestockHistoryCard(
     items: List<RestockHistoryRow>,
+    isLoading: Boolean,
     isLoadingMore: Boolean,
     hasMore: Boolean,
     onLoadMore: () -> Unit
@@ -466,7 +452,16 @@ private fun RestockHistoryCard(
 
             HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
 
-            if (items.isEmpty()) {
+            if (isLoading && items.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(color = RsGreen)
+                }
+            } else if (items.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

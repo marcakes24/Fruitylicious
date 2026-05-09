@@ -27,7 +27,8 @@ data class InventoryReportRow(
     val category: String,
     val currentStock: Double,
     val unitType: String,
-    val lowStockThreshold: Double
+    val lowStockThreshold: Double,
+    val image: String? = null
 )
 
 data class InventoryReportUiState(
@@ -157,7 +158,8 @@ class InventoryReportViewModel @Inject constructor(
                     },
                     currentStock = inventory.currentStock,
                     unitType = ingredient.unitType,
-                    lowStockThreshold = ingredient.lowStockThreshold
+                    lowStockThreshold = ingredient.lowStockThreshold,
+                    image = ingredient.image
                 )
             }
             .sortedBy {
@@ -291,7 +293,8 @@ class InventoryReportViewModel @Inject constructor(
             },
             currentStock = currentStock,
             unitType = unitType,
-            lowStockThreshold = lowStockThreshold
+            lowStockThreshold = lowStockThreshold,
+            image = localIngredient?.image
         )
     }
 
@@ -314,7 +317,8 @@ class InventoryReportViewModel @Inject constructor(
                         it.currentStock
                     },
                     unitType = first.unitType,
-                    lowStockThreshold = first.lowStockThreshold
+                    lowStockThreshold = first.lowStockThreshold,
+                    image = first.image
                 )
             }
             .sortedBy {

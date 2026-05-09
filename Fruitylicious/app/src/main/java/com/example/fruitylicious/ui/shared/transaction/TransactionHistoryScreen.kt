@@ -33,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
@@ -68,6 +67,7 @@ import java.util.Date
 import java.util.Locale
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 
@@ -183,87 +183,82 @@ fun TransactionHistoryScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(ThPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                canAccessCrossBranch = uiState.canAccessCrossBranch,
-                isOnline = uiState.isOnline,
-                branches = uiState.branches,
-                localBranchId = uiState.localBranchId,
-                onBranchSelect = {
-                    viewModel.onBranchSelected(it)
-                    viewModel.clearMessages()
-                },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
-                }
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch transactions are visible.",
-                    color = ThTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
-            LazyColumn(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(ThPageBg)
             ) {
-                if (!uiState.error.isNullOrBlank()) {
-                    item {
-                        Text(
-                            text = uiState.error ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 13.sp
-                        )
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    canAccessCrossBranch = uiState.canAccessCrossBranch,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    branches = uiState.branches,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelect = {
+                        viewModel.onBranchSelected(it)
+                        viewModel.clearMessages()
+                    },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
                     }
-                }
+                )
 
-                if (!uiState.successMessage.isNullOrBlank()) {
-                    item {
-                        Text(
-                            text = uiState.successMessage ?: "",
-                            color = ThGreen,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                ErrorWarning(message = uiState.error)
 
-                item {
-                    FilterCard(
-                        searchQuery = searchQuery,
-                        onSearchChange = { searchQuery = it },
-                        selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true }
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch transactions are visible.",
+                        color = ThTextSub,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
                     )
                 }
 
-                item {
-                    TransactionHistoryCard(
-                        transactions = filteredTransactions,
-                        isLoading = uiState.isLoading,
-                        isLoadingMore = uiState.isLoadingMore,
-                        hasMore = uiState.hasMore,
-                        isAdmin = uiState.isAdmin,
-                        onTransactionClick = { selectedTransaction = it },
-                        onVoidClick = { transactionToVoid = it },
-                        onLoadMore = { viewModel.loadMore() }
-                    )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (!uiState.successMessage.isNullOrBlank()) {
+                        item {
+                            Text(
+                                text = uiState.successMessage ?: "",
+                                color = ThGreen,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    item {
+                        FilterCard(
+                            searchQuery = searchQuery,
+                            onSearchChange = { searchQuery = it },
+                            selectedDateText = selectedDateText,
+                            onDateClick = { showDatePicker = true }
+                        )
+                    }
+
+                    item {
+                        TransactionHistoryCard(
+                            transactions = filteredTransactions,
+                            isLoading = uiState.isLoading,
+                            isLoadingMore = uiState.isLoadingMore,
+                            hasMore = uiState.hasMore,
+                            isAdmin = uiState.isAdmin,
+                            onTransactionClick = { selectedTransaction = it },
+                            onVoidClick = { transactionToVoid = it },
+                            onLoadMore = { viewModel.loadMore() }
+                        )
+                    }
                 }
             }
         }
@@ -301,6 +296,7 @@ private fun Header(
     selectedBranchId: Int?,
     canAccessCrossBranch: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     branches: List<BranchEntity>,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
@@ -333,6 +329,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = ThGreen,
                     containerColor = Color(0xFFF5F5F5),
@@ -478,7 +475,14 @@ private fun TransactionHistoryCard(
 
             when {
                 isLoading && transactions.isEmpty() -> {
-                    EmptyText("Loading transactions...")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(color = ThGreen)
+                    }
                 }
 
                 transactions.isEmpty() -> {

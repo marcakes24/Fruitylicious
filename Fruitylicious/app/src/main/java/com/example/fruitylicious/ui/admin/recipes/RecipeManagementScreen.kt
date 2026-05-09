@@ -163,6 +163,7 @@ fun RecipeManagementScreen(
                                     product = product,
                                     variants = uiState.variantsByProductId[product.productId].orEmpty(),
                                     hasRecipe = product.productId in uiState.productIdsWithRecipes,
+                                    isRecipesLoaded = uiState.isRecipesLoaded,
                                     onClick = { viewModel.selectProduct(product) }
                                 )
                             }
@@ -237,6 +238,7 @@ private fun ProductGridItem(
     product: ProductEntity,
     variants: List<ProductVariantEntity>,
     hasRecipe: Boolean,
+    isRecipesLoaded: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
@@ -281,7 +283,7 @@ private fun ProductGridItem(
                 )
             }
 
-            if (!hasRecipe) {
+            if (isRecipesLoaded && !hasRecipe) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -686,8 +688,8 @@ private fun ProductImage(
     val imageFile = imagePath?.let { ImageStorage.getImageFile(context, it) }
 
     Surface(
-        shape = CircleShape,
-        color = Color(0xFFF5F5F5),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFFE8F5E9),
         modifier = Modifier.size(size),
         border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {

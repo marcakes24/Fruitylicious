@@ -844,7 +844,12 @@ fun SalesTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (uiState.isLoading) {
-                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = RptGreen)
+                }
             } else if (uiState.topItems.isEmpty()) {
                 Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
@@ -863,7 +868,12 @@ fun SalesTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (uiState.isLoading) {
-                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = RptGreen)
+                }
             } else if (uiState.topAddons.isEmpty()) {
                 Text("No addons found.", fontSize = 13.sp, color = RptTextSub)
             } else {
@@ -882,7 +892,12 @@ fun SalesTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (uiState.isLoading) {
-                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = RptGreen)
+                }
             } else if (uiState.topCombos.isEmpty()) {
                 Text("No combos found.", fontSize = 13.sp, color = RptTextSub)
             } else {

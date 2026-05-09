@@ -1,11 +1,8 @@
 package com.example.fruitylicious
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -141,30 +138,10 @@ fun FruityliciousNavGraph(
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            enterTransition = {
-                slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(300))
-            },
-            exitTransition = {
-                slideOutHorizontally(
-                    targetOffsetX = { -it / 3 },
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(300))
-            },
-            popEnterTransition = {
-                slideInHorizontally(
-                    initialOffsetX = { -it / 3 },
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(300))
-            },
-            popExitTransition = {
-                slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(300))
-            }
+            enterTransition = { fadeIn(animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) }
         ) {
         composable(LOGIN) {
             LoginScreen(
@@ -201,6 +178,14 @@ fun FruityliciousNavGraph(
 
         composable(STAFF_POS) {
             PosScreen(
+                navController = navController,
+                mode = if (sessionManager.isAdmin()) SharedScreenMode.OWNER else SharedScreenMode.STAFF,
+                userName = sessionManager.getUserName(),
+                branchName = if (sessionManager.isAdmin()) "All" else "Branch ${sessionManager.getBranchId()}",
+                onLogout = {
+                    sessionManager.clearSession()
+                    navController.navigate(LOGIN) { popUpTo(0) }
+                },
                 onNavigate = { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
@@ -227,7 +212,7 @@ fun FruityliciousNavGraph(
                     }
 
                     navController.navigate(destination) {
-                        popUpTo(STAFF_CHECKOUT) {
+                        popUpTo(STAFF_POS) {
                             inclusive = true
                         }
                         launchSingleTop = true

@@ -9,7 +9,6 @@ import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.WasteLogDao
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
-import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.WasteLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -55,6 +55,7 @@ data class WasteManagementUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
+    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -95,19 +96,86 @@ class WasteManagementViewModel @Inject constructor(
     val uiState: StateFlow<WasteManagementUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-
-    private var localInventory: List<InventoryEntity> = emptyList()
-    private var localIngredients: List<IngredientEntity> = emptyList()
-    private var localWasteLogs: List<WasteLogEntity> = emptyList()
+    private var lockoutJob: kotlinx.coroutines.Job? = null
+    private val refreshTrigger = MutableStateFlow(0)
     private var branches: List<BranchEntity> = emptyList()
 
     init {
         observeBranches()
         observeNetwork()
-        observeInventory()
-        observeIngredients()
-        observeWasteLogs()
+        observeLocalData()
         observeClockInStatus()
+        loadHistory()
+    }
+
+    private fun observeLocalData() {
+        viewModelScope.launch {
+            combine(
+                wasteLogDao.observeAllWasteLogs(),
+                ingredientDao.observeIngredients(),
+                inventoryDao.observeInventoryByBranch(localBranchId),
+                refreshTrigger
+            ) { logs, ingredients, inventory, _ ->
+                Triple(logs, ingredients, inventory)
+            }.collect { (logs, ingredients, inventory) ->
+                val state = _uiState.value
+                
+                val ingredientRows = inventory.mapNotNull { item ->
+                    val ingredient = ingredients.find { it.ingredientId == item.ingredientId } ?: return@mapNotNull null
+                    WasteIngredientRow(
+                        ingredientId = item.ingredientId,
+                        branchId = item.branchId,
+                        ingredientName = ingredient.ingredientName,
+                        currentStock = item.currentStock,
+                        unitType = ingredient.unitType
+                    )
+                }.sortedBy { it.ingredientName.lowercase() }
+
+                val historyRows = buildHistoryRows(logs, ingredients)
+
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                    _uiState.update {
+                        it.copy(
+                            ingredients = ingredientRows,
+                            history = historyRows,
+                            isLoading = false,
+                            hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE,
+                            error = state.error
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(ingredients = ingredientRows) }
+                }
+            }
+        }
+    }
+
+    private fun buildHistoryRows(entities: List<WasteLogEntity>, ingredients: List<IngredientEntity>): List<WasteHistoryRow> {
+        val state = _uiState.value
+        val ingredientMap = ingredients.associateBy { it.ingredientId }
+        
+        return entities
+            .filter { log ->
+                state.selectedBranchId == null || log.branchId == state.selectedBranchId
+            }
+            .take(PAGE_SIZE + (state.currentPage * PAGE_SIZE))
+            .map { log ->
+                val ingredient = ingredientMap[log.ingredientId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                WasteHistoryRow(
+                    wasteId = log.wasteId,
+                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
+                    quantity = log.quantity,
+                    unitType = ingredient?.unitType ?: "",
+                    reason = log.reason,
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    dateTime = log.dateTime,
+                    imagePath = log.image
+                )
+            }
     }
 
     fun selectBranch(branchId: Int?) {
@@ -125,10 +193,12 @@ class WasteManagementViewModel @Inject constructor(
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null
+                error = null,
+                history = emptyList()
             )
         }
 
+        refreshTrigger.value += 1
         loadHistory()
     }
 
@@ -136,11 +206,13 @@ class WasteManagementViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isLoading = true,
-                error = null
+                error = null,
+                currentPage = 0,
+                history = emptyList()
             )
         }
 
-        rebuildIngredientRows()
+        refreshTrigger.value += 1
         loadHistory()
     }
 
@@ -148,12 +220,8 @@ class WasteManagementViewModel @Inject constructor(
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
                 branches = branchList
-
-                _uiState.update {
-                    it.copy(branches = branchList)
-                }
-
-                rebuildIngredientRows()
+                _uiState.update { it.copy(branches = branchList) }
+                refreshTrigger.value += 1
                 loadHistory()
             }
         }
@@ -188,72 +256,15 @@ class WasteManagementViewModel @Inject constructor(
             }
 
             val userId = sessionManager.getUserId()
-
             staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
                 val hasActiveLog = logs.any { it.clockOut == null }
-
                 _uiState.update {
                     it.copy(
                         isClockedIn = hasActiveLog,
-                        error = if (!hasActiveLog) {
-                            "You must clock in before recording waste."
-                        } else {
-                            null
-                        }
+                        error = if (!hasActiveLog) "You must clock in before recording waste." else null
                     )
                 }
             }
-        }
-    }
-
-    private fun observeInventory() {
-        viewModelScope.launch {
-            inventoryDao.observeInventoryByBranch(localBranchId).collectLatest { items ->
-                localInventory = items
-                rebuildIngredientRows()
-            }
-        }
-    }
-
-    private fun observeIngredients() {
-        viewModelScope.launch {
-            ingredientDao.observeIngredients().collectLatest { items ->
-                localIngredients = items
-                rebuildIngredientRows()
-                loadHistory()
-            }
-        }
-    }
-
-    private fun observeWasteLogs() {
-        viewModelScope.launch {
-            wasteLogDao.observeWasteLogsByBranch(localBranchId).collectLatest { items ->
-                localWasteLogs = items
-                loadHistory()
-            }
-        }
-    }
-
-    private fun rebuildIngredientRows() {
-        val ingredientMap = localIngredients.associateBy { it.ingredientId }
-
-        val ingredientRows = localInventory.mapNotNull { item ->
-            val ingredient = ingredientMap[item.ingredientId] ?: return@mapNotNull null
-
-            WasteIngredientRow(
-                ingredientId = item.ingredientId,
-                branchId = item.branchId,
-                ingredientName = ingredient.ingredientName,
-                currentStock = item.currentStock,
-                unitType = ingredient.unitType
-            )
-        }.sortedBy { it.ingredientName.lowercase() }
-
-        _uiState.update {
-            it.copy(
-                ingredients = ingredientRows,
-                isLoading = false
-            )
         }
     }
 
@@ -261,144 +272,52 @@ class WasteManagementViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
         
-        // Only for local history in this simple implementation
-        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
-
-        _uiState.update { it.copy(isLoadingMore = true) }
-
-        viewModelScope.launch {
-            val nextPage = state.currentPage + 1
-            val offset = nextPage * PAGE_SIZE
-            
-            val newEntities = if (state.selectedBranchId == null) {
-                wasteLogDao.getAllWasteLogsPaged(PAGE_SIZE, offset)
-            } else {
-                wasteLogDao.getWasteLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
-            }
-            
-            if (newEntities.isEmpty()) {
-                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
-                return@launch
-            }
-            
-            val ingredientMap = localIngredients.associateBy { it.ingredientId }
-            val newRows = newEntities.map { log ->
-                val ingredient = ingredientMap[log.ingredientId]
-                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
-                    ?: "Branch ${log.branchId}"
-
-                WasteHistoryRow(
-                    wasteId = log.wasteId,
-                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
-                    quantity = log.quantity,
-                    unitType = ingredient?.unitType ?: "",
-                    reason = log.reason,
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    dateTime = log.dateTime,
-                    imagePath = log.image
-                )
-            }
-
-            _uiState.update { 
-                it.copy(
-                    history = it.history + newRows,
-                    currentPage = nextPage,
-                    isLoadingMore = false,
-                    hasMore = newRows.size == PAGE_SIZE
-                )
-            }
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteHistoryPage(state.currentPage + 1)
+        } else {
+            _uiState.update { it.copy(currentPage = it.currentPage + 1) }
+            refreshTrigger.value += 1
         }
     }
 
     private fun loadHistory() {
         val state = _uiState.value
 
-        when {
-            state.selectedBranchId == localBranchId -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            !state.isAdmin -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            !state.isOnline -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            state.selectedBranchId == null -> {
-                loadRemoteAllBranchesHistory()
-            }
-
-            else -> {
-                loadRemoteBranchHistory(state.selectedBranchId)
-            }
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteHistoryPage(0)
+        } else {
+            // Local load handled by observeLocalData
         }
     }
 
-    private fun loadLocalHistory(branchId: Int) {
-        val ingredientMap = localIngredients.associateBy { it.ingredientId }
-        val branchName = branches.firstOrNull { it.branchId == branchId }?.branchName
-            ?: "Branch $branchId"
-
-        val historyRows = localWasteLogs
-            .filter { it.branchId == branchId }
-            .take(PAGE_SIZE)
-            .map { log ->
-                val ingredient = ingredientMap[log.ingredientId]
-
-                WasteHistoryRow(
-                    wasteId = log.wasteId,
-                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
-                    quantity = log.quantity,
-                    unitType = ingredient?.unitType ?: "",
-                    reason = log.reason,
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    dateTime = log.dateTime,
-                    imagePath = log.image
-                )
-            }
-            .sortedByDescending { it.dateTime }
-
-        _uiState.update {
-            it.copy(
-                history = historyRows,
-                isLoading = false,
-                hasMore = historyRows.size >= PAGE_SIZE,
-                currentPage = 0,
-                error = null
-            )
-        }
-    }
-
-    private fun loadRemoteBranchHistory(branchId: Int) {
+    private fun loadRemoteHistoryPage(page: Int) {
+        val state = _uiState.value
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
+            if (page == 0) {
+                _uiState.update { it.copy(isLoading = true, error = null, history = emptyList()) }
+            } else {
+                _uiState.update { it.copy(isLoadingMore = true) }
             }
 
-            val from = 0L
-            val to = System.currentTimeMillis()
-
-            val result = reportRepository.getWasteReport(
-                branchId = branchId,
-                from = from,
-                to = to
+            val result = reportRepository.getWastePage(
+                branchId = state.selectedBranchId,
+                from = 0L,
+                to = System.currentTimeMillis(),
+                page = page,
+                size = PAGE_SIZE
             )
 
             result.fold(
-                onSuccess = { report ->
-                    val rows = report.items.map { item ->
-                        WasteHistoryRow(
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { item ->
+                         WasteHistoryRow(
                             wasteId = item.wasteId,
                             ingredientName = item.ingredientName,
                             quantity = item.quantity,
                             unitType = item.unitType,
                             reason = item.reason,
-                            branchId = report.branchId ?: branchId,
-                            branchName = report.branchName ?: "Branch $branchId",
+                            branchId = item.branchId ?: state.selectedBranchId ?: 0,
+                            branchName = branches.firstOrNull { it.branchId == item.branchId }?.branchName ?: "Remote Branch",
                             dateTime = item.dateTime,
                             imagePath = ImageStorage.saveBase64Image(
                                 context = context,
@@ -406,12 +325,15 @@ class WasteManagementViewModel @Inject constructor(
                                 folder = "waste"
                             )
                         )
-                    }.sortedByDescending { it.dateTime }
+                    }
 
                     _uiState.update {
                         it.copy(
-                            history = rows,
+                            history = if (page == 0) newRows else it.history + newRows,
                             isLoading = false,
+                            isLoadingMore = false,
+                            currentPage = page,
+                            hasMore = pageResponse.hasNext,
                             error = null
                         )
                     }
@@ -419,85 +341,24 @@ class WasteManagementViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            history = emptyList(),
                             isLoading = false,
-                            error = error.message ?: "Failed to load remote waste history."
+                            isLoadingMore = false,
+                            error = error.message ?: "Failed to load remote waste history.",
+                            isRemoteAccessLocked = true
                         )
                     }
+                    startLockoutTimer()
+                    refreshTrigger.value += 1
                 }
             )
         }
     }
 
-    private fun loadRemoteAllBranchesHistory() {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
-            }
-
-            val from = 0L
-            val to = System.currentTimeMillis()
-            val allRows = mutableListOf<WasteHistoryRow>()
-            var firstError: String? = null
-
-            val branchList = branches.ifEmpty {
-                listOf(
-                    BranchEntity(
-                        branchId = localBranchId,
-                        branchName = "Branch $localBranchId",
-                        address = "",
-                        contactNumber = "",
-                        lastModified = 0L,
-                        isSynced = true,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            for (branch in branchList) {
-                val result = reportRepository.getWasteReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        val rows = report.items.map { item ->
-                            WasteHistoryRow(
-                                wasteId = item.wasteId,
-                                ingredientName = item.ingredientName,
-                                quantity = item.quantity,
-                                unitType = item.unitType,
-                                reason = item.reason,
-                                branchId = report.branchId ?: branch.branchId,
-                                branchName = report.branchName ?: branch.branchName,
-                                dateTime = item.dateTime,
-                                imagePath = ImageStorage.saveBase64Image(
-                                    context = context,
-                                    base64Value = item.image,
-                                    folder = "waste"
-                                )
-                            )
-                        }
-
-                        allRows.addAll(rows)
-                    },
-                    onFailure = { error ->
-                        if (firstError == null) {
-                            firstError = error.message
-                        }
-                    }
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    history = allRows.sortedByDescending { row -> row.dateTime },
-                    isLoading = false,
-                    error = firstError
-                )
-            }
+    private fun startLockoutTimer() {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }
 
@@ -523,7 +384,6 @@ class WasteManagementViewModel @Inject constructor(
         }
 
         val quantity = quantityText.toDoubleOrNull()
-
         if (quantity == null || quantity <= 0.0) {
             setError("Enter a valid quantity.")
             return
@@ -536,11 +396,9 @@ class WasteManagementViewModel @Inject constructor(
 
         viewModelScope.launch {
             val userId = sessionManager.getUserId()
-            val branchId = localBranchId
-
             val result = wasteRepository.logWaste(
                 ingredientId = ingredient.ingredientId,
-                branchId = branchId,
+                branchId = localBranchId,
                 userId = userId,
                 quantity = quantity,
                 image = imagePath,
@@ -549,17 +407,11 @@ class WasteManagementViewModel @Inject constructor(
 
             if (result.isSuccess) {
                 _uiState.update {
-                    it.copy(
-                        successMessage = "Waste entry saved.",
-                        error = null
-                    )
+                    it.copy(successMessage = "Waste entry saved.", error = null)
                 }
             } else {
                 _uiState.update {
-                    it.copy(
-                        error = result.exceptionOrNull()?.message ?: "Failed to save waste entry.",
-                        successMessage = null
-                    )
+                    it.copy(error = result.exceptionOrNull()?.message ?: "Failed to save waste entry.", successMessage = null)
                 }
             }
         }

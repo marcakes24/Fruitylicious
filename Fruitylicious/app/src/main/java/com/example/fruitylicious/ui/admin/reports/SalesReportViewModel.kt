@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 
 data class SalesDataPoint(
     val label: String,
@@ -199,6 +202,8 @@ class SalesReportViewModel @Inject constructor(
         chartJob?.cancel()
 
         reportJob = viewModelScope.launch {
+            delay(300) // Debounce rapid toggling
+            
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -543,37 +548,50 @@ class SalesReportViewModel @Inject constructor(
         branchId: Int?,
         period: String,
         range: Range
-    ) {
+    ) = coroutineScope {
         // 1. Load Summary
-        val summaryResult = reportRepository.getSalesSummary(
-            branchId = branchId,
-            from = range.currentStart,
-            to = range.currentEnd
-        )
+        val summaryDeferred = async {
+            reportRepository.getSalesSummary(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd
+            )
+        }
 
         // 2. Load Top Items
-        val topItemsResult = reportRepository.getTopSellingItems(
-            branchId = branchId,
-            from = range.currentStart,
-            to = range.currentEnd,
-            limit = 5
-        )
+        val topItemsDeferred = async {
+            reportRepository.getTopSellingItems(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd,
+                limit = 5
+            )
+        }
 
         // 3. Load First Page of Items
-        val itemsResult = reportRepository.getSalesItemsPage(
-            branchId = branchId,
-            from = range.currentStart,
-            to = range.currentEnd,
-            page = 0,
-            size = PAGE_SIZE
-        )
+        val itemsDeferred = async {
+            reportRepository.getSalesItemsPage(
+                branchId = branchId,
+                from = range.currentStart,
+                to = range.currentEnd,
+                page = 0,
+                size = PAGE_SIZE
+            )
+        }
 
         // 4. Load Transactions for Addons/Combos
-        val transactionsResult = if (branchId == null) {
-            reportRepository.getCombinedTransactionReport(range.currentStart, range.currentEnd)
-        } else {
-            reportRepository.getTransactionReport(branchId, range.currentStart, range.currentEnd)
+        val transactionsDeferred = async {
+            if (branchId == null) {
+                reportRepository.getCombinedTransactionReport(range.currentStart, range.currentEnd)
+            } else {
+                reportRepository.getTransactionReport(branchId, range.currentStart, range.currentEnd)
+            }
         }
+
+        val summaryResult = summaryDeferred.await()
+        val topItemsResult = topItemsDeferred.await()
+        val itemsResult = itemsDeferred.await()
+        val transactionsResult = transactionsDeferred.await()
 
         summaryResult.fold(
             onSuccess = { summary ->

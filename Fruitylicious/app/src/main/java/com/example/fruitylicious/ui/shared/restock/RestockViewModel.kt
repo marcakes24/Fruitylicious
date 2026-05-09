@@ -2,17 +2,12 @@ package com.example.fruitylicious.ui.shared.restock
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
-import com.example.fruitylicious.data.local.dao.AuditLogDao
 import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.dao.IngredientDao
 import com.example.fruitylicious.data.local.dao.InventoryDao
 import com.example.fruitylicious.data.local.dao.RestockLogDao
-import com.example.fruitylicious.data.local.db.PosDatabase
-import com.example.fruitylicious.data.local.entity.AuditLogEntity
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
-import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.local.entity.RestockLogEntity
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.RestockRepository
@@ -26,6 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -55,6 +53,7 @@ data class RestockUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
+    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -86,28 +85,108 @@ class RestockViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         RestockUiState(
             isAdmin = isAdminUser(),
-            selectedBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
-            localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId,
-            userBranchId = "B${sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId}"
+            selectedBranchId = localBranchId,
+            localBranchId = localBranchId,
+            userBranchId = "B$localBranchId"
         )
     )
 
     val uiState: StateFlow<RestockUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-
-    private var localIngredients: List<IngredientEntity> = emptyList()
-    private var localInventory: List<InventoryEntity> = emptyList()
-    private var localRestockLogs: List<RestockLogEntity> = emptyList()
+    private var lockoutJob: kotlinx.coroutines.Job? = null
+    private val refreshTrigger = MutableStateFlow(0)
     private var branches: List<BranchEntity> = emptyList()
 
     init {
         observeBranches()
         observeNetwork()
-        observeIngredients()
-        observeInventory()
-        observeRestockLogs()
+        observeLocalData()
         observeClockInStatus()
+
+        // Reactive history loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
+                loadHistory()
+            }
+        }
+    }
+
+    private fun observeLocalData() {
+        viewModelScope.launch {
+            combine(
+                restockLogDao.observeAllRestockLogs(),
+                ingredientDao.observeIngredients(),
+                inventoryDao.observeInventoryByBranch(localBranchId),
+                refreshTrigger
+            ) { logs, ingredients, inventory, _ ->
+                Triple(logs, ingredients, inventory)
+            }.collect { (logs, ingredients, inventory) ->
+                val state = _uiState.value
+                
+                val ingredientRows = ingredients.map { ingredient ->
+                    val inv = inventory.find { it.ingredientId == ingredient.ingredientId }
+                    RestockIngredientRow(
+                        ingredientId = ingredient.ingredientId,
+                        branchId = localBranchId,
+                        ingredientName = ingredient.ingredientName,
+                        currentStock = inv?.currentStock ?: 0.0,
+                        unitType = ingredient.unitType
+                    )
+                }.sortedBy { it.ingredientName.lowercase() }
+
+                val historyRows = buildHistoryRows(logs, ingredients)
+
+                // Fallback if local branch, offline, or remote error
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                    _uiState.update {
+                        it.copy(
+                            ingredients = ingredientRows,
+                            history = historyRows,
+                            isLoading = false,
+                            hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE,
+                            error = state.error
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(ingredients = ingredientRows) }
+                }
+            }
+        }
+    }
+
+    private fun buildHistoryRows(entities: List<RestockLogEntity>, ingredients: List<IngredientEntity>): List<RestockHistoryRow> {
+        val state = _uiState.value
+        val ingredientMap = ingredients.associateBy { it.ingredientId }
+        
+        return entities
+            .filter { log ->
+                state.selectedBranchId == null || log.branchId == state.selectedBranchId
+            }
+            .take(PAGE_SIZE + (state.currentPage * PAGE_SIZE))
+            .map { log ->
+                val ingredient = ingredientMap[log.ingredientId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                RestockHistoryRow(
+                    restockId = log.restockId,
+                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
+                    supplier = log.supplier,
+                    quantityAdded = log.quantityAdded,
+                    unitType = ingredient?.unitType ?: "",
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    dateTime = log.dateTime
+                )
+            }
     }
 
     fun selectBranch(branchId: Int?) {
@@ -119,42 +198,38 @@ class RestockViewModel @Inject constructor(
             localBranchId
         }
 
+        if (state.selectedBranchId == finalBranchId) return
+
         _uiState.update {
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null
+                error = null,
+                history = emptyList()
             )
         }
-
-        loadHistory()
     }
 
     fun refresh() {
         _uiState.update {
             it.copy(
                 isLoading = true,
-                error = null
+                error = null,
+                currentPage = 0,
+                history = emptyList()
             )
         }
 
-        rebuildIngredientRows()
-        loadHistory()
+        refreshTrigger.value += 1
     }
 
     private fun observeBranches() {
         viewModelScope.launch {
             branchDao.observeAllBranches().collectLatest { branchList ->
                 branches = branchList
-
-                _uiState.update {
-                    it.copy(branches = branchList)
-                }
-
-                rebuildIngredientRows()
-                loadHistory()
+                _uiState.update { it.copy(branches = branchList) }
             }
         }
     }
@@ -174,8 +249,6 @@ class RestockViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
-
-                loadHistory()
             }
         }
     }
@@ -183,84 +256,20 @@ class RestockViewModel @Inject constructor(
     private fun observeClockInStatus() {
         viewModelScope.launch {
             if (sessionManager.isAdmin()) {
-                _uiState.update {
-                    it.copy(
-                        isClockedIn = true,
-                        error = null
-                    )
-                }
+                _uiState.update { it.copy(isClockedIn = true) }
                 return@launch
             }
 
             val userId = sessionManager.getUserId()
-
             staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
                 val hasActiveLog = logs.any { it.clockOut == null }
-
                 _uiState.update {
                     it.copy(
                         isClockedIn = hasActiveLog,
-                        error = if (!hasActiveLog) {
-                            "You must clock in before restocking."
-                        } else {
-                            null
-                        }
+                        error = if (!hasActiveLog) "You must clock in before restocking." else null
                     )
                 }
             }
-        }
-    }
-
-    private fun observeIngredients() {
-        viewModelScope.launch {
-            ingredientDao.observeIngredients().collectLatest { items ->
-                localIngredients = items
-                rebuildIngredientRows()
-                loadHistory()
-            }
-        }
-    }
-
-    private fun observeInventory() {
-        viewModelScope.launch {
-            inventoryDao.observeInventoryByBranch(localBranchId).collectLatest { items ->
-                localInventory = items
-                rebuildIngredientRows()
-            }
-        }
-    }
-
-    private fun observeRestockLogs() {
-        viewModelScope.launch {
-            restockLogDao.observeRestockLogsByBranch(localBranchId).collectLatest { items ->
-                localRestockLogs = items
-                loadHistory()
-            }
-        }
-    }
-
-    private fun rebuildIngredientRows() {
-        val inventoryMap = localInventory.associateBy { it.ingredientId }
-
-        val ingredientRows = localIngredients
-            .map { ingredient ->
-                val inventory = inventoryMap[ingredient.ingredientId]
-
-                RestockIngredientRow(
-                    ingredientId = ingredient.ingredientId,
-                    branchId = localBranchId,
-                    ingredientName = ingredient.ingredientName,
-                    currentStock = inventory?.currentStock ?: 0.0,
-                    unitType = ingredient.unitType
-                )
-            }
-            .sortedBy { it.ingredientName.lowercase() }
-
-        _uiState.update {
-            it.copy(
-                ingredients = ingredientRows,
-                isLoading = false
-            )
         }
     }
 
@@ -268,153 +277,63 @@ class RestockViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
         
-        // Pagination only supported for local history for now in this simple implementation
-        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) return
-
-        _uiState.update { it.copy(isLoadingMore = true) }
-
-        viewModelScope.launch {
-            val nextPage = state.currentPage + 1
-            val offset = nextPage * PAGE_SIZE
-            
-            val newEntities = if (state.selectedBranchId == null) {
-                restockLogDao.getAllRestockLogsPaged(PAGE_SIZE, offset)
-            } else {
-                restockLogDao.getRestockLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
-            }
-            
-            if (newEntities.isEmpty()) {
-                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
-                return@launch
-            }
-            
-            val ingredientMap = localIngredients.associateBy { it.ingredientId }
-            val newRows = newEntities.map { log ->
-                val ingredient = ingredientMap[log.ingredientId]
-                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
-                    ?: "Branch ${log.branchId}"
-
-                RestockHistoryRow(
-                    restockId = log.restockId,
-                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
-                    supplier = log.supplier,
-                    quantityAdded = log.quantityAdded,
-                    unitType = ingredient?.unitType ?: "",
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    dateTime = log.dateTime
-                )
-            }
-
-            _uiState.update { 
-                it.copy(
-                    history = it.history + newRows,
-                    currentPage = nextPage,
-                    isLoadingMore = false,
-                    hasMore = newRows.size == PAGE_SIZE
-                )
-            }
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteHistoryPage(state.currentPage + 1)
+        } else {
+            _uiState.update { it.copy(currentPage = it.currentPage + 1) }
+            refreshTrigger.value += 1
         }
     }
 
     private fun loadHistory() {
         val state = _uiState.value
-        val selectedBranchId = state.selectedBranchId
 
-        when {
-            !state.isAdmin -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            !state.isOnline -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            selectedBranchId == localBranchId -> {
-                loadLocalHistory(localBranchId)
-            }
-
-            selectedBranchId == null -> {
-                loadRemoteAllBranchesHistory()
-            }
-
-            else -> {
-                loadRemoteBranchHistory(selectedBranchId)
-            }
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteHistoryPage(0)
+        } else {
+            // Local load handled by observeLocalData
         }
     }
 
-    private fun loadLocalHistory(branchId: Int) {
-        val ingredientMap = localIngredients.associateBy { it.ingredientId }
-        val branchName = branches.firstOrNull { it.branchId == branchId }?.branchName
-            ?: "Branch $branchId"
-
-        val historyRows = localRestockLogs
-            .filter { it.branchId == branchId }
-            .take(PAGE_SIZE)
-            .map { log ->
-                val ingredient = ingredientMap[log.ingredientId]
-
-                RestockHistoryRow(
-                    restockId = log.restockId,
-                    ingredientName = ingredient?.ingredientName ?: "Unknown ingredient",
-                    supplier = log.supplier,
-                    quantityAdded = log.quantityAdded,
-                    unitType = ingredient?.unitType ?: "",
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    dateTime = log.dateTime
-                )
-            }
-            .sortedByDescending { it.dateTime }
-
-        _uiState.update {
-            it.copy(
-                history = historyRows,
-                isLoading = false,
-                hasMore = historyRows.size >= PAGE_SIZE,
-                currentPage = 0,
-                error = null
-            )
-        }
-    }
-
-    private fun loadRemoteBranchHistory(branchId: Int) {
+    private fun loadRemoteHistoryPage(page: Int) {
+        val state = _uiState.value
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
+            if (page == 0) {
+                _uiState.update { it.copy(isLoading = true, error = null, history = emptyList()) }
+            } else {
+                _uiState.update { it.copy(isLoadingMore = true) }
             }
 
-            val from = 0L
-            val to = System.currentTimeMillis()
-
-            val result = reportRepository.getRestockReport(
-                branchId = branchId,
-                from = from,
-                to = to
+            val result = reportRepository.getRestockPage(
+                branchId = state.selectedBranchId,
+                from = 0L,
+                to = System.currentTimeMillis(),
+                page = page,
+                size = PAGE_SIZE
             )
 
             result.fold(
-                onSuccess = { report ->
-                    val rows = report.items
-                        .map { item ->
-                            RestockHistoryRow(
-                                restockId = item.restockId,
-                                ingredientName = item.ingredientName,
-                                supplier = item.supplier,
-                                quantityAdded = item.quantityAdded,
-                                unitType = item.unitType,
-                                branchId = report.branchId ?: branchId,
-                                branchName = report.branchName ?: "Branch $branchId",
-                                dateTime = item.dateTime
-                            )
-                        }
-                        .sortedByDescending { it.dateTime }
+                onSuccess = { pageResponse ->
+                    val newRows = pageResponse.items.map { item ->
+                        RestockHistoryRow(
+                            restockId = item.restockId,
+                            ingredientName = item.ingredientName,
+                            supplier = item.supplier,
+                            quantityAdded = item.quantityAdded,
+                            unitType = item.unitType,
+                            branchId = item.branchId ?: state.selectedBranchId ?: 0,
+                            branchName = branches.firstOrNull { it.branchId == item.branchId }?.branchName ?: "Remote Branch",
+                            dateTime = item.dateTime
+                        )
+                    }
 
                     _uiState.update {
                         it.copy(
-                            history = rows,
+                            history = if (page == 0) newRows else it.history + newRows,
                             isLoading = false,
+                            isLoadingMore = false,
+                            currentPage = page,
+                            hasMore = pageResponse.hasNext,
                             error = null
                         )
                     }
@@ -422,80 +341,24 @@ class RestockViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            history = emptyList(),
                             isLoading = false,
-                            error = error.message ?: "Failed to load remote restock history."
+                            isLoadingMore = false,
+                            error = error.message ?: "Failed to load remote restock history.",
+                            isRemoteAccessLocked = true
                         )
                     }
+                    startLockoutTimer()
+                    refreshTrigger.value += 1
                 }
             )
         }
     }
 
-    private fun loadRemoteAllBranchesHistory() {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(isLoading = true, error = null)
-            }
-
-            val from = 0L
-            val to = System.currentTimeMillis()
-            val allRows = mutableListOf<RestockHistoryRow>()
-            var firstError: String? = null
-
-            val branchList = branches.ifEmpty {
-                listOf(
-                    BranchEntity(
-                        branchId = localBranchId,
-                        branchName = "Branch $localBranchId",
-                        address = "",
-                        contactNumber = "",
-                        lastModified = 0L,
-                        isSynced = true,
-                        syncedAt = null
-                    )
-                )
-            }
-
-            for (branch in branchList) {
-                val result = reportRepository.getRestockReport(
-                    branchId = branch.branchId,
-                    from = from,
-                    to = to
-                )
-
-                result.fold(
-                    onSuccess = { report ->
-                        val rows = report.items.map { item ->
-                            RestockHistoryRow(
-                                restockId = item.restockId,
-                                ingredientName = item.ingredientName,
-                                supplier = item.supplier,
-                                quantityAdded = item.quantityAdded,
-                                unitType = item.unitType,
-                                branchId = report.branchId ?: branch.branchId,
-                                branchName = report.branchName ?: branch.branchName,
-                                dateTime = item.dateTime
-                            )
-                        }
-
-                        allRows.addAll(rows)
-                    },
-                    onFailure = { error ->
-                        if (firstError == null) {
-                            firstError = error.message
-                        }
-                    }
-                )
-            }
-
-            _uiState.update {
-                it.copy(
-                    history = allRows.sortedByDescending { row -> row.dateTime },
-                    isLoading = false,
-                    error = firstError
-                )
-            }
+    private fun startLockoutTimer() {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }
 
@@ -504,9 +367,7 @@ class RestockViewModel @Inject constructor(
         quantityText: String,
         supplier: String
     ) {
-        if (_uiState.value.isSubmitting) {
-            return
-        }
+        if (_uiState.value.isSubmitting) return
 
         if (ingredient == null) {
             setError("Select an ingredient.")
@@ -514,7 +375,6 @@ class RestockViewModel @Inject constructor(
         }
 
         val quantity = quantityText.toDoubleOrNull()
-
         if (quantity == null || quantity <= 0.0) {
             setError("Enter a valid quantity.")
             return
@@ -531,76 +391,39 @@ class RestockViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isSubmitting = true,
-                    error = null,
-                    successMessage = null
-                )
-            }
+            _uiState.update { it.copy(isSubmitting = true, error = null, successMessage = null) }
 
             try {
                 val userId = sessionManager.getUserId()
-                val branchId = localBranchId
-
                 val result = restockRepository.restock(
                     ingredientId = ingredient.ingredientId,
-                    branchId = branchId,
+                    branchId = localBranchId,
                     userId = userId,
                     quantityAdded = quantity,
                     supplier = supplier.ifBlank { "N/A" }
                 )
 
                 if (result.isSuccess) {
-                    _uiState.update {
-                        it.copy(
-                            successMessage = "Restock saved.",
-                            error = null
-                        )
-                    }
+                    _uiState.update { it.copy(successMessage = "Restock saved.", error = null) }
                 } else {
                     val error = result.exceptionOrNull()?.message ?: "Failed to save restock."
-                    _uiState.update {
-                        it.copy(
-                            error = error,
-                            successMessage = null
-                        )
-                    }
+                    _uiState.update { it.copy(error = error, successMessage = null) }
                 }
-
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        error = e.message ?: "Failed to save restock.",
-                        successMessage = null
-                    )
-                }
+                _uiState.update { it.copy(error = e.message ?: "Failed to save restock.", successMessage = null) }
             } finally {
-                // ✅ Always resets isSubmitting — even if a CancellationException
-                // is thrown, ensuring the button never stays permanently grayed out.
-                _uiState.update {
-                    it.copy(isSubmitting = false)
-                }
+                _uiState.update { it.copy(isSubmitting = false) }
             }
         }
     }
 
     fun clearMessages() {
-        _uiState.update {
-            it.copy(
-                error = null,
-                successMessage = null
-            )
-        }
+        _uiState.update { it.copy(error = null, successMessage = null) }
     }
 
     private fun setError(message: String) {
         _uiState.update {
-            it.copy(
-                error = message,
-                successMessage = null,
-                isSubmitting = false
-            )
+            it.copy(error = message, successMessage = null, isSubmitting = false)
         }
     }
 

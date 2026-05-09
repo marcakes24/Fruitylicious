@@ -17,29 +17,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -54,13 +45,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.FruityDateFilterField
 import com.example.fruitylicious.ui.shared.FruityDatePicker
 import com.example.fruitylicious.ui.shared.FruitySearchField
@@ -126,6 +117,19 @@ fun AuditLogScreen(
         }
     }
 
+    if (showDatePicker) {
+        FruityDatePicker(
+            state = datePickerState,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { millis ->
+                selectedDateMillis = millis
+            },
+            onClear = {
+                selectedDateMillis = null
+            }
+        )
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -143,123 +147,105 @@ fun AuditLogScreen(
             }
         }
     ) {
-        Scaffold(
-            topBar = {
-                AuditHeader(
-                    selectedBranchId = uiState.selectedBranchId,
-                    branches = uiState.branches,
-                    isAdmin = uiState.isAdmin,
-                    isOnline = uiState.isOnline,
-                    localBranchId = uiState.localBranchId,
-                    onBranchSelect = { branchId ->
-                        viewModel.selectBranch(branchId)
-                    },
-                    onMenuClick = {
-                        scope.launch {
-                            drawerState.open()
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                topBar = {
+                    AuditHeader(
+                        selectedBranchId = uiState.selectedBranchId,
+                        branches = uiState.branches,
+                        isAdmin = uiState.isAdmin,
+                        isOnline = uiState.isOnline,
+                        isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                        localBranchId = uiState.localBranchId,
+                        onBranchSelect = { branchId ->
+                            viewModel.selectBranch(branchId)
+                        },
+                        onMenuClick = {
+                            scope.launch {
+                                drawerState.open()
+                            }
                         }
-                    }
-                )
-            }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(AuditBackgroundYellow)
-                    .padding(horizontal = 16.dp)
-            ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (!uiState.error.isNullOrBlank()) {
-                    Text(
-                        text = uiState.error ?: "",
-                        color = Color.Red,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-
-                if (uiState.isAdmin && !uiState.isOnline) {
-                    Text(
-                        text = "Offline mode: Only local branch audit logs are available.",
-                        color = AuditGrayText,
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                    )
-                }
-
+            ) { padding ->
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .background(AuditBackgroundYellow)
                 ) {
-                    FruitySearchField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = "Search logs..."
-                    )
+                    ErrorWarning(message = uiState.error)
 
-                    FruityDateFilterField(
-                        selectedDateText = if (selectedDateMillis != null) {
-                            SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(selectedDateMillis!!))
-                        } else "",
-                        onClick = { showDatePicker = true },
-                        onClear = { selectedDateMillis = null }
-                    )
-                }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 16.dp, end = 16.dp)
+                    ) {
+                        item {
+                            FilterCard(
+                                searchQuery = searchQuery,
+                                onSearchChange = { searchQuery = it },
+                                selectedDateText = if (selectedDateMillis != null) {
+                                    SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date(selectedDateMillis!!))
+                                } else "",
+                                onDateClick = { showDatePicker = true },
+                                onDateClear = { selectedDateMillis = null }
+                            )
+                        }
 
-    if (showDatePicker) {
-        FruityDatePicker(
-            state = datePickerState,
-            onDismiss = { showDatePicker = false },
-            onConfirm = { millis ->
-                selectedDateMillis = millis
-            },
-            onClear = {
-                selectedDateMillis = null
-            }
-        )
-    }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    when {
-                        uiState.isLoading && filteredLogs.isEmpty() -> {
+                        if (uiState.isLoading && uiState.logs.isEmpty()) {
                             item {
-                                EmptyAuditText("Loading audit logs...")
+                                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = AuditGreenPrimary)
+                                }
                             }
                         }
 
-                        filteredLogs.isEmpty() -> {
+                        if (uiState.isAdmin && !uiState.isOnline) {
                             item {
-                                EmptyAuditText("No audit logs found")
+                                Text(
+                                    text = "Offline mode: Only local branch audit logs are available.",
+                                    color = AuditGrayText,
+                                    fontSize = 12.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp)
+                                )
                             }
                         }
 
-                        else -> {
-                            items(
-                                items = filteredLogs,
-                                key = { it.logId }
-                            ) { log ->
-                                AuditLogCard(log)
-                            }
-
-                            if (uiState.hasMore) {
+                        when {
+                            uiState.isLoading && filteredLogs.isEmpty() -> {
                                 item {
-                                    Button(
-                                        onClick = { viewModel.loadMore() },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = !uiState.isLoadingMore,
-                                        colors = ButtonDefaults.buttonColors(containerColor = AuditGreenPrimary)
-                                    ) {
-                                        Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                    EmptyAuditText("Loading audit logs...")
+                                }
+                            }
+
+                            filteredLogs.isEmpty() -> {
+                                item {
+                                    EmptyAuditText("No audit logs found")
+                                }
+                            }
+
+                            else -> {
+                                items(
+                                    items = filteredLogs,
+                                    key = { it.logId }
+                                ) { log ->
+                                    AuditLogCard(log)
+                                }
+
+                                if (uiState.hasMore) {
+                                    item {
+                                        Button(
+                                            onClick = { viewModel.loadMore() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            enabled = !uiState.isLoadingMore,
+                                            colors = ButtonDefaults.buttonColors(containerColor = AuditGreenPrimary)
+                                        ) {
+                                            Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                        }
                                     }
                                 }
                             }
@@ -272,11 +258,45 @@ fun AuditLogScreen(
 }
 
 @Composable
+private fun FilterCard(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    selectedDateText: String,
+    onDateClick: () -> Unit,
+    onDateClear: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FruitySearchField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = "Search logs..."
+            )
+
+            FruityDateFilterField(
+                selectedDateText = selectedDateText,
+                onClick = onDateClick,
+                onClear = onDateClear
+            )
+        }
+    }
+}
+
+@Composable
 private fun AuditHeader(
     selectedBranchId: Int?,
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -312,6 +332,7 @@ private fun AuditHeader(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = AuditGreenPrimary,
                     containerColor = Color(0xFFF5F5F5),

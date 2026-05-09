@@ -22,7 +22,10 @@ data class ReportsUiState(
     val selectedBranchId: Int? = 1,
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
-    val canAccessCrossBranch: Boolean = false
+    val canAccessCrossBranch: Boolean = false,
+    val isRemoteAccessLocked: Boolean = false,
+    val isLoading: Boolean = false,
+    val error: String? = null
 )
 
 @HiltViewModel
@@ -33,6 +36,7 @@ class ReportsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val localBranchId = sessionManager.getBranchId()
+    private var lockoutJob: kotlinx.coroutines.Job? = null
 
     private val _uiState = MutableStateFlow(
         ReportsUiState(
@@ -86,7 +90,6 @@ class ReportsViewModel @Inject constructor(
 
     fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
-
         val finalBranchId = if (state.canAccessCrossBranch) {
             branchId
         } else {
@@ -95,8 +98,29 @@ class ReportsViewModel @Inject constructor(
 
         _uiState.update {
             it.copy(
-                selectedBranchId = finalBranchId
+                selectedBranchId = finalBranchId,
+                isLoading = true
             )
+        }
+
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun setRemoteError(errorMessage: String?) {
+        _uiState.update { it.copy(error = errorMessage, isRemoteAccessLocked = errorMessage != null) }
+        if (errorMessage != null) {
+            startLockoutTimer()
+        }
+    }
+
+    private fun startLockoutTimer() {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }
 

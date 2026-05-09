@@ -22,8 +22,10 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val usernameError: String? = null,
     val passwordError: String? = null,
+    val termsError: String? = null,
     val error: String? = null,
-    val loggedInRole: String? = null
+    val loggedInRole: String? = null,
+    val agreedToTerms: Boolean = false
 )
 
 @HiltViewModel
@@ -62,6 +64,15 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun onTermsAgreedChanged(agreed: Boolean) {
+        _uiState.update {
+            it.copy(
+                agreedToTerms = agreed,
+                termsError = null
+            )
+        }
+    }
+
     fun login() {
         val currentState = _uiState.value
         val username = currentState.username.trim()
@@ -79,11 +90,18 @@ class LoginViewModel @Inject constructor(
             null
         }
 
-        if (usernameError != null || passwordError != null) {
+        val termsError = if (!currentState.agreedToTerms) {
+            "You must agree to the Terms and Conditions."
+        } else {
+            null
+        }
+
+        if (usernameError != null || passwordError != null || termsError != null) {
             _uiState.update {
                 it.copy(
                     usernameError = usernameError,
                     passwordError = passwordError,
+                    termsError = termsError,
                     error = null
                 )
             }
@@ -96,7 +114,8 @@ class LoginViewModel @Inject constructor(
                     isLoading = true,
                     error = null,
                     usernameError = null,
-                    passwordError = null
+                    passwordError = null,
+                    termsError = null
                 )
             }
 

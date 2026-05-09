@@ -23,8 +23,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Inventory
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,8 +30,6 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,6 +51,7 @@ import com.example.fruitylicious.ui.shared.OwnerSideBarContent
 import androidx.compose.runtime.collectAsState
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import kotlinx.coroutines.launch
 
 val RptGreen = Color(0xFF2E7D32)
@@ -102,68 +99,72 @@ fun ReportsScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(RptPageBg)
-        ) {
-        ReportsHeader(
-            selectedBranchId = uiState.selectedBranchId,
-            canAccessCrossBranch = uiState.canAccessCrossBranch,
-            isOnline = uiState.isOnline,
-            branches = uiState.branches,
-            localBranchId = uiState.localBranchId,
-            onBranchSelected = { viewModel.onBranchSelected(it) },
-            onMenuClick = {
-                scope.launch {
-                    drawerState.open()
-                }
-            }
-        )
-
-        if (uiState.isAdmin && !uiState.isOnline) {
-            Text(
-                text = "Offline mode: Only local branch reports are available.",
-                color = RptTextSub,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        ReportTabBar(
-            selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it }
-        )
-
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTab) {
-                    ReportTab.SALES -> {
-                        SalesTabContent(
-                            branchId = uiState.selectedBranchId,
-                            navController = navController
-                        )
+                    .fillMaxSize()
+                    .background(RptPageBg)
+            ) {
+                ReportsHeader(
+                    selectedBranchId = uiState.selectedBranchId,
+                    canAccessCrossBranch = uiState.canAccessCrossBranch,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    branches = uiState.branches,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelected = { viewModel.onBranchSelected(it) },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
+                        }
                     }
+                )
 
-                    ReportTab.WASTE -> {
-                        WasteTabContent(
-                            branchId = uiState.selectedBranchId
-                        )
-                    }
+                ErrorWarning(message = uiState.error)
 
-                    ReportTab.RESTOCK -> {
-                        RestockTabContent(
-                            branchId = uiState.selectedBranchId
-                        )
-                    }
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch reports are available.",
+                        color = RptTextSub,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp)
+                    )
+                }
 
-                    ReportTab.INVENTORY -> {
-                        InventoryTabContent(
-                            branchId = uiState.selectedBranchId
-                        )
+                ReportTabBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it }
+                )
+
+                Box(modifier = Modifier.weight(1f)) {
+                    when (selectedTab) {
+                        ReportTab.SALES -> {
+                            SalesTabContent(
+                                branchId = uiState.selectedBranchId,
+                                navController = navController
+                            )
+                        }
+
+                        ReportTab.WASTE -> {
+                            WasteTabContent(
+                                branchId = uiState.selectedBranchId
+                            )
+                        }
+
+                        ReportTab.RESTOCK -> {
+                            RestockTabContent(
+                                branchId = uiState.selectedBranchId
+                            )
+                        }
+
+                        ReportTab.INVENTORY -> {
+                            InventoryTabContent(
+                                branchId = uiState.selectedBranchId
+                            )
+                        }
                     }
                 }
             }
@@ -176,6 +177,7 @@ private fun ReportsHeader(
     selectedBranchId: Int?,
     canAccessCrossBranch: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     branches: List<BranchEntity>,
     localBranchId: Int,
     onBranchSelected: (Int?) -> Unit,
@@ -185,7 +187,7 @@ private fun ReportsHeader(
         modifier = Modifier
             .fillMaxWidth()
             .background(RptGreen)
-            .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 12.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -193,8 +195,9 @@ private fun ReportsHeader(
             contentDescription = "Menu",
             tint = Color.White,
             modifier = Modifier
-                .size(28.dp)
+                .size(48.dp)
                 .clickable { onMenuClick() }
+                .padding(10.dp)
         )
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -212,6 +215,7 @@ private fun ReportsHeader(
                 selectedBranchId = selectedBranchId,
                 branches = branches,
                 isOnline = isOnline,
+                isRemoteAccessLocked = isRemoteAccessLocked,
                 onBranchSelected = onBranchSelected,
                 activeColor = RptGreen,
                 containerColor = Color.White,

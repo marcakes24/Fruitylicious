@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,16 +38,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -54,6 +54,7 @@ import com.example.fruitylicious.ADMIN_RESTOCK_HISTORY
 import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.BranchSelector
+import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
@@ -101,72 +102,82 @@ fun NotificationsScreen(
             }
         }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(NotifPageBg)
-        ) {
-            Header(
-                selectedBranchId = uiState.selectedBranchId,
-                branches = uiState.branches,
-                isAdmin = uiState.isAdmin,
-                isOnline = uiState.isOnline,
-                localBranchId = uiState.localBranchId,
-                onBranchSelected = { viewModel.selectBranch(it) },
-                onMenuClick = {
-                    scope.launch {
-                        drawerState.open()
-                    }
-                }
-            )
-
-            if (uiState.isAdmin && !uiState.isOnline) {
-                Text(
-                    text = "Offline mode: Only local branch notifications are available.",
-                    color = NotifTextSub,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
-
+        Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .background(NotifPageBg)
             ) {
-                when {
-                    uiState.isLoading -> {
-                        EmptyNotificationText("Loading notifications...")
-                    }
-
-                    uiState.notifications.isEmpty() -> {
-                        EmptyNotificationText("No low-stock notifications.")
-                    }
-
-                    else -> {
-                        uiState.notifications.forEach { notification ->
-                            NotificationItem(
-                                notification = notification,
-                                onRestock = {
-                                    val route = if (mode == SharedScreenMode.OWNER) {
-                                        ADMIN_RESTOCK_HISTORY
-                                    } else {
-                                        STAFF_RESTOCK_HISTORY
-                                    }
-
-                                    navController.navigate(route)
-                                }
-                            )
+                Header(
+                    selectedBranchId = uiState.selectedBranchId,
+                    branches = uiState.branches,
+                    isAdmin = uiState.isAdmin,
+                    isOnline = uiState.isOnline,
+                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
+                    localBranchId = uiState.localBranchId,
+                    onBranchSelected = { viewModel.selectBranch(it) },
+                    onMenuClick = {
+                        scope.launch {
+                            drawerState.open()
                         }
                     }
+                )
+
+                ErrorWarning(message = uiState.error)
+
+                if (uiState.isAdmin && !uiState.isOnline) {
+                    Text(
+                        text = "Offline mode: Only local branch notifications are available.",
+                        color = NotifTextSub,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    when {
+                        uiState.isLoading && uiState.notifications.isEmpty() -> {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.CircularProgressIndicator(color = NotifGreen)
+                            }
+                        }
+
+                        uiState.notifications.isEmpty() -> {
+                            EmptyNotificationText("No low-stock notifications.")
+                        }
+
+                        else -> {
+                            uiState.notifications.forEach { notification ->
+                                NotificationItem(
+                                    notification = notification,
+                                    onRestock = {
+                                        val route = if (mode == SharedScreenMode.OWNER) {
+                                            ADMIN_RESTOCK_HISTORY
+                                        } else {
+                                            STAFF_RESTOCK_HISTORY
+                                        }
+
+                                        navController.navigate(route)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
     }
@@ -178,6 +189,7 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
+    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -213,6 +225,7 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
+                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelected,
                     activeColor = NotifGreen,
                     containerColor = Color(0xFFF5F5F5),

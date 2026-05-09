@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -39,6 +40,7 @@ data class AuditLogUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
+    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -73,16 +75,72 @@ class AuditLogViewModel @Inject constructor(
     val uiState: StateFlow<AuditLogUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
+    private var lockoutJob: kotlinx.coroutines.Job? = null
 
-    private var localAuditLogs: List<AuditLogEntity> = emptyList()
-    private var localUsers: List<UserEntity> = emptyList()
     private var branches: List<BranchEntity> = emptyList()
+    private val refreshTrigger = MutableStateFlow(0)
 
     init {
         observeBranches()
         observeNetwork()
-        observeLocalUsers()
-        observeLocalAuditLogs()
+        observeLocalData()
+        loadLogs()
+    }
+
+    private fun observeLocalData() {
+        viewModelScope.launch {
+            combine(
+                auditLogDao.observeAllAuditLogs(),
+                userDao.observeUsers(),
+                refreshTrigger
+            ) { logs, users, _ ->
+                buildLogRows(logs, users)
+            }.collect { rows ->
+                val state = _uiState.value
+                // Use local data if:
+                // 1. Local branch selected
+                // 2. Offline
+                // 3. Remote fetch failed (error != null)
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                    _uiState.update {
+                        it.copy(
+                            logs = rows,
+                            isLoading = false,
+                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE,
+                            error = state.error
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildLogRows(entities: List<AuditLogEntity>, users: List<UserEntity>): List<AuditLogRow> {
+        val state = _uiState.value
+        val userMap = users.associateBy { it.userId }
+        
+        return entities
+            .filter { log ->
+                state.selectedBranchId == null || log.branchId == state.selectedBranchId
+            }
+            .take(PAGE_SIZE + (state.currentPage * PAGE_SIZE))
+            .map { log ->
+                val user = userMap[log.userId]
+                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
+                    ?: "Branch ${log.branchId}"
+
+                AuditLogRow(
+                    logId = log.logId,
+                    action = extractActionTitle(log.action),
+                    description = log.action,
+                    userName = user?.name ?: "Unknown User",
+                    username = user?.username ?: "unknown",
+                    tableAffected = log.tableAffected,
+                    branchId = log.branchId,
+                    branchName = branchName,
+                    timestamp = log.timestamp
+                )
+            }
     }
 
     fun selectBranch(branchId: Int?) {
@@ -100,10 +158,12 @@ class AuditLogViewModel @Inject constructor(
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null
+                error = null,
+                logs = emptyList()
             )
         }
 
+        refreshTrigger.value += 1
         loadLogs()
     }
 
@@ -111,10 +171,13 @@ class AuditLogViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isLoading = true,
-                error = null
+                error = null,
+                currentPage = 0,
+                logs = emptyList()
             )
         }
 
+        refreshTrigger.value += 1
         loadLogs()
     }
 
@@ -127,6 +190,7 @@ class AuditLogViewModel @Inject constructor(
                     it.copy(branches = branchList)
                 }
 
+                refreshTrigger.value += 1
                 loadLogs()
             }
         }
@@ -153,133 +217,27 @@ class AuditLogViewModel @Inject constructor(
         }
     }
 
-    private fun observeLocalUsers() {
-        viewModelScope.launch {
-            userDao.observeUsers().collectLatest { userList ->
-                localUsers = userList
-                loadLogs()
-            }
-        }
-    }
-
-    private fun observeLocalAuditLogs() {
-        viewModelScope.launch {
-            auditLogDao.observeAuditLogsByBranch(localBranchId).collectLatest { logs ->
-                localAuditLogs = logs
-                loadLogs()
-            }
-        }
-    }
-
     fun loadMore() {
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
         
-        if (state.isAdmin && state.isOnline && state.selectedBranchId != localBranchId) {
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
             loadRemoteLogsPage(state.currentPage + 1)
-            return
-        }
-
-        _uiState.update { it.copy(isLoadingMore = true) }
-
-        viewModelScope.launch {
-            val nextPage = state.currentPage + 1
-            val offset = nextPage * PAGE_SIZE
-            
-            val newEntities = if (state.selectedBranchId == null) {
-                auditLogDao.getAuditLogsPaged(PAGE_SIZE, offset)
-            } else {
-                auditLogDao.getAuditLogsByBranchPaged(state.selectedBranchId, PAGE_SIZE, offset)
-            }
-            
-            if (newEntities.isEmpty()) {
-                _uiState.update { it.copy(isLoadingMore = false, hasMore = false) }
-                return@launch
-            }
-            
-            val userMap = localUsers.associateBy { it.userId }
-            val newRows = newEntities.map { log ->
-                val user = userMap[log.userId]
-                val branchName = branches.firstOrNull { it.branchId == log.branchId }?.branchName
-                    ?: "Branch ${log.branchId}"
-
-                AuditLogRow(
-                    logId = log.logId,
-                    action = extractActionTitle(log.action),
-                    description = log.action,
-                    userName = user?.name ?: "Unknown User",
-                    username = user?.username ?: "unknown",
-                    tableAffected = log.tableAffected,
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    timestamp = log.timestamp
-                )
-            }
-
+        } else {
             _uiState.update { 
-                it.copy(
-                    logs = it.logs + newRows,
-                    currentPage = nextPage,
-                    isLoadingMore = false,
-                    hasMore = newRows.size == PAGE_SIZE
-                )
+                it.copy(currentPage = it.currentPage + 1)
             }
+            refreshTrigger.value += 1
         }
     }
 
     private fun loadLogs() {
         val state = _uiState.value
 
-        when {
-            state.selectedBranchId == localBranchId -> {
-                loadLocalLogs(localBranchId)
-            }
-
-            !state.isAdmin -> {
-                loadLocalLogs(localBranchId)
-            }
-
-            !state.isOnline -> {
-                loadLocalLogs(localBranchId)
-            }
-
-            else -> {
-                loadRemoteLogsPage(0)
-            }
-        }
-    }
-
-    private fun loadLocalLogs(branchId: Int) {
-        val userMap = localUsers.associateBy { it.userId }
-        val branchName = branches.firstOrNull { it.branchId == branchId }?.branchName ?: "Branch $branchId"
-
-        val rows = localAuditLogs
-            .filter { it.branchId == branchId }
-            .take(PAGE_SIZE)
-            .map { log ->
-                val user = userMap[log.userId]
-
-                AuditLogRow(
-                    logId = log.logId,
-                    action = extractActionTitle(log.action),
-                    description = log.action,
-                    userName = user?.name ?: "Unknown User",
-                    username = user?.username ?: "unknown",
-                    tableAffected = log.tableAffected,
-                    branchId = log.branchId,
-                    branchName = branchName,
-                    timestamp = log.timestamp
-                )
-            }
-
-        _uiState.update {
-            it.copy(
-                logs = rows,
-                isLoading = false,
-                hasMore = rows.size >= PAGE_SIZE,
-                currentPage = 0,
-                error = null
-            )
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteLogsPage(0)
+        } else {
+            // Local load is handled by observeLocalData
         }
     }
 
@@ -335,20 +293,23 @@ class AuditLogViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             isLoadingMore = false,
-                            error = error.message ?: "Failed to load remote audit logs."
+                            error = error.message ?: "Failed to load remote audit logs.",
+                            isRemoteAccessLocked = true
                         )
                     }
+                    startLockoutTimer()
+                    refreshTrigger.value += 1
                 }
             )
         }
     }
 
-    private fun loadRemoteBranch(branchId: Int) {
-        loadRemoteLogsPage(0)
-    }
-
-    private fun loadRemoteAllBranches() {
-        loadRemoteLogsPage(0)
+    private fun startLockoutTimer() {
+        lockoutJob?.cancel()
+        lockoutJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            _uiState.update { it.copy(isRemoteAccessLocked = false) }
+        }
     }
 
     private fun isAdminUser(): Boolean {

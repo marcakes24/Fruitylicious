@@ -864,7 +864,7 @@ private fun ProductRow(
     onDeleteProduct: () -> Unit
 ) {
     RowCard {
-        ProductImageCircle(
+        ProductIconBox(
             imagePath = row.product.image,
             productName = row.product.productName,
             fallbackIcon = Icons.Default.Inventory2
@@ -904,7 +904,7 @@ private fun AddOnRow(
     onDelete: () -> Unit
 ) {
     RowCard {
-        ProductImageCircle(
+        ProductIconBox(
             imagePath = addon.image,
             productName = addon.productName,
             fallbackIcon = Icons.Default.AddCircle
@@ -950,7 +950,7 @@ private fun RowCard(
 }
 
 @Composable
-private fun ProductImageCircle(
+private fun ProductIconBox(
     imagePath: String?,
     productName: String,
     fallbackIcon: ImageVector
@@ -958,8 +958,8 @@ private fun ProductImageCircle(
     Box(
         modifier = Modifier
             .size(44.dp)
-            .clip(CircleShape)
-            .background(Color.White),
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFE8F5E9)),
         contentAlignment = Alignment.Center
     ) {
         ProductImage(

@@ -33,6 +33,7 @@ data class HourlySales(
 )
 
 data class AdminDashboardUiState(
+    val branchName: String = "",
     val userName: String = "",
     val selectedBranchId: Int? = null,
     val selectedBranchName: String = "All Branches",
@@ -74,6 +75,7 @@ class AdminDashboardViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(
         AdminDashboardUiState(
+            branchName = branchConfig.branchName,
             userName = sessionManager.getUserName().ifBlank { "Owner User" },
             selectedBranchId = if (isAdminUser()) null else localBranchId,
             selectedBranchName = if (isAdminUser()) "All Branches" else "Branch $localBranchId",
@@ -234,7 +236,7 @@ class AdminDashboardViewModel @Inject constructor(
             val state = _uiState.value
             val isOnline = networkMonitor.isOnline()
 
-            if (state.isAdmin && isOnline) {
+            if (isOnline && state.selectedBranchId != localBranchId) {
                 loadRemoteNotifications()
             } else {
                 observeLocalNotifications()

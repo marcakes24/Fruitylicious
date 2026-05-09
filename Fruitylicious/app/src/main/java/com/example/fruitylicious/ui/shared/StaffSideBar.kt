@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.fruitylicious.LOGIN
 import com.example.fruitylicious.R
@@ -445,10 +446,10 @@ private fun staffNavigateTo(
     if (route == currentRoute) return
 
     navController.navigate(route) {
-        popUpTo(STAFF_DASHBOARD) {
-            saveState = (route != STAFF_DASHBOARD)
+        popUpTo(navController.graph.findStartDestination().id) {
+            saveState = true
         }
         launchSingleTop = true
-        restoreState = (route != STAFF_DASHBOARD)
+        restoreState = true
     }
 }

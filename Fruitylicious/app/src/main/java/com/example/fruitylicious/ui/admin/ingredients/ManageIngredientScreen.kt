@@ -114,9 +114,11 @@ fun ManageIngredientsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var currentIngredient by remember { mutableStateOf<IngredientEntity?>(null) }
 
-    val filteredIngredients = uiState.ingredients.filter {
-        it.ingredientName.contains(searchQuery, ignoreCase = true) ||
-                it.unitType.contains(searchQuery, ignoreCase = true)
+    val filteredIngredients = remember(uiState.ingredients, searchQuery) {
+        uiState.ingredients.filter {
+            it.ingredientName.contains(searchQuery, ignoreCase = true) ||
+                    it.unitType.contains(searchQuery, ignoreCase = true)
+        }
     }
 
     ModalNavigationDrawer(
@@ -327,8 +329,8 @@ private fun IngredientRow(
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.White),
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFE8F5E9)),
             contentAlignment = Alignment.Center
         ) {
             if (imageFile != null && imageFile.exists()) {

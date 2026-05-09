@@ -356,7 +356,12 @@ fun RestockTabContent(
             }
 
             if (uiState.isLoading) {
-                Text("Loading...", fontSize = 13.sp, color = RptTextSub)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(color = RptGreen)
+                }
             } else if (filteredIngredients.isEmpty()) {
                 Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
@@ -413,12 +418,12 @@ fun RestockTabContent(
 
             when {
                 uiState.isLoading -> {
-                    Text(
-                        text = "Loading restock data...",
-                        fontSize = 13.sp,
-                        color = RptTextSub,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(color = RptGreenDark)
+                    }
                 }
 
                 restockItems.isEmpty() -> {

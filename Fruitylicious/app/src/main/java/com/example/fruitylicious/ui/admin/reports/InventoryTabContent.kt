@@ -2,6 +2,7 @@ package com.example.fruitylicious.ui.admin.reports
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,10 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import com.example.fruitylicious.util.ImageStorage
 import java.util.Locale
 
 private val RptLowStock = Color(0xFFE53935)
@@ -121,12 +132,12 @@ fun InventoryTabContent(
 
             when {
                 uiState.isLoading -> {
-                    Text(
-                        text = "Loading inventory data...",
-                        fontSize = 13.sp,
-                        color = RptTextSub,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(color = RptGreen)
+                    }
                 }
 
                 filteredRows.isEmpty() -> {
@@ -139,8 +150,12 @@ fun InventoryTabContent(
                 }
 
                 else -> {
+                    val context = LocalContext.current
                     filteredRows.forEach { item ->
                         val isLow = item.currentStock <= item.lowStockThreshold
+                        val imageFile = item.image?.let {
+                            ImageStorage.getImageFile(context, it)
+                        }
 
                         Row(
                             modifier = Modifier
@@ -149,6 +164,32 @@ fun InventoryTabContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFFE8F5E9)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (imageFile != null && imageFile.exists()) {
+                                    AsyncImage(
+                                        model = imageFile,
+                                        contentDescription = item.ingredientName,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Inventory2,
+                                        contentDescription = "Inventory",
+                                        tint = RptGreen,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.ingredientName,
@@ -158,7 +199,7 @@ fun InventoryTabContent(
                                 )
 
                                 Text(
-                                    text = "${item.category} • Branch ${item.branchId}",
+                                    text = "${item.category} • Branch ${if (item.branchId == 0) "All" else item.branchId}",
                                     fontSize = 11.sp,
                                     color = RptTextSub
                                 )

@@ -156,6 +156,7 @@ fun AdminDashboardScreen(
 
                     GreetingCard(
                         ownerName = uiState.userName,
+                        branchName = uiState.branchName,
                         dateText = uiState.dateText,
                         isOnline = uiState.isOnline,
                         onStartPos = {
@@ -267,6 +268,7 @@ private fun DashboardHeader(
 @Composable
 private fun GreetingCard(
     ownerName: String,
+    branchName: String,
     dateText: String,
     isOnline: Boolean,
     onStartPos: () -> Unit
@@ -304,6 +306,22 @@ private fun GreetingCard(
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFFE8F5E9))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = branchName,
+                            color = DashGreenPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
