@@ -1,6 +1,6 @@
 package com.example.fruitylicious.ui.admin.staffmanagement
+
 import android.content.Context
-import com.example.fruitylicious.data.repository.ReportRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.BranchDao
@@ -9,6 +9,7 @@ import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.StaffLogEntity
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.ImageStorage
 import com.example.fruitylicious.util.NetworkMonitor
@@ -16,13 +17,20 @@ import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class StaffLogRow(
     val logId: String,
@@ -78,7 +86,7 @@ class StaffLogViewModel @Inject constructor(
     val uiState: StateFlow<StaffLogUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-    private var lockoutJob: kotlinx.coroutines.Job? = null
+    private var lockoutJob: Job? = null
 
     private var branches: List<BranchEntity> = emptyList()
     private val refreshTrigger = MutableStateFlow(0)
@@ -87,7 +95,25 @@ class StaffLogViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
-        loadLogs()
+        
+        // Reactive history loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    delay(300) // Debounce branch selection
+                    loadLogs()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                }
+            }
+        }
     }
 
     private fun observeLocalData() {
@@ -97,24 +123,29 @@ class StaffLogViewModel @Inject constructor(
                 userDao.observeUsers(),
                 refreshTrigger
             ) { logs, users, _ ->
-                buildLogRows(logs, users)
-            }.collect { rows ->
-                val state = _uiState.value
-                // Fallback to local data if:
-                // 1. Local branch selected
-                // 2. Offline
-                // 3. Remote fetch failed (error != null)
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
-                    _uiState.update {
-                        it.copy(
-                            logs = rows,
-                            isLoading = false,
-                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE,
-                            error = state.error
-                        )
+                logs to users
+            }
+                .flowOn(Dispatchers.Default)
+                .map { (logs, users) ->
+                    buildLogRows(logs, users)
+                }
+                .collectLatest { rows ->
+                    _uiState.update { state ->
+                        // Show local data if:
+                        // 1. Local branch selected
+                        // 2. Offline
+                        // 3. Error fallback
+                        if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                            state.copy(
+                                logs = rows,
+                                isLoading = false,
+                                hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE
+                            )
+                        } else {
+                            state
+                        }
                     }
                 }
-            }
         }
     }
 
@@ -266,22 +297,24 @@ class StaffLogViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { pageResponse ->
-                    val newRows = pageResponse.items.map { log ->
-                        StaffLogRow(
-                            logId = log.logId,
-                            userId = log.userId,
-                            staffName = log.userName,
-                            username = "unknown",
-                            branchId = log.branchId ?: state.selectedBranchId ?: 0,
-                            branchName = log.branchName ?: branches.firstOrNull { it.branchId == log.branchId }?.branchName ?: "Remote Branch",
-                            clockIn = log.clockIn,
-                            clockOut = log.clockOut,
-                            imagePath = ImageStorage.saveBase64Image(
-                                context = context,
-                                base64Value = log.image,
-                                folder = "staff_logs"
+                    val newRows = withContext(Dispatchers.IO) {
+                        pageResponse.items.map { log ->
+                            StaffLogRow(
+                                logId = log.logId,
+                                userId = log.userId,
+                                staffName = log.userName,
+                                username = "unknown",
+                                branchId = log.branchId ?: state.selectedBranchId ?: 0,
+                                branchName = log.branchName ?: branches.firstOrNull { it.branchId == log.branchId }?.branchName ?: "Remote Branch",
+                                clockIn = log.clockIn,
+                                clockOut = log.clockOut,
+                                imagePath = ImageStorage.saveBase64Image(
+                                    context = context,
+                                    base64Value = log.image,
+                                    folder = "staff_logs"
+                                )
                             )
-                        )
+                        }
                     }
 
                     _uiState.update {
@@ -314,7 +347,7 @@ class StaffLogViewModel @Inject constructor(
     private fun startLockoutTimer() {
         lockoutJob?.cancel()
         lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            delay(5 * 60 * 1000L)
             _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }

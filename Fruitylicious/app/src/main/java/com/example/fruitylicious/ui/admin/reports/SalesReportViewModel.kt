@@ -223,41 +223,24 @@ class SalesReportViewModel @Inject constructor(
                 it.copy(rangeText = formatRangeText(period, range))
             }
 
-            // Load Chart Data separately via Flow for real-time updates if local, or one-shot if remote
+            // Always observe/load chart data (has internal local fallback)
             observeChartData(branchId, period, range)
 
-            when {
-                branchId != null && branchId == localBranchId -> {
-                    loadLocalReport(
-                        branchId = localBranchId,
-                        period = period,
-                        range = range
-                    )
-                }
+            // 1. Load Local first as placeholder
+            loadLocalReport(
+                branchId = branchId ?: if (isAdmin) null else localBranchId,
+                period = period,
+                range = range
+            )
 
-                !isAdmin -> {
-                    loadLocalReport(
-                        branchId = localBranchId,
-                        period = period,
-                        range = range
-                    )
-                }
-
-                !isOnline -> {
-                    loadLocalReport(
-                        branchId = branchId, // Can be null now
-                        period = period,
-                        range = range
-                    )
-                }
-
-                else -> {
-                    loadRemoteReport(
-                        branchId = branchId,
-                        period = period,
-                        range = range
-                    )
-                }
+            // 2. Then if remote is needed and possible, load remote
+            if (isOnline && isAdmin && (branchId == null || branchId != localBranchId)) {
+                _uiState.update { it.copy(isLoading = true) }
+                loadRemoteReport(
+                    branchId = branchId,
+                    period = period,
+                    range = range
+                )
             }
         }
     }

@@ -132,36 +132,19 @@ class RestockReportViewModel @Inject constructor(
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
 
-            when {
-                branchId == null && isAdmin && isOnline -> {
+            // 1. Load Local first as placeholder
+            loadLocalReport(
+                branchId = branchId ?: localBranchId,
+                from = range.first,
+                to = range.second
+            )
+
+            // 2. Then Load Remote/Combined if needed
+            if (isAdmin && isOnline && (branchId == null || branchId != localBranchId)) {
+                _uiState.update { it.copy(isLoading = true) }
+                if (branchId == null) {
                     loadCombinedReport(range.first, range.second)
-                }
-
-                branchId == localBranchId -> {
-                    loadLocalReport(
-                        branchId = localBranchId,
-                        from = range.first,
-                        to = range.second
-                    )
-                }
-
-                !isAdmin -> {
-                    loadLocalReport(
-                        branchId = localBranchId,
-                        from = range.first,
-                        to = range.second
-                    )
-                }
-
-                !isOnline -> {
-                    loadLocalReport(
-                        branchId = branchId ?: localBranchId,
-                        from = range.first,
-                        to = range.second
-                    )
-                }
-
-                else -> {
+                } else {
                     loadRemoteReport(
                         branchId = branchId,
                         from = range.first,

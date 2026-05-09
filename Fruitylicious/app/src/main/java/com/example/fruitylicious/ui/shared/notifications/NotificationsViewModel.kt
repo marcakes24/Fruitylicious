@@ -88,20 +88,7 @@ class NotificationsViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
-        
-        // Reactive history loading: only one central point for loading
-        viewModelScope.launch {
-            combine(
-                _uiState.map { it.isOnline }.distinctUntilChanged(),
-                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
-                refreshTrigger
-            ) { online, branchId, trigger ->
-                Triple(online, branchId, trigger)
-            }.collectLatest { (online, branchId, _) ->
-                delay(300) // Debounce branch selection
-                loadNotifications()
-            }
-        }
+        loadNotifications()
     }
 
     private fun observeLocalData() {
@@ -114,12 +101,17 @@ class NotificationsViewModel @Inject constructor(
                 buildNotificationRows(inventory, ingredients)
             }.collect { rows ->
                 val state = _uiState.value
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                
+                // Show local data if:
+                // 1. Local branch selected
+                // 2. Offline
+                // 3. Error fallback
+                // 4. Loading remote data (placeholder)
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.notifications.isEmpty()) {
                     _uiState.update {
                         it.copy(
                             notifications = rows,
-                            isLoading = false,
-                            error = state.error
+                            isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false
                         )
                     }
                 }
@@ -176,6 +168,18 @@ class NotificationsViewModel @Inject constructor(
                 notifications = emptyList()
             )
         }
+
+        refreshTrigger.value += 1
+        loadNotifications()
+    }
+
+    private fun loadNotifications() {
+        val state = _uiState.value
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteNotifications(state.selectedBranchId)
+        } else {
+            loadJob?.cancel()
+        }
     }
 
     fun refresh() {
@@ -214,28 +218,38 @@ class NotificationsViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
+                loadNotifications()
             }
         }
     }
 
-    private fun loadNotifications() {
-        val state = _uiState.value
+    private fun loadRemoteNotifications(branchId: Int?) {
         loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
 
-        if (state.isOnline && state.selectedBranchId != localBranchId) {
-            loadJob = if (state.selectedBranchId == null) {
-                loadRemoteAllBranchesNotifications()
-            } else {
-                loadRemoteBranchNotifications(state.selectedBranchId)
+                if (branchId == null) {
+                    loadRemoteAllBranchesNotificationsInternal()
+                } else {
+                    loadRemoteBranchNotificationsInternal(branchId)
+                }
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) {
+                    return@launch
+                }
+
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false, 
+                        error = t.message ?: "Failed to load remote notifications."
+                    )
+                }
             }
-        } else {
-            // Local load handled by observeLocalData
         }
     }
 
-    private fun loadRemoteBranchNotifications(branchId: Int) = viewModelScope.launch {
-        _uiState.update { it.copy(isLoading = true, error = null) }
-
+    private suspend fun loadRemoteBranchNotificationsInternal(branchId: Int) {
         val result = reportRepository.getInventoryReport(branchId)
 
         result.fold(
@@ -269,36 +283,41 @@ class NotificationsViewModel @Inject constructor(
         )
     }
 
-    private fun loadRemoteAllBranchesNotifications() = viewModelScope.launch {
-        _uiState.update { it.copy(isLoading = true, error = null) }
-
+    private suspend fun loadRemoteAllBranchesNotificationsInternal() {
         val allRows = mutableListOf<NotificationRow>()
         var firstError: String? = null
 
-        coroutineScope {
-            val deferredResults = branches.map { branch ->
-                async {
-                    branch to reportRepository.getInventoryReport(branch.branchId)
+        try {
+            // Use supervisorScope to isolate sibling failures and handle cancellation better
+            kotlinx.coroutines.supervisorScope {
+                val deferredResults = branches.map { branch ->
+                    async {
+                        branch to reportRepository.getInventoryReport(branch.branchId)
+                    }
+                }
+
+                val results = deferredResults.awaitAll()
+
+                results.forEach { (branch, result) ->
+                    result.fold(
+                        onSuccess = { report ->
+                            allRows.addAll(report.items.mapNotNull { item ->
+                                item.toNotificationRow(
+                                    branchId = branch.branchId,
+                                    branchName = branch.branchName
+                                )
+                            })
+                        },
+                        onFailure = { exception ->
+                            if (firstError == null) firstError = exception.message
+                        }
+                    )
                 }
             }
-
-            val results = deferredResults.awaitAll()
-
-            results.forEach { (branch, result) ->
-                result.fold(
-                    onSuccess = { report ->
-                        allRows.addAll(report.items.mapNotNull { item ->
-                            item.toNotificationRow(
-                                branchId = branch.branchId,
-                                branchName = branch.branchName
-                            )
-                        })
-                    },
-                    onFailure = { exception ->
-                        if (firstError == null) firstError = exception.message
-                    }
-                )
-            }
+        } catch (t: Throwable) {
+            // Re-throw CancellationException so the top-level launch knows to stop silently
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (firstError == null) firstError = t.message
         }
 
         if (allRows.isNotEmpty()) {

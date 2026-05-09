@@ -76,24 +76,15 @@ class InventoryReportViewModel @Inject constructor(
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
 
-            when {
-                branchId == localBranchId -> {
-                    loadLocalReport(localBranchId)
-                }
+            // 1. Load Local first as placeholder
+            loadLocalReport(localBranchId)
 
-                !isAdmin -> {
-                    loadLocalReport(localBranchId)
-                }
-
-                !isOnline -> {
-                    loadLocalReport(localBranchId)
-                }
-
-                branchId == null -> {
+            // 2. Then Load Remote if needed and possible
+            if (isAdmin && isOnline && (branchId == null || branchId != localBranchId)) {
+                _uiState.update { it.copy(isLoading = true) }
+                if (branchId == null) {
                     loadRemoteAllBranchesReport()
-                }
-
-                else -> {
+                } else {
                     loadRemoteBranchReport(branchId)
                 }
             }

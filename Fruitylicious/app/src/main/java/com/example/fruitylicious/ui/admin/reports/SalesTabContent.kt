@@ -605,12 +605,6 @@ fun SalesTabContent(
                         color = RptTextSub
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.CalendarToday,
-                    contentDescription = null,
-                    tint = RptTextSub,
-                    modifier = Modifier.size(24.dp)
-                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))

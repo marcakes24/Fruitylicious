@@ -119,6 +119,8 @@ class InventoryAdjustmentViewModel @Inject constructor(
     private var branches: List<BranchEntity> = emptyList()
     private var users: List<UserEntity> = emptyList()
 
+    private val refreshTrigger = MutableStateFlow(0)
+
     init {
         observeBranches()
         observeNetwork()
@@ -133,12 +135,19 @@ class InventoryAdjustmentViewModel @Inject constructor(
                 _uiState.map { it.isOnline }.distinctUntilChanged(),
                 _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
                 _uiState.map { it.startDate }.distinctUntilChanged(),
-                _uiState.map { it.endDate }.distinctUntilChanged()
-            ) { online, branchId, start, end ->
+                _uiState.map { it.endDate }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, start, end, trigger ->
                 online to branchId
             }.collectLatest { (online, branchId) ->
-                kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
-                loadHistory()
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
+                    loadHistory()
+                } else {
+                    // For local branch, observeLocalAdjustments/loadLocalHistory handles it
+                    loadLocalHistory()
+                }
             }
         }
     }
@@ -209,7 +218,8 @@ class InventoryAdjustmentViewModel @Inject constructor(
         
         if (state.selectedBranchId == finalBranchId) return
         
-        _uiState.update { it.copy(selectedBranchId = finalBranchId) }
+        _uiState.update { it.copy(selectedBranchId = finalBranchId, isLoading = true) }
+        refreshTrigger.value += 1
     }
 
     fun setSearchQuery(query: String) {
@@ -240,10 +250,13 @@ class InventoryAdjustmentViewModel @Inject constructor(
             val state = _uiState.value
             _uiState.update { it.copy(isLoading = true, currentPage = 0, history = emptyList()) }
 
+            // Load local as placeholder/immediate view
+            loadLocalHistory()
+
             if (state.isOnline && state.selectedBranchId != localBranchId) {
+                // If remote is needed, show loading again and fetch
+                _uiState.update { it.copy(isLoading = true) }
                 loadRemoteHistory()
-            } else {
-                loadLocalHistory()
             }
         }
     }

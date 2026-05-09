@@ -122,8 +122,15 @@ class TransactionHistoryViewModel @Inject constructor(
             ) { online, branchId, trigger ->
                 Triple(online, branchId, trigger)
             }.collectLatest { (online, branchId, _) ->
-                kotlinx.coroutines.delay(300) // Debounce branch selection
-                loadTransactions()
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    kotlinx.coroutines.delay(300) // Debounce branch selection
+                    loadTransactions()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                    loadJob?.cancel()
+                    // Remove premature isLoading = false here, let observeLocalData handle it
+                }
             }
         }
     }
@@ -142,18 +149,18 @@ class TransactionHistoryViewModel @Inject constructor(
                 rows
             }.collect { rows ->
                 val state = _uiState.value
-                // Fallback to local data if:
+                
+                // Show local data if:
                 // 1. Local branch selected
                 // 2. Offline
-                // 3. Non-admin
-                // 4. Remote fetch failed (error != null)
-                if (state.selectedBranchId == localBranchId || !state.isAdmin || !state.isOnline || state.error != null) {
+                // 3. Error fallback
+                // 4. Loading remote data (placeholder)
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.transactions.isEmpty()) {
                     _uiState.update {
                         it.copy(
                             transactions = rows,
-                            isLoading = false,
-                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE,
-                            error = state.error
+                            isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
+                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE
                         )
                     }
                 }
@@ -271,6 +278,8 @@ class TransactionHistoryViewModel @Inject constructor(
                 transactions = emptyList()
             )
         }
+
+        refreshTrigger.value += 1
     }
 
     fun refresh() {

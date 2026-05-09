@@ -14,9 +14,10 @@ import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,9 +25,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 
 data class InventoryMonitoringRow(
     val ingredientId: Int,
@@ -95,28 +99,15 @@ class InventoryMonitoringViewModel @Inject constructor(
     val uiState: StateFlow<InventoryMonitoringUiState> = _uiState.asStateFlow()
 
     private var branches: List<BranchEntity> = emptyList()
-    private var lockoutJob: kotlinx.coroutines.Job? = null
-    private var loadJob: kotlinx.coroutines.Job? = null
+    private var lockoutJob: Job? = null
+    private var loadJob: Job? = null
     private val refreshTrigger = MutableStateFlow(0)
 
     init {
         observeBranches()
         observeNetwork()
         observeLocalData()
-        
-        // Reactive history loading: only one central point for loading
-        viewModelScope.launch {
-            combine(
-                _uiState.map { it.isOnline }.distinctUntilChanged(),
-                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
-                refreshTrigger
-            ) { online, branchId, trigger ->
-                Triple(online, branchId, trigger)
-            }.collectLatest { (online, branchId, _) ->
-                delay(300) // Debounce branch selection
-                loadRows()
-            }
-        }
+        loadRows()
     }
 
     private fun observeLocalData() {
@@ -126,21 +117,28 @@ class InventoryMonitoringViewModel @Inject constructor(
                 ingredientDao.observeIngredients(),
                 refreshTrigger
             ) { inventory, ingredients, _ ->
-                Triple(inventory, ingredients, Unit)
-            }.collect { (inventory, ingredients, _) ->
-                val state = _uiState.value
-                val rows = buildInventoryRows(inventory, ingredients)
-
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
-                    _uiState.update {
-                        it.copy(
-                            rows = rows,
-                            isLoading = false,
-                            error = state.error
-                        )
+                inventory to ingredients
+            }
+                .flowOn(Dispatchers.Default)
+                .map { (inventory, ingredients) ->
+                    buildInventoryRows(inventory, ingredients)
+                }
+                .collectLatest { rows ->
+                    _uiState.update { state ->
+                        // Show local data if:
+                        // 1. Local branch selected
+                        // 2. Offline
+                        // 3. Error fallback
+                        if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                            state.copy(
+                                rows = rows,
+                                isLoading = false
+                            )
+                        } else {
+                            state
+                        }
                     }
                 }
-            }
         }
     }
 
@@ -207,6 +205,18 @@ class InventoryMonitoringViewModel @Inject constructor(
                 rows = emptyList()
             )
         }
+
+        refreshTrigger.value += 1
+        loadRows()
+    }
+
+    private fun loadRows() {
+        val state = _uiState.value
+        if (state.isOnline && state.selectedBranchId != localBranchId) {
+            loadRemoteRows(state.selectedBranchId)
+        } else {
+            loadJob?.cancel()
+        }
     }
 
     fun refresh() {
@@ -245,29 +255,34 @@ class InventoryMonitoringViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
+                loadRows()
             }
         }
     }
 
-    private fun loadRows() {
-        val state = _uiState.value
+    private fun loadRemoteRows(branchId: Int?) {
         loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
 
-        if (state.isOnline && state.selectedBranchId != localBranchId) {
-            loadJob = loadRemoteRows()
-        } else {
-            // Local load handled by observeLocalData
-        }
-    }
-
-    private fun loadRemoteRows() = viewModelScope.launch {
-        val state = _uiState.value
-        _uiState.update { it.copy(isLoading = true, error = null) }
-
-        if (state.selectedBranchId == null) {
-            loadRemoteAllBranches()
-        } else {
-            loadRemoteBranch(state.selectedBranchId)
+                if (branchId == null) {
+                    loadRemoteAllBranches()
+                } else {
+                    loadRemoteBranch(branchId)
+                }
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) {
+                    return@launch
+                }
+                
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false, 
+                        error = t.message ?: "Failed to load remote inventory."
+                    )
+                }
+            }
         }
     }
 
@@ -276,19 +291,21 @@ class InventoryMonitoringViewModel @Inject constructor(
 
         result.fold(
             onSuccess = { report ->
-                val rows = report.items.map { item ->
-                    InventoryMonitoringRow(
-                        ingredientId = item.ingredientId,
-                        branchId = report.branchId ?: branchId,
-                        branchName = report.branchName ?: "Branch $branchId",
-                        ingredientName = item.ingredientName,
-                        currentStock = item.currentStock,
-                        unitType = item.unitType,
-                        lowStockThreshold = item.lowStockThreshold,
-                        lastModified = report.generatedAt,
-                        image = null // Images are local only or handled by UI
-                    )
-                }.sortedBy { it.ingredientName.lowercase() }
+                val rows = withContext(Dispatchers.Default) {
+                    report.items.map { item ->
+                        InventoryMonitoringRow(
+                            ingredientId = item.ingredientId,
+                            branchId = report.branchId ?: branchId,
+                            branchName = report.branchName ?: "Branch $branchId",
+                            ingredientName = item.ingredientName,
+                            currentStock = item.currentStock,
+                            unitType = item.unitType,
+                            lowStockThreshold = item.lowStockThreshold,
+                            lastModified = report.generatedAt,
+                            image = null // Images are local only or handled by UI
+                        )
+                    }.sortedBy { it.ingredientName.lowercase() }
+                }
 
                 _uiState.update {
                     it.copy(
@@ -312,42 +329,54 @@ class InventoryMonitoringViewModel @Inject constructor(
         )
     }
 
-    private suspend fun loadRemoteAllBranches() = coroutineScope {
-        val deferredResults = branches.map { branch ->
-            async {
-                branch to reportRepository.getInventoryReport(branchId = branch.branchId)
-            }
-        }
-
-        val results = deferredResults.awaitAll()
+    private suspend fun loadRemoteAllBranches() {
         val allRows = mutableListOf<InventoryMonitoringRow>()
         var firstError: String? = null
 
-        results.forEach { (branch, result) ->
-            result.fold(
-                onSuccess = { report ->
-                    allRows.addAll(report.items.map { item ->
-                        InventoryMonitoringRow(
-                            ingredientId = item.ingredientId,
-                            branchId = branch.branchId,
-                            branchName = branch.branchName,
-                            ingredientName = item.ingredientName,
-                            currentStock = item.currentStock,
-                            unitType = item.unitType,
-                            lowStockThreshold = item.lowStockThreshold,
-                            lastModified = report.generatedAt,
-                            image = null
-                        )
-                    })
-                },
-                onFailure = { error ->
-                    if (firstError == null) firstError = error.message
+        try {
+            // Use supervisorScope to isolate sibling failures and handle cancellation better
+            supervisorScope {
+                val deferredResults = branches.map { branch ->
+                    async {
+                        branch to reportRepository.getInventoryReport(branchId = branch.branchId)
+                    }
                 }
-            )
+
+                val results = deferredResults.awaitAll()
+
+                results.forEach { (branch, result) ->
+                    result.fold(
+                        onSuccess = { report ->
+                            allRows.addAll(report.items.map { item ->
+                                InventoryMonitoringRow(
+                                    ingredientId = item.ingredientId,
+                                    branchId = branch.branchId,
+                                    branchName = branch.branchName,
+                                    ingredientName = item.ingredientName,
+                                    currentStock = item.currentStock,
+                                    unitType = item.unitType,
+                                    lowStockThreshold = item.lowStockThreshold,
+                                    lastModified = report.generatedAt,
+                                    image = null
+                                )
+                            })
+                        },
+                        onFailure = { error ->
+                            if (firstError == null) firstError = error.message
+                        }
+                    )
+                }
+            }
+        } catch (t: Throwable) {
+            // Re-throw CancellationException so the top-level launch knows to stop silently
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            if (firstError == null) firstError = t.message
         }
 
         if (allRows.isNotEmpty()) {
-            val aggregated = aggregateRows(allRows)
+            val aggregated = withContext(Dispatchers.Default) {
+                aggregateRows(allRows)
+            }
             _uiState.update {
                 it.copy(
                     rows = aggregated,
@@ -392,7 +421,7 @@ class InventoryMonitoringViewModel @Inject constructor(
     private fun startLockoutTimer() {
         lockoutJob?.cancel()
         lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            delay(5 * 60 * 1000L)
             _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }

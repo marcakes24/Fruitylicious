@@ -14,13 +14,20 @@ import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class AuditLogRow(
     val logId: String,
@@ -75,7 +82,7 @@ class AuditLogViewModel @Inject constructor(
     val uiState: StateFlow<AuditLogUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-    private var lockoutJob: kotlinx.coroutines.Job? = null
+    private var lockoutJob: Job? = null
 
     private var branches: List<BranchEntity> = emptyList()
     private val refreshTrigger = MutableStateFlow(0)
@@ -84,7 +91,25 @@ class AuditLogViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
-        loadLogs()
+        
+        // Reactive history loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    delay(300) // Debounce branch selection
+                    loadLogs()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                }
+            }
+        }
     }
 
     private fun observeLocalData() {
@@ -94,24 +119,27 @@ class AuditLogViewModel @Inject constructor(
                 userDao.observeUsers(),
                 refreshTrigger
             ) { logs, users, _ ->
-                buildLogRows(logs, users)
-            }.collect { rows ->
-                val state = _uiState.value
-                // Use local data if:
-                // 1. Local branch selected
-                // 2. Offline
-                // 3. Remote fetch failed (error != null)
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
-                    _uiState.update {
-                        it.copy(
-                            logs = rows,
-                            isLoading = false,
-                            hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE,
-                            error = state.error
-                        )
+                logs to users
+            }
+                .flowOn(Dispatchers.Default)
+                .map { (logs, users) -> buildLogRows(logs, users) }
+                .collectLatest { rows ->
+                    _uiState.update { state ->
+                        // Show local data if:
+                        // 1. Local branch selected
+                        // 2. Offline
+                        // 3. Error fallback
+                        if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                            state.copy(
+                                logs = rows,
+                                isLoading = false,
+                                hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE
+                            )
+                        } else {
+                            state
+                        }
                     }
                 }
-            }
         }
     }
 
@@ -263,18 +291,20 @@ class AuditLogViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { pageResponse ->
-                    val newRows = pageResponse.items.map { log ->
-                        AuditLogRow(
-                            logId = log.logId,
-                            action = extractActionTitle(log.action),
-                            description = log.action,
-                            userName = log.userName,
-                            username = "unknown",
-                            tableAffected = log.tableAffected,
-                            branchId = state.selectedBranchId ?: 0,
-                            branchName = branches.firstOrNull { it.branchId == state.selectedBranchId }?.branchName ?: "Remote Branch",
-                            timestamp = log.timestamp
-                        )
+                    val newRows = withContext(Dispatchers.Default) {
+                        pageResponse.items.map { log ->
+                            AuditLogRow(
+                                logId = log.logId,
+                                action = extractActionTitle(log.action),
+                                description = log.action,
+                                userName = log.userName,
+                                username = "unknown",
+                                tableAffected = log.tableAffected,
+                                branchId = state.selectedBranchId ?: 0,
+                                branchName = branches.firstOrNull { it.branchId == state.selectedBranchId }?.branchName ?: "Remote Branch",
+                                timestamp = log.timestamp
+                            )
+                        }
                     }
 
                     _uiState.update {
@@ -307,7 +337,7 @@ class AuditLogViewModel @Inject constructor(
     private fun startLockoutTimer() {
         lockoutJob?.cancel()
         lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
+            delay(5 * 60 * 1000L)
             _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }

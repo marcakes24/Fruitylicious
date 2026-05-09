@@ -113,8 +113,13 @@ class RestockViewModel @Inject constructor(
             ) { online, branchId, trigger ->
                 Triple(online, branchId, trigger)
             }.collectLatest { (online, branchId, _) ->
-                kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
-                loadHistory()
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
+                    loadHistory()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                }
             }
         }
     }
@@ -144,15 +149,18 @@ class RestockViewModel @Inject constructor(
 
                 val historyRows = buildHistoryRows(logs, ingredients)
 
-                // Fallback if local branch, offline, or remote error
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                // Show local data if:
+                // 1. Local branch selected
+                // 2. Offline
+                // 3. Error fallback
+                // 4. Loading remote data (placeholder)
+                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
                     _uiState.update {
                         it.copy(
                             ingredients = ingredientRows,
                             history = historyRows,
-                            isLoading = false,
-                            hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE,
-                            error = state.error
+                            isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
+                            hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE
                         )
                     }
                 } else {
@@ -210,6 +218,8 @@ class RestockViewModel @Inject constructor(
                 history = emptyList()
             )
         }
+
+        refreshTrigger.value += 1
     }
 
     fun refresh() {
