@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -134,10 +135,6 @@ class RestockViewModel @Inject constructor(
                 inventoryDao.observeInventoryByBranch(localBranchId),
                 refreshTrigger
             ) { logs, ingredients, inventory, _ ->
-                Triple(logs, ingredients, inventory)
-            }.collect { (logs, ingredients, inventory) ->
-                val state = _uiState.value
-                
                 val ingredientRows = ingredients.map { ingredient ->
                     val inv = inventory.find { it.ingredientId == ingredient.ingredientId }
                     RestockIngredientRow(
@@ -151,23 +148,26 @@ class RestockViewModel @Inject constructor(
                 }.sortedBy { it.ingredientName.lowercase() }
 
                 val historyRows = buildHistoryRows(logs, ingredients)
-
-                // Show local data if:
-                // 1. Local branch selected
-                // 2. Offline
-                // 3. Error fallback
-                // 4. Loading remote data (placeholder)
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
+                Triple(ingredientRows, historyRows, logs.size)
+            }
+            .flowOn(kotlinx.coroutines.Dispatchers.Default)
+            .collect { (ingredientRows, historyRows, _) ->
+                _uiState.update { state ->
+                    // Show local data if:
+                    // 1. Local branch selected
+                    // 2. Offline
+                    // 3. Error fallback
+                    // 4. Loading remote data (placeholder)
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
+                        state.copy(
                             ingredients = ingredientRows,
                             history = historyRows,
                             isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
                             hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE
                         )
+                    } else {
+                        state.copy(ingredients = ingredientRows)
                     }
-                } else {
-                    _uiState.update { it.copy(ingredients = ingredientRows) }
                 }
             }
         }

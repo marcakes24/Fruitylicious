@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -185,22 +186,97 @@ fun InventoryAdjustmentScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         if (!uiState.successMessage.isNullOrBlank()) {
-                            item { Text(text = uiState.successMessage!!, color = IaGreen, fontSize = 13.sp) }
+                            item { 
+                                Text(
+                                    text = uiState.successMessage!!, 
+                                    color = IaGreen, 
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                ) 
+                            }
                         }
 
-                        item { RecentAdjustmentsCard(items = uiState.history, isLoading = uiState.isLoading) }
+                        // --- History Card Header ---
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                    Text("Adjustment History", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                                }
+                            }
+                        }
+
+                        if (uiState.isLoading && uiState.history.isEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                        androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
+                                    }
+                                }
+                            }
+                        } else if (uiState.history.isEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                        Text("No records found", color = Color.Gray)
+                                    }
+                                }
+                            }
+                        } else {
+                            itemsIndexed(uiState.history) { index, item ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp,
+                                    shape = if (index == uiState.history.lastIndex && !uiState.hasMore) {
+                                        RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                    } else {
+                                        RoundedCornerShape(0.dp)
+                                    }
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                        AdjustmentRow(item)
+                                        if (index < uiState.history.size - 1 || uiState.hasMore) {
+                                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         if (uiState.hasMore) {
                             item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                                    if (uiState.isLoadingMore) {
-                                        androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
-                                    } else {
-                                        TextButton(onClick = { viewModel.loadMoreHistory() }) {
-                                            Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                        if (uiState.isLoadingMore) {
+                                            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
+                                        } else {
+                                            TextButton(onClick = { viewModel.loadMoreHistory() }) {
+                                                Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -485,28 +561,6 @@ private fun AdjustmentTypeButton(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) selectedColor else Color.Gray, lineHeight = 16.sp
             )
-        }
-    }
-}
-
-@Composable
-private fun RecentAdjustmentsCard(items: List<AdjustmentHistoryRow>, isLoading: Boolean) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 2.dp) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Adjustment History", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-            HorizontalDivider(color = Color(0xFFF1F5F9))
-            if (isLoading && items.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
-                }
-            } else if (items.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { Text("No records found", color = Color.Gray) }
-            } else {
-                items.forEachIndexed { index, item ->
-                    AdjustmentRow(item)
-                    if (index < items.size - 1) HorizontalDivider(color = Color(0xFFF1F5F9))
-                }
-            }
         }
     }
 }

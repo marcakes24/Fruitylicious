@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -225,7 +226,7 @@ fun WasteManagementScreen(
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     item {
                         val containerColor = if (uiState.isClockedIn) WsGreen else Color.LightGray
@@ -260,10 +261,13 @@ fun WasteManagementScreen(
                             Text(
                                 text = uiState.successMessage ?: "",
                                 color = WsGreen,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
                     }
+
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
 
                     item {
                         FilterCard(
@@ -281,15 +285,131 @@ fun WasteManagementScreen(
                         )
                     }
 
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+
+                    // --- History Card Start ---
                     item {
-                        WasteHistoryCard(
-                            items = filteredHistory,
-                            isLoading = uiState.isLoading,
-                            isLoadingMore = uiState.isLoadingMore,
-                            hasMore = uiState.hasMore,
-                            onImageClick = { file -> expandedImageFile = file },
-                            onLoadMore = { viewModel.loadMore() }
-                        )
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            color = Color.White,
+                            shadowElevation = 2.dp
+                        ) {
+                            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Waste History",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF333333)
+                                    )
+
+                                    Surface(
+                                        color = Color(0xFFFFB300),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${filteredHistory.size} entries",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
+                            }
+                        }
+                    }
+
+                    if (uiState.isLoading && filteredHistory.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = WsGreen)
+                                }
+                            }
+                        }
+                    } else if (filteredHistory.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No records found",
+                                        color = Color.Gray,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        itemsIndexed(filteredHistory) { index, entry ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color.White,
+                                shadowElevation = 2.dp,
+                                shape = if (index == filteredHistory.lastIndex && !uiState.hasMore) {
+                                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                } else {
+                                    RoundedCornerShape(0.dp)
+                                }
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    key(entry.wasteId) {
+                                        WasteRecordRow(
+                                            entry = entry,
+                                            onImageClick = { file -> expandedImageFile = file }
+                                        )
+                                    }
+                                    if (index < filteredHistory.size - 1 || uiState.hasMore) {
+                                        HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                                    }
+                                }
+                            }
+                        }
+
+                        if (uiState.hasMore) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Button(
+                                            onClick = { viewModel.loadMore() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            enabled = !uiState.isLoadingMore,
+                                            colors = ButtonDefaults.buttonColors(containerColor = WsGreen)
+                                        ) {
+                                            Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -435,104 +555,6 @@ private fun FilterCard(
                 onClick = onDateClick,
                 onClear = onDateClear
             )
-        }
-    }
-}
-
-@Composable
-private fun WasteHistoryCard(
-    items: List<WasteHistoryRow>,
-    isLoading: Boolean,
-    isLoadingMore: Boolean,
-    hasMore: Boolean,
-    onImageClick: (java.io.File) -> Unit,
-    onLoadMore: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Waste History",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF333333)
-                )
-
-                Surface(
-                    color = Color(0xFFFFB300),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "${items.size} entries",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
-
-            if (isLoading && items.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.material3.CircularProgressIndicator(color = WsGreen)
-                }
-            } else if (items.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No records found",
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                items.forEachIndexed { index, entry ->
-                    androidx.compose.runtime.key(entry.wasteId) {
-                        WasteRecordRow(
-                            entry = entry,
-                            onImageClick = onImageClick
-                        )
-
-                        if (index < items.size - 1) {
-                            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
-                        }
-                    }
-                }
-
-                if (hasMore) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = onLoadMore,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoadingMore,
-                        colors = ButtonDefaults.buttonColors(containerColor = WsGreen)
-                    ) {
-                        Text(if (isLoadingMore) "Loading..." else "Load More")
-                    }
-                }
-            }
         }
     }
 }

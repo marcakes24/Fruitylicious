@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -235,14 +236,15 @@ fun TransactionHistoryScreen(
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     if (!uiState.successMessage.isNullOrBlank()) {
                         item {
                             Text(
                                 text = uiState.successMessage ?: "",
                                 color = ThGreen,
-                                fontSize = 13.sp
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
                     }
@@ -256,17 +258,124 @@ fun TransactionHistoryScreen(
                         )
                     }
 
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+
+                    // --- Transaction History "Card" start ---
                     item {
-                        TransactionHistoryCard(
-                            transactions = filteredTransactions,
-                            isLoading = uiState.isLoading,
-                            isLoadingMore = uiState.isLoadingMore,
-                            hasMore = uiState.hasMore,
-                            isAdmin = uiState.isAdmin,
-                            onTransactionClick = { selectedTransaction = it },
-                            onVoidClick = { transactionToVoid = it },
-                            onLoadMore = { viewModel.loadMore() }
-                        )
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            color = Color.White,
+                            shadowElevation = 2.dp
+                        ) {
+                            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Transaction History",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ThTextMain
+                                    )
+
+                                    Surface(
+                                        color = Color(0xFFFFB300),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${filteredTransactions.size} entries",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
+                            }
+                        }
+                    }
+
+                    if (uiState.isLoading && filteredTransactions.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = ThGreen)
+                                }
+                            }
+                        }
+                    } else if (filteredTransactions.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                EmptyText("No transactions found")
+                            }
+                        }
+                    } else {
+                        itemsIndexed(filteredTransactions) { index, transaction ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color.White,
+                                shadowElevation = 2.dp,
+                                shape = if (index == filteredTransactions.lastIndex && !uiState.hasMore) {
+                                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                } else {
+                                    RoundedCornerShape(0.dp)
+                                }
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    TransactionListItem(
+                                        transaction = transaction,
+                                        isAdmin = uiState.isAdmin,
+                                        onClick = { selectedTransaction = transaction },
+                                        onVoidClick = { transactionToVoid = transaction }
+                                    )
+                                    if (index < filteredTransactions.size - 1 || uiState.hasMore) {
+                                        HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                                    }
+                                }
+                            }
+                        }
+
+                        if (uiState.hasMore) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Button(
+                                            onClick = { viewModel.loadMore() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            enabled = !uiState.isLoadingMore,
+                                            colors = ButtonDefaults.buttonColors(containerColor = ThGreen)
+                                        ) {
+                                            Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -429,101 +538,6 @@ private fun FilterCard(
                         .matchParentSize()
                         .clickable { onDateClick() }
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TransactionHistoryCard(
-    transactions: List<TransactionHistoryRow>,
-    isLoading: Boolean,
-    isLoadingMore: Boolean,
-    hasMore: Boolean,
-    isAdmin: Boolean,
-    onTransactionClick: (TransactionHistoryRow) -> Unit,
-    onVoidClick: (TransactionHistoryRow) -> Unit,
-    onLoadMore: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Transaction History",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ThTextMain
-                )
-
-                Surface(
-                    color = Color(0xFFFFB300),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "${transactions.size} entries",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
-
-            when {
-                isLoading && transactions.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = ThGreen)
-                    }
-                }
-
-                transactions.isEmpty() -> {
-                    EmptyText("No transactions found")
-                }
-
-                else -> {
-                    transactions.forEachIndexed { index, transaction ->
-                        TransactionListItem(
-                            transaction = transaction,
-                            isAdmin = isAdmin,
-                            onClick = { onTransactionClick(transaction) },
-                            onVoidClick = { onVoidClick(transaction) }
-                        )
-
-                        if (index < transactions.size - 1) {
-                            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
-                        }
-                    }
-
-                    if (hasMore) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onLoadMore,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoadingMore,
-                            colors = ButtonDefaults.buttonColors(containerColor = ThGreen)
-                        ) {
-                            Text(if (isLoadingMore) "Loading..." else "Load More")
-                        }
-                    }
-                }
             }
         }
     }

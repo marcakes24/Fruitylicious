@@ -66,7 +66,7 @@ data class TransactionHistoryUiState(
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
     val canAccessCrossBranch: Boolean = false,
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
     val currentPage: Int = 0,
@@ -141,25 +141,24 @@ class TransactionHistoryViewModel @Inject constructor(
                 userDao.observeUsers().distinctUntilChanged(),
                 refreshTrigger
             ) { transactionsWithItems, products, users, _ ->
-                Triple(transactionsWithItems, products, users)
+                buildHistoryRows(transactionsWithItems, products, users)
             }
             .flowOn(Dispatchers.Default)
-            .collect { (transactionsWithItems, products, users) ->
-                val state = _uiState.value
-                val rows = buildHistoryRows(transactionsWithItems, products, users)
-                
-                // Show local data if:
-                // 1. Local branch selected
-                // 2. Offline
-                // 3. Error fallback
-                // 4. Loading remote data (placeholder)
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.transactions.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
+            .collect { rows ->
+                _uiState.update { state ->
+                    // Show local data if:
+                    // 1. Local branch selected
+                    // 2. Offline
+                    // 3. Error fallback
+                    // 4. Loading remote data (placeholder)
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.transactions.isEmpty()) {
+                        state.copy(
                             transactions = rows,
                             isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
                             hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE
                         )
+                    } else {
+                        state
                     }
                 }
             }
@@ -215,7 +214,7 @@ class TransactionHistoryViewModel @Inject constructor(
                     dateTime = transaction.dateTime,
                     items = itemRows
                 )
-            }.sortedByDescending { it.dateTime }
+            }
     }
 
     private fun observeBranches() {

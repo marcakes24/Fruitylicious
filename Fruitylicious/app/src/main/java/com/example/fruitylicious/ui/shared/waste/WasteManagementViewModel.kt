@@ -25,8 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 data class WasteIngredientRow(
     val ingredientId: Int,
@@ -116,10 +118,6 @@ class WasteManagementViewModel @Inject constructor(
                 inventoryDao.observeInventoryByBranch(localBranchId),
                 refreshTrigger
             ) { logs, ingredients, inventory, _ ->
-                Triple(logs, ingredients, inventory)
-            }.collect { (logs, ingredients, inventory) ->
-                val state = _uiState.value
-                
                 val ingredientRows = inventory.mapNotNull { item ->
                     val ingredient = ingredients.find { it.ingredientId == item.ingredientId } ?: return@mapNotNull null
                     WasteIngredientRow(
@@ -132,19 +130,22 @@ class WasteManagementViewModel @Inject constructor(
                 }.sortedBy { it.ingredientName.lowercase() }
 
                 val historyRows = buildHistoryRows(logs, ingredients)
-
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
-                    _uiState.update {
-                        it.copy(
+                Triple(ingredientRows, historyRows, logs.size)
+            }
+            .flowOn(Dispatchers.Default)
+            .collect { (ingredientRows, historyRows, _) ->
+                _uiState.update { state ->
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
+                        state.copy(
                             ingredients = ingredientRows,
                             history = historyRows,
-                            isLoading = false,
+                            isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
                             hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE,
                             error = state.error
                         )
+                    } else {
+                        state.copy(ingredients = ingredientRows)
                     }
-                } else {
-                    _uiState.update { it.copy(ingredients = ingredientRows) }
                 }
             }
         }

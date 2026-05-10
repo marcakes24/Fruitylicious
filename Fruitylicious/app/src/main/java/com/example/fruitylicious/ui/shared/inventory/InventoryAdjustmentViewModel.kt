@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.util.Calendar
 
 data class AdjustmentIngredientRow(
@@ -323,24 +325,26 @@ class InventoryAdjustmentViewModel @Inject constructor(
             adjustmentDao.getAdjustmentsByDateRange(state.selectedBranchId, from, to)
         }
         
-        val ingredientMap = ingredients.associateBy { it.ingredientId }
-        val branchMap = branches.associateBy { it.branchId }
-        val userMap = users.associateBy { it.userId }
+        val rows = withContext(Dispatchers.Default) {
+            val ingredientMap = ingredients.associateBy { it.ingredientId }
+            val branchMap = branches.associateBy { it.branchId }
+            val userMap = users.associateBy { it.userId }
 
-        val rows = items.map { adjustment ->
-            val isAdd = adjustment.adjustmentAmount >= 0.0
-            AdjustmentHistoryRow(
-                adjustmentId = adjustment.adjustmentId,
-                ingredientName = ingredientMap[adjustment.ingredientId]?.ingredientName ?: "Unknown ingredient",
-                adjustmentType = if (isAdd) "Add" else "Reduce",
-                quantity = abs(adjustment.adjustmentAmount),
-                reason = adjustment.reason,
-                dateTime = adjustment.dateTime,
-                branchId = adjustment.branchId,
-                branchName = branchMap[adjustment.branchId]?.branchName ?: "Branch ${adjustment.branchId}",
-                userName = userMap[adjustment.userId]?.name ?: "User ${adjustment.userId}"
-            )
-        }.sortedByDescending { it.dateTime }
+            items.map { adjustment ->
+                val isAdd = adjustment.adjustmentAmount >= 0.0
+                AdjustmentHistoryRow(
+                    adjustmentId = adjustment.adjustmentId,
+                    ingredientName = ingredientMap[adjustment.ingredientId]?.ingredientName ?: "Unknown ingredient",
+                    adjustmentType = if (isAdd) "Add" else "Reduce",
+                    quantity = abs(adjustment.adjustmentAmount),
+                    reason = adjustment.reason,
+                    dateTime = adjustment.dateTime,
+                    branchId = adjustment.branchId,
+                    branchName = branchMap[adjustment.branchId]?.branchName ?: "Branch ${adjustment.branchId}",
+                    userName = userMap[adjustment.userId]?.name ?: "User ${adjustment.userId}"
+                )
+            }.sortedByDescending { it.dateTime }
+        }
 
         _uiState.update {
             it.copy(
