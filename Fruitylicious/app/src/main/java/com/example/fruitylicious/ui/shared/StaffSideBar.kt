@@ -444,13 +444,13 @@ private fun staffNavigateTo(
 
     if (route == currentRoute) return
 
-    val isDashboard = route == STAFF_DASHBOARD
+    val isLandingPage = route == STAFF_LOG
 
     navController.navigate(route) {
-        popUpTo(STAFF_DASHBOARD) {
+        popUpTo(STAFF_LOG) {
             saveState = true
         }
         launchSingleTop = true
-        restoreState = !isDashboard
+        restoreState = !isLandingPage
     }
 }

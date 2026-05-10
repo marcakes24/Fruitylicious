@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.repository.LoginResult
 import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.domain.usecase.auth.LoginUseCase
-import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -33,12 +33,12 @@ class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val syncRepository: SyncRepository,
     private val sessionManager: SessionManager,
-    branchConfig: BranchConfig
+    branchConfigManager: BranchConfigManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         LoginUiState(
-            branchName = branchConfig.branchName
+            branchName = branchConfigManager.branchName
         )
     )
 

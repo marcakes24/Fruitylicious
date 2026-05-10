@@ -837,14 +837,7 @@ fun SalesTabContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = RptGreen)
-                }
-            } else if (uiState.topItems.isEmpty()) {
+            if (uiState.topItems.isEmpty()) {
                 Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 TopSellingItemsChart(items = uiState.topItems)
@@ -861,14 +854,7 @@ fun SalesTabContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = RptGreen)
-                }
-            } else if (uiState.topAddons.isEmpty()) {
+            if (uiState.topAddons.isEmpty()) {
                 Text("No addons found.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 TopAddonsChart(items = uiState.topAddons)
@@ -885,14 +871,7 @@ fun SalesTabContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = RptGreen)
-                }
-            } else if (uiState.topCombos.isEmpty()) {
+            if (uiState.topCombos.isEmpty()) {
                 Text("No combos found.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 TopCombosChart(items = uiState.topCombos)
@@ -1041,7 +1020,7 @@ private fun TopAddonsChart(items: List<TopAddonRow>) {
                     fontSize = 13.sp,
                     color = RptTextSub,
                     modifier = Modifier.weight(1.2f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 
@@ -1101,7 +1080,7 @@ private fun TopCombosChart(items: List<TopComboRow>) {
                     fontSize = 13.sp,
                     color = RptTextSub,
                     modifier = Modifier.weight(1.2f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 

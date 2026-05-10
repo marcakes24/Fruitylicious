@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
@@ -145,7 +146,7 @@ fun InventoryMonitoringScreen(
                     )
                 }
 
-                // Move FilterCard out to be fixed at the top
+                // Fixed Controls area
                 Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                     FilterCard(
                         searchQuery = searchQuery,
@@ -160,53 +161,92 @@ fun InventoryMonitoringScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         item {
-                            Text(
-                                text = "Ingredient List",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF333333),
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Ingredient List",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF333333)
+                                )
+
+                                Surface(
+                                    color = Color(0xFFFFB300),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${filteredRows.size} entries",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
 
-                        item {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.White,
-                                shadowElevation = 2.dp
-                            ) {
-                                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                                    when {
-                                        uiState.isLoading && uiState.rows.isEmpty() -> {
-                                            Box(
-                                                modifier = Modifier.fillMaxWidth().padding(24.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                androidx.compose.material3.CircularProgressIndicator(color = ImGreen)
-                                            }
-                                        }
+                        if (uiState.isLoading) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(48.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        androidx.compose.material3.CircularProgressIndicator(color = ImGreen)
+                                    }
+                                }
+                            }
+                        } else if (filteredRows.isEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    EmptyInventoryText("No ingredients found")
+                                }
+                            }
+                        } else {
+                            itemsIndexed(
+                                items = filteredRows,
+                                key = { _, item -> "${item.ingredientId}-${item.branchId}" }
+                            ) { index, item ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp,
+                                    shape = if (index == 0 && filteredRows.size == 1) {
+                                        RoundedCornerShape(24.dp)
+                                    } else if (index == 0) {
+                                        RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                                    } else if (index == filteredRows.lastIndex) {
+                                        RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                    } else {
+                                        RoundedCornerShape(0.dp)
+                                    }
+                                ) {
+                                    Column {
+                                        InventoryListItem(item)
 
-                                        filteredRows.isEmpty() -> {
-                                            EmptyInventoryText("No ingredients found")
-                                        }
-
-                                        else -> {
-                                            filteredRows.forEachIndexed { index, item ->
-                                                InventoryListItem(item)
-
-                                                if (index < filteredRows.size - 1) {
-                                                    HorizontalDivider(
-                                                        modifier = Modifier.padding(horizontal = 16.dp),
-                                                        color = Color(0xFFF1F5F9),
-                                                        thickness = 1.dp
-                                                    )
-                                                }
-                                            }
+                                        if (index < filteredRows.size - 1) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(horizontal = 16.dp),
+                                                color = Color(0xFFF1F5F9),
+                                                thickness = 0.5.dp
+                                            )
                                         }
                                     }
                                 }

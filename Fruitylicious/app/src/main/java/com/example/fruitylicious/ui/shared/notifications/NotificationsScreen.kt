@@ -144,9 +144,11 @@ fun NotificationsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     when {
-                        uiState.isLoading && uiState.notifications.isEmpty() -> {
+                        uiState.isLoading -> {
                             Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 100.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 androidx.compose.material3.CircularProgressIndicator(color = NotifGreen)

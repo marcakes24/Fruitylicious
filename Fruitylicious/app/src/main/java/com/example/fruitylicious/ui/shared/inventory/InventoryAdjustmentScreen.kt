@@ -198,30 +198,15 @@ fun InventoryAdjustmentScreen(
                             }
                         }
 
-                        // --- History Card Header ---
-                        item {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                                color = Color.White,
-                                shadowElevation = 2.dp
-                            ) {
-                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
-                                    Text("Adjustment History", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    HorizontalDivider(color = Color(0xFFF1F5F9))
-                                }
-                            }
-                        }
-
-                        if (uiState.isLoading && uiState.history.isEmpty()) {
+                        if (uiState.isLoading) {
                             item {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(24.dp),
                                     color = Color.White,
                                     shadowElevation = 2.dp
                                 ) {
-                                    Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                    Box(Modifier.fillMaxWidth().padding(48.dp), Alignment.Center) {
                                         androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
                                     }
                                 }
@@ -230,7 +215,7 @@ fun InventoryAdjustmentScreen(
                             item {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                    shape = RoundedCornerShape(24.dp),
                                     color = Color.White,
                                     shadowElevation = 2.dp
                                 ) {
@@ -240,6 +225,46 @@ fun InventoryAdjustmentScreen(
                                 }
                             }
                         } else {
+                            // --- History Card Header ---
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Adjustment History",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = IaTextMain
+                                            )
+
+                                            Surface(
+                                                color = Color(0xFFFFB300),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${uiState.history.size} entries",
+                                                    color = Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                                    }
+                                }
+                            }
+
                             itemsIndexed(uiState.history) { index, item ->
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),

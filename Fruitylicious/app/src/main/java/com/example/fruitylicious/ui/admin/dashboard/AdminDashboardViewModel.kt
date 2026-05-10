@@ -9,7 +9,7 @@ import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.SyncRepository
 import com.example.fruitylicious.data.repository.TransactionRepository
 import com.example.fruitylicious.domain.usecase.auth.LogoutUseCase
-import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -58,7 +58,7 @@ data class AdminDashboardUiState(
 @HiltViewModel
 class AdminDashboardViewModel @Inject constructor(
     private val sessionManager: SessionManager,
-    private val branchConfig: BranchConfig,
+    private val branchConfigManager: BranchConfigManager,
     private val networkMonitor: NetworkMonitor,
     private val transactionRepository: TransactionRepository,
     private val inventoryRepository: InventoryRepository,
@@ -71,11 +71,11 @@ class AdminDashboardViewModel @Inject constructor(
     private var salesJob: Job? = null
     private var notificationJob: Job? = null
 
-    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
 
     private val _uiState = MutableStateFlow(
         AdminDashboardUiState(
-            branchName = branchConfig.branchName,
+            branchName = branchConfigManager.branchName,
             userName = sessionManager.getUserName().ifBlank { "Owner User" },
             selectedBranchId = if (isAdminUser()) null else localBranchId,
             selectedBranchName = if (isAdminUser()) "All Branches" else "Branch $localBranchId",

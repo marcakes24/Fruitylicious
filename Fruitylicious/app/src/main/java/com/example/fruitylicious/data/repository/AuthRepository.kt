@@ -6,7 +6,8 @@ import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.data.remote.api.AuthApi
 import com.example.fruitylicious.data.remote.dto.LoginRequestDto
 import com.example.fruitylicious.data.remote.dto.LoginResponseDto
-import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.BranchConfigManager
+import com.example.fruitylicious.util.PasswordHasher
 import com.example.fruitylicious.util.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,7 +26,8 @@ class AuthRepository @Inject constructor(
     private val userDao: UserDao,
     private val staffLogDao: StaffLogDao,
     private val sessionManager: SessionManager,
-    private val branchConfig: BranchConfig
+    private val branchConfigManager: BranchConfigManager,
+    private val passwordHasher: PasswordHasher
 ) {
 
     suspend fun login(
@@ -41,7 +43,7 @@ class AuthRepository @Inject constructor(
         // Check if anyone else is still clocked in at this branch
         val userToLogin = userDao.getUserByUsername(trimmedUsername)
         if (userToLogin != null && userToLogin.role.equals("staff", ignoreCase = true)) {
-            val anyOpenLog = staffLogDao.getStaffLogsByBranch(branchConfig.branchId)
+            val anyOpenLog = staffLogDao.getStaffLogsByBranch(branchConfigManager.branchId)
                 .firstOrNull { it.clockOut == null }
 
             if (anyOpenLog != null && anyOpenLog.userId != userToLogin.userId) {
@@ -71,7 +73,7 @@ class AuthRepository @Inject constructor(
     ): LoginResult? {
         val user = userDao.getUserByUsername(username)
 
-        if (user == null || user.password != password) {
+        if (user == null || !passwordHasher.verifyPassword(password, user.password)) {
             return null
         }
 
@@ -81,7 +83,7 @@ class AuthRepository @Inject constructor(
             userName = user.name,
             username = user.username,
             role = user.role,
-            branchId = branchConfig.branchId,
+            branchId = branchConfigManager.branchId,
             loginTime = System.currentTimeMillis()
         )
 
@@ -97,7 +99,7 @@ class AuthRepository @Inject constructor(
                 LoginRequestDto(
                     username = username,
                     password = password,
-                    branchId = branchConfig.branchId
+                    branchId = branchConfigManager.branchId
                 )
             )
 
@@ -114,11 +116,12 @@ class AuthRepository @Inject constructor(
                 userName = body.name,
                 username = body.username,
                 role = body.role,
-                branchId = branchConfig.branchId,
+                branchId = branchConfigManager.branchId,
                 loginTime = System.currentTimeMillis()
             )
 
             val now = System.currentTimeMillis()
+            val hashedPassword = passwordHasher.hashPassword(password)
 
             userDao.upsertUser(
                 UserEntity(
@@ -126,7 +129,7 @@ class AuthRepository @Inject constructor(
                     name = body.name,
                     role = body.role,
                     username = body.username,
-                    password = password,
+                    password = hashedPassword,
                     lastModified = now,
                     isSynced = true,
                     syncedAt = now

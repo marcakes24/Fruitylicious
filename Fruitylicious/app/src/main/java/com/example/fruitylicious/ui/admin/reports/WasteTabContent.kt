@@ -287,15 +287,6 @@ fun WasteTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = RptRed)
-                    }
-                }
-
                 uiState.reasonData.isEmpty() -> {
                     Text(
                         text = "No data.",
@@ -387,15 +378,6 @@ fun WasteTabContent(
             }
 
             when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = RptRed)
-                    }
-                }
-
                 filteredItems.isEmpty() -> {
                     Text(
                         text = "No data.",

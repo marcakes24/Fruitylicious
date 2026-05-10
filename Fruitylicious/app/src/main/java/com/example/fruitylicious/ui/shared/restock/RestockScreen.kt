@@ -283,67 +283,16 @@ fun RestockScreen(
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                    // --- History Card Start ---
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                            color = Color.White,
-                            shadowElevation = 2.dp
-                        ) {
-                            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.History,
-                                            contentDescription = null,
-                                            tint = RsTextSub,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Text(
-                                            text = "Restock History",
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF333333)
-                                        )
-                                    }
-
-                                    Surface(
-                                        color = Color(0xFFFFB300),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "${filteredHistory.size} entries",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
-                            }
-                        }
-                    }
-
-                    if (uiState.isLoading && filteredHistory.isEmpty()) {
+                    if (uiState.isLoading) {
                         item {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 color = Color.White,
                                 shadowElevation = 2.dp
                             ) {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(48.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     androidx.compose.material3.CircularProgressIndicator(color = RsGreen)
@@ -354,7 +303,7 @@ fun RestockScreen(
                         item {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 color = Color.White,
                                 shadowElevation = 2.dp
                             ) {
@@ -367,6 +316,57 @@ fun RestockScreen(
                             }
                         }
                     } else {
+                        // --- History Card Start ---
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = RsTextSub,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            Text(
+                                                text = "Restock History",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF333333)
+                                            )
+                                        }
+
+                                        Surface(
+                                            color = Color(0xFFFFB300),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "${filteredHistory.size} entries",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
+                                }
+                            }
+                        }
+
                         itemsIndexed(
                             items = filteredHistory,
                             key = { _, entry -> entry.restockId }

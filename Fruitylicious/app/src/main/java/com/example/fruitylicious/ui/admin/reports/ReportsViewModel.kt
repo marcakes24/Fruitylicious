@@ -23,7 +23,6 @@ data class ReportsUiState(
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
     val canAccessCrossBranch: Boolean = false,
-    val isLoading: Boolean = false,
     val error: String? = null
 )
 
@@ -96,14 +95,8 @@ class ReportsViewModel @Inject constructor(
 
         _uiState.update {
             it.copy(
-                selectedBranchId = finalBranchId,
-                isLoading = true
+                selectedBranchId = finalBranchId
             )
-        }
-
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(500)
-            _uiState.update { it.copy(isLoading = false) }
         }
     }
 

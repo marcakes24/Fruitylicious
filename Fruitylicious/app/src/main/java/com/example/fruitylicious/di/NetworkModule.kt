@@ -2,11 +2,13 @@ package com.example.fruitylicious.di
 
 import com.example.fruitylicious.data.remote.api.AdminApi
 import com.example.fruitylicious.data.remote.api.AuthApi
+import com.example.fruitylicious.data.remote.api.HealthApi
 import com.example.fruitylicious.data.remote.api.ReportApi
 import com.example.fruitylicious.data.remote.api.SyncApi
 import com.example.fruitylicious.data.remote.interceptor.ApiKeyInterceptor
+import com.example.fruitylicious.data.remote.interceptor.DynamicBaseUrlInterceptor
 import com.example.fruitylicious.data.remote.interceptor.JwtInterceptor
-import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.BranchConfigManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,9 +37,11 @@ object NetworkModule {
     fun provideOkHttpClient(
         apiKeyInterceptor: ApiKeyInterceptor,
         jwtInterceptor: JwtInterceptor,
+        dynamicBaseUrlInterceptor: DynamicBaseUrlInterceptor,
         loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(dynamicBaseUrlInterceptor)
             .addInterceptor(apiKeyInterceptor)
             .addInterceptor(jwtInterceptor)
             .addInterceptor(loggingInterceptor)
@@ -50,11 +54,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(
-        branchConfig: BranchConfig,
+        branchConfigManager: BranchConfigManager,
         okHttpClient: OkHttpClient
     ): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(branchConfig.apiBaseUrl)
+            .baseUrl(branchConfigManager.apiBaseUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -82,5 +86,11 @@ object NetworkModule {
     @Singleton
     fun provideAdminApi(retrofit: Retrofit): AdminApi {
         return retrofit.create(AdminApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideHealthApi(retrofit: Retrofit): HealthApi {
+        return retrofit.create(HealthApi::class.java)
     }
 }

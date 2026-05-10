@@ -205,36 +205,53 @@ fun StaffLogScreen(
                         )
                     }
 
-                    when {
-                        filteredLogs.isEmpty() -> {
-                            if (!uiState.isLoading) {
-                                item {
-                                    EmptyStaffLogText("No staff logs found")
+                    if (uiState.isLoading) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(48.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = SlGreen)
                                 }
                             }
                         }
-
-                        else -> {
-                            items(
-                                items = filteredLogs,
-                                key = { it.logId }
-                            ) { log ->
-                                StaffLogCard(
-                                    log = log,
-                                    onImageClick = { path -> expandedImagePath = path }
-                                )
+                    } else if (filteredLogs.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                EmptyStaffLogText("No staff logs found")
                             }
+                        }
+                    } else {
+                        items(
+                            items = filteredLogs,
+                            key = { it.logId }
+                        ) { log ->
+                            StaffLogCard(
+                                log = log,
+                                onImageClick = { path -> expandedImagePath = path }
+                            )
+                        }
 
-                            if (uiState.hasMore) {
-                                item {
-                                    Button(
-                                        onClick = { viewModel.loadMore() },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = !uiState.isLoadingMore,
-                                        colors = ButtonDefaults.buttonColors(containerColor = SlGreen)
-                                    ) {
-                                        Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
-                                    }
+                        if (uiState.hasMore) {
+                            item {
+                                Button(
+                                    onClick = { viewModel.loadMore() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !uiState.isLoadingMore,
+                                    colors = ButtonDefaults.buttonColors(containerColor = SlGreen)
+                                ) {
+                                    Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
                                 }
                             }
                         }

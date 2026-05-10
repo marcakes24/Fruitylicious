@@ -9,7 +9,7 @@ import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.repository.ReportRepository
-import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -80,11 +80,11 @@ class InventoryMonitoringViewModel @Inject constructor(
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val sessionManager: SessionManager,
-    private val branchConfig: BranchConfig,
+    private val branchConfigManager: BranchConfigManager,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfig.branchId
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
 
     private val _uiState = MutableStateFlow(
         InventoryMonitoringUiState(
@@ -431,7 +431,7 @@ class InventoryMonitoringViewModel @Inject constructor(
 
         val local = BranchEntity(
             branchId = localBranchId,
-            branchName = branchConfig.branchName.ifBlank { "Branch $localBranchId" },
+            branchName = branchConfigManager.branchName.ifBlank { "Branch $localBranchId" },
             address = "",
             contactNumber = "",
             lastModified = 0L,

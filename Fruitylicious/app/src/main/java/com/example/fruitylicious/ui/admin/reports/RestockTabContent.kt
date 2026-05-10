@@ -355,14 +355,7 @@ fun RestockTabContent(
                 uiState.topIngredients.filter { it.unitType == uiState.selectedUnit }
             }
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.material3.CircularProgressIndicator(color = RptGreen)
-                }
-            } else if (filteredIngredients.isEmpty()) {
+            if (filteredIngredients.isEmpty()) {
                 Text("No data.", fontSize = 13.sp, color = RptTextSub)
             } else {
                 TopIngredientsChart(items = filteredIngredients.take(5))
@@ -417,15 +410,6 @@ fun RestockTabContent(
             )
 
             when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = RptGreenDark)
-                    }
-                }
-
                 restockItems.isEmpty() -> {
                     Text(
                         text = "No restock data found.",

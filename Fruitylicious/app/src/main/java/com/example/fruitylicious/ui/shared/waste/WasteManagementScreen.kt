@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +45,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +81,7 @@ import kotlinx.coroutines.launch
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
@@ -286,56 +285,16 @@ fun WasteManagementScreen(
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                    // --- History Card Start ---
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                            color = Color.White,
-                            shadowElevation = 2.dp
-                        ) {
-                            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Waste History",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF333333)
-                                    )
-
-                                    Surface(
-                                        color = Color(0xFFFFB300),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "${filteredHistory.size} entries",
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
-                            }
-                        }
-                    }
-
-                    if (uiState.isLoading && filteredHistory.isEmpty()) {
+                    if (uiState.isLoading) {
                         item {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 color = Color.White,
                                 shadowElevation = 2.dp
                             ) {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(48.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     androidx.compose.material3.CircularProgressIndicator(color = WsGreen)
@@ -346,7 +305,7 @@ fun WasteManagementScreen(
                         item {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 color = Color.White,
                                 shadowElevation = 2.dp
                             ) {
@@ -363,6 +322,46 @@ fun WasteManagementScreen(
                             }
                         }
                     } else {
+                        // --- History Card Start ---
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Waste History",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF333333)
+                                        )
+
+                                        Surface(
+                                            color = Color(0xFFFFB300),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "${filteredHistory.size} entries",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 1.dp)
+                                }
+                            }
+                        }
+
                         itemsIndexed(
                             items = filteredHistory,
                             key = { _, entry -> entry.wasteId }

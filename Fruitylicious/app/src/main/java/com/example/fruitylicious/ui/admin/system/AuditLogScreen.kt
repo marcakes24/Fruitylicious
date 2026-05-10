@@ -192,55 +192,47 @@ fun AuditLogScreen(
                             )
                         }
 
-                        if (uiState.isLoading && uiState.logs.isEmpty()) {
+                        if (uiState.isLoading) {
                             item {
-                                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
-                                    androidx.compose.material3.CircularProgressIndicator(color = AuditGreenPrimary)
-                                }
-                            }
-                        }
-
-                        if (uiState.isAdmin && !uiState.isOnline) {
-                            item {
-                                Text(
-                                    text = "Offline mode: Only local branch audit logs are available.",
-                                    color = AuditGrayText,
-                                    fontSize = 12.sp,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                )
-                            }
-                        }
-
-                        when {
-                            filteredLogs.isEmpty() -> {
-                                if (!uiState.isLoading) {
-                                    item {
-                                        EmptyAuditText("No audit logs found")
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    Box(Modifier.fillMaxWidth().padding(48.dp), Alignment.Center) {
+                                        androidx.compose.material3.CircularProgressIndicator(color = AuditGreenPrimary)
                                     }
                                 }
                             }
-
-                            else -> {
-                                items(
-                                    items = filteredLogs,
-                                    key = { it.logId }
-                                ) { log ->
-                                    AuditLogCard(log)
+                        } else if (filteredLogs.isEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = Color.White,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    EmptyAuditText("No audit logs found")
                                 }
+                            }
+                        } else {
+                            items(
+                                items = filteredLogs,
+                                key = { it.logId }
+                            ) { log ->
+                                AuditLogCard(log)
+                            }
 
-                                if (uiState.hasMore) {
-                                    item {
-                                        Button(
-                                            onClick = { viewModel.loadMore() },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            enabled = !uiState.isLoadingMore,
-                                            colors = ButtonDefaults.buttonColors(containerColor = AuditGreenPrimary)
-                                        ) {
-                                            Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
-                                        }
+                            if (uiState.hasMore) {
+                                item {
+                                    Button(
+                                        onClick = { viewModel.loadMore() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !uiState.isLoadingMore,
+                                        colors = ButtonDefaults.buttonColors(containerColor = AuditGreenPrimary)
+                                    ) {
+                                        Text(if (uiState.isLoadingMore) "Loading..." else "Load More")
                                     }
                                 }
                             }

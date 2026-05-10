@@ -2,8 +2,8 @@ package com.example.fruitylicious.ui.admin.users
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
+import com.example.fruitylicious.data.repository.UserRepository
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +25,7 @@ data class UserManagementUiState(
 
 @HiltViewModel
 class UserManagementViewModel @Inject constructor(
-    private val userDao: UserDao,
+    private val userRepository: UserRepository,
     private val sessionManager: SessionManager
 ) : ViewModel() {
 
@@ -40,7 +40,7 @@ class UserManagementViewModel @Inject constructor(
 
     private fun observeUsers() {
         viewModelScope.launch {
-            userDao.observeUsers().collectLatest { users ->
+            userRepository.observeUsers().collectLatest { users ->
                 _uiState.update {
                     it.copy(
                         users = users,
@@ -58,59 +58,32 @@ class UserManagementViewModel @Inject constructor(
         password: String,
         role: String
     ) {
-        val cleanName = name.trim()
-        val cleanUsername = username.trim().lowercase()
-        val cleanRole = role.lowercase()
-
-        if (cleanName.isBlank()) {
-            setError("Name is required.")
-            return
-        }
-
-        if (cleanUsername.isBlank()) {
-            setError("Username is required.")
-            return
-        }
-
-        if (cleanRole !in listOf("staff", "admin")) {
-            setError("Invalid role selected.")
-            return
-        }
-
-        if (existingUserId == null && password.isBlank()) {
-            setError("Password is required.")
-            return
-        }
-
         viewModelScope.launch {
             val existingUser = existingUserId?.let { id ->
                 _uiState.value.users.firstOrNull { it.userId == id }
             }
 
-            val now = System.currentTimeMillis()
-
-            userDao.upsertUser(
-                UserEntity(
-                    userId = existingUserId ?: generateId(),
-                    name = cleanName,
-                    role = cleanRole,
-                    username = cleanUsername,
-                    password = if (password.isBlank()) {
-                        existingUser?.password ?: ""
-                    } else {
-                        password
-                    },
-                    lastModified = now,
-                    isSynced = false,
-                    syncedAt = null
-                )
+            val result = userRepository.saveUser(
+                userId = existingUserId ?: generateId(),
+                name = name,
+                role = role,
+                username = username,
+                password = if (password.isBlank()) {
+                    existingUser?.password ?: ""
+                } else {
+                    password
+                }
             )
 
-            _uiState.update {
-                it.copy(
-                    successMessage = "User saved.",
-                    error = null
-                )
+            result.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        successMessage = "User saved.",
+                        error = null
+                    )
+                }
+            }.onFailure { e ->
+                setError(e.message ?: "Failed to save user.")
             }
         }
     }
@@ -122,13 +95,15 @@ class UserManagementViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            userDao.softDeleteUser(userId, System.currentTimeMillis())
-
-            _uiState.update {
-                it.copy(
-                    successMessage = "User deleted.",
-                    error = null
-                )
+            userRepository.deleteUser(userId).onSuccess {
+                _uiState.update {
+                    it.copy(
+                        successMessage = "User deleted.",
+                        error = null
+                    )
+                }
+            }.onFailure { e ->
+                setError(e.message ?: "Failed to delete user.")
             }
         }
     }

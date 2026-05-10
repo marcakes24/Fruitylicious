@@ -88,7 +88,7 @@ fun FruityliciousNavGraph(
             if (sessionManager.isAdmin()) {
                 ADMIN_DASHBOARD
             } else {
-                STAFF_DASHBOARD
+                STAFF_LOG
             }
         } else {
             LOGIN
@@ -149,7 +149,7 @@ fun FruityliciousNavGraph(
                     val destination = if (sessionManager.isAdmin()) {
                         ADMIN_DASHBOARD
                     } else {
-                        STAFF_DASHBOARD
+                        STAFF_LOG
                     }
 
                     navController.navigate(destination) {

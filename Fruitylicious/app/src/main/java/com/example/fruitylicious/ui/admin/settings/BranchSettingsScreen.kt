@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +34,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +66,7 @@ fun BranchSettingsScreen(
     val scrollState = rememberScrollState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -74,6 +81,26 @@ fun BranchSettingsScreen(
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
+            val message = if (uiState.requiresRestart) {
+                "Configuration saved. Please restart the app or re-login to apply the new backend URL."
+            } else {
+                "Branch configuration saved."
+            }
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(uiState.testConnectionSuccess) {
+        uiState.testConnectionSuccess?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(uiState.testConnectionError) {
+        uiState.testConnectionError?.let {
+            snackbarHostState.showSnackbar(it)
             viewModel.clearMessages()
         }
     }
@@ -95,12 +122,9 @@ fun BranchSettingsScreen(
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MpPageBg)
-            ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
                 BranchSettingsHeader(
                     onMenuClick = {
                         scope.launch {
@@ -108,7 +132,12 @@ fun BranchSettingsScreen(
                         }
                     }
                 )
-
+            },
+            containerColor = MpPageBg
+        ) { paddingValues ->
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)) {
                 if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MpGreen)
@@ -117,21 +146,20 @@ fun BranchSettingsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 14.dp),
+                            .padding(horizontal = 14.dp)
+                            .verticalScroll(scrollState),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Surface(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxWidth(),
                             color = MpCardBg,
-                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Column(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(scrollState)
-                                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                                    .padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(18.dp)
                             ) {
                                 Text(
@@ -215,7 +243,9 @@ fun BranchSettingsScreen(
                                                     Image(
                                                         bitmap = bitmap.asImageBitmap(),
                                                         contentDescription = "GCash QR Code",
-                                                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .padding(12.dp),
                                                         contentScale = ContentScale.Fit
                                                     )
                                                     
@@ -271,14 +301,103 @@ fun BranchSettingsScreen(
                                                 color = Color.White
                                             )
                                         } else {
-                                            Text("SAVE CHANGES", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text("SAVE BRANCH DETAILS", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                         }
                                     }
                                 }
-
-                                Spacer(modifier = Modifier.height(30.dp))
                             }
                         }
+
+                        // ADMIN ONLY BRANCH CONFIGURATION SECTION
+                        if (uiState.isAdmin) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MpCardBg,
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                                ) {
+                                    Text(
+                                        text = "Branch Configuration (Admin)",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MpGreen
+                                    )
+
+                                    SettingsField(
+                                        label = "Branch ID",
+                                        value = uiState.configBranchIdText,
+                                        onValueChange = viewModel::onConfigBranchIdChanged,
+                                        placeholder = "e.g. 1",
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                    )
+
+                                    SettingsField(
+                                        label = "Branch Name (Config)",
+                                        value = uiState.configBranchName,
+                                        onValueChange = viewModel::onConfigBranchNameChanged,
+                                        placeholder = "e.g. Branch 1"
+                                    )
+
+                                    SettingsField(
+                                        label = "API Base URL",
+                                        value = uiState.configApiBaseUrl,
+                                        onValueChange = viewModel::onConfigApiBaseUrlChanged,
+                                        placeholder = "http://192.168.1.100:8083/"
+                                    )
+
+                                    SettingsField(
+                                        label = "API Key",
+                                        value = uiState.configApiKey,
+                                        onValueChange = viewModel::onConfigApiKeyChanged,
+                                        placeholder = "Enter API Key",
+                                        isPassword = true,
+                                        isPasswordVisible = uiState.isApiKeyVisible,
+                                        onTogglePasswordVisibility = viewModel::toggleApiKeyVisibility
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = viewModel::testConnection,
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            enabled = !uiState.isTestingConnection,
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MpGreen)
+                                        ) {
+                                            if (uiState.isTestingConnection) {
+                                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MpGreen, strokeWidth = 2.dp)
+                                            } else {
+                                                Text("TEST CONNECTION", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = viewModel::saveConfig,
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            enabled = !uiState.isSaving,
+                                            colors = ButtonDefaults.buttonColors(containerColor = MpGreen)
+                                        ) {
+                                            Text("SAVE CONFIG", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    TextButton(
+                                        onClick = viewModel::resetConfigToDefault,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Reset to Default", color = Color.Gray, fontSize = 14.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(30.dp))
                     }
                 }
             }
@@ -328,7 +447,9 @@ private fun BranchSettingsHeader(
             imageVector = Icons.Default.Settings,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.align(Alignment.CenterEnd).size(24.dp)
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(24.dp)
         )
     }
 }
@@ -340,7 +461,11 @@ private fun SettingsField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     singleLine: Boolean = true,
-    minLines: Int = 1
+    minLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    isPassword: Boolean = false,
+    isPasswordVisible: Boolean = false,
+    onTogglePasswordVisibility: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -355,6 +480,8 @@ private fun SettingsField(
             value = value,
             onValueChange = onValueChange,
             textStyle = TextStyle(fontSize = 14.sp, color = MpTextMain),
+            keyboardOptions = keyboardOptions,
+            visualTransformation = if (isPassword && !isPasswordVisible) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
@@ -362,14 +489,28 @@ private fun SettingsField(
                 .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(10.dp))
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             decorationBox = { inner ->
-                if (value.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (value.isEmpty()) {
+                            Text(
+                                text = placeholder,
+                                color = Color.Gray,
+                                fontSize = 14.sp
+                            )
+                        }
+                        inner()
+                    }
+                    if (isPassword) {
+                        Icon(
+                            imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { onTogglePasswordVisibility() }
+                        )
+                    }
                 }
-                inner()
             },
             singleLine = singleLine,
             minLines = minLines

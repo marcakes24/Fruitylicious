@@ -3,6 +3,7 @@ package com.example.fruitylicious.data.repository
 import com.example.fruitylicious.data.local.dao.UserDao
 import com.example.fruitylicious.data.local.entity.UserEntity
 import com.example.fruitylicious.sync.AutoSyncManager
+import com.example.fruitylicious.util.PasswordHasher
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -10,7 +11,8 @@ import javax.inject.Singleton
 @Singleton
 class UserRepository @Inject constructor(
     private val userDao: UserDao,
-    private val autoSyncManager: AutoSyncManager
+    private val autoSyncManager: AutoSyncManager,
+    private val passwordHasher: PasswordHasher
 ) {
 
     fun observeUsers(): Flow<List<UserEntity>> {
@@ -70,6 +72,11 @@ class UserRepository @Inject constructor(
             return Result.failure(IllegalStateException("Username is already taken."))
         }
 
+        val hashedPassword = if (passwordHasher.isHashed(password)) {
+            password
+        } else {
+            passwordHasher.hashPassword(password)
+        }
         val now = System.currentTimeMillis()
 
         userDao.upsertUser(
@@ -78,7 +85,7 @@ class UserRepository @Inject constructor(
                 name = cleanName,
                 role = cleanRole,
                 username = cleanUsername,
-                password = password,
+                password = hashedPassword,
                 lastModified = now,
                 isSynced = false,
                 syncedAt = null

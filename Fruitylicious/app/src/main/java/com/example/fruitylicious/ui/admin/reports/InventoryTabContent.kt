@@ -131,15 +131,6 @@ fun InventoryTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = RptGreen)
-                    }
-                }
-
                 filteredRows.isEmpty() -> {
                     Text(
                         text = "No inventory data.",
