@@ -187,7 +187,7 @@ fun TransactionHistoryScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
-                    isClockedIn = true,
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = onLogout
                 )
             }

@@ -96,7 +96,7 @@ fun NotificationsScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
-                    isClockedIn = true, // Common status for screens
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = onLogout
                 )
             }

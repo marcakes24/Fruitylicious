@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.SalesBreakdownRow
 import com.example.fruitylicious.data.local.dao.TransactionDao
+import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Calendar
 import java.util.Locale
@@ -12,6 +14,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -30,6 +33,7 @@ data class StaffSalesSummaryUiState(
     val branchId: Int = 1,
     val branchName: String = "",
     val isLoading: Boolean = true,
+    val isClockedIn: Boolean = false,
     val error: String? = null,
     val dailySalesData: List<HourlySales> = emptyList(),
     val selectedHourlySales: HourlySales? = null,
@@ -39,6 +43,8 @@ data class StaffSalesSummaryUiState(
 @HiltViewModel
 class StaffSalesSummaryViewModel @Inject constructor(
     private val transactionDao: TransactionDao,
+    private val staffLogRepository: StaffLogRepository,
+    private val sessionManager: SessionManager,
     branchConfig: BranchConfig
 ) : ViewModel() {
 
@@ -56,6 +62,7 @@ class StaffSalesSummaryViewModel @Inject constructor(
 
     init {
         loadTodaySales()
+        observeClockInStatus()
     }
 
     fun onHourSelected(hourlySales: HourlySales?) {
@@ -154,5 +161,20 @@ class StaffSalesSummaryViewModel @Inject constructor(
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         return calendar.timeInMillis
+    }
+
+    private fun observeClockInStatus() {
+        viewModelScope.launch {
+            if (sessionManager.isAdmin()) {
+                _uiState.update { it.copy(isClockedIn = true) }
+                return@launch
+            }
+
+            val userId = sessionManager.getUserId()
+            staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val hasActiveLog = logs.any { it.clockOut == null }
+                _uiState.update { it.copy(isClockedIn = hasActiveLog) }
+            }
+        }
     }
 }

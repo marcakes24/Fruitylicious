@@ -66,7 +66,7 @@ data class WasteManagementUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
     val currentPage: Int = 0,
-    val isClockedIn: Boolean = true,
+    val isClockedIn: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )

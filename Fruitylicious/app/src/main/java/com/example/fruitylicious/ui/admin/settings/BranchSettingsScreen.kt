@@ -331,6 +331,7 @@ fun BranchSettingsScreen(
                                         value = uiState.configBranchIdText,
                                         onValueChange = viewModel::onConfigBranchIdChanged,
                                         placeholder = "e.g. 1",
+                                        enabled = false,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                     )
 
@@ -338,7 +339,8 @@ fun BranchSettingsScreen(
                                         label = "Branch Name (Config)",
                                         value = uiState.configBranchName,
                                         onValueChange = viewModel::onConfigBranchNameChanged,
-                                        placeholder = "e.g. Branch 1"
+                                        placeholder = "e.g. Branch 1",
+                                        enabled = false
                                     )
 
                                     SettingsField(
@@ -372,7 +374,12 @@ fun BranchSettingsScreen(
                                             if (uiState.isTestingConnection) {
                                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MpGreen, strokeWidth = 2.dp)
                                             } else {
-                                                Text("TEST CONNECTION", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    text = "TEST CONNECTION",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center
+                                                )
                                             }
                                         }
 
@@ -383,7 +390,12 @@ fun BranchSettingsScreen(
                                             enabled = !uiState.isSaving,
                                             colors = ButtonDefaults.buttonColors(containerColor = MpGreen)
                                         ) {
-                                            Text("SAVE CONFIG", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = "SAVE CONFIG",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center
+                                            )
                                         }
                                     }
 
@@ -460,6 +472,7 @@ private fun SettingsField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    enabled: Boolean = true,
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -472,21 +485,30 @@ private fun SettingsField(
             text = label,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            color = MpTextMain,
+            color = if (enabled) MpTextMain else MpTextSub,
             modifier = Modifier.padding(bottom = 6.dp)
         )
 
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            textStyle = TextStyle(fontSize = 14.sp, color = MpTextMain),
+            enabled = enabled,
+            readOnly = !enabled,
+            textStyle = TextStyle(
+                fontSize = 14.sp, 
+                color = if (enabled) MpTextMain else MpTextSub
+            ),
             keyboardOptions = keyboardOptions,
             visualTransformation = if (isPassword && !isPasswordVisible) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
-                .background(FieldBg)
-                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(10.dp))
+                .background(if (enabled) FieldBg else FieldBg.copy(alpha = 0.5f))
+                .border(
+                    1.dp, 
+                    if (enabled) Color(0xFFEEEEEE) else Color(0xFFDDDDDD), 
+                    RoundedCornerShape(10.dp)
+                )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             decorationBox = { inner ->
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -204,6 +204,7 @@ fun TimeLogScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
+                    isClockedIn = uiState.attendanceState == AttendanceState.CLOCKED_IN,
                     onLogout = {
                         if (uiState.attendanceState == AttendanceState.CLOCKED_IN) {
                             showLogoutAlert = true

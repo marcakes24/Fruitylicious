@@ -125,7 +125,7 @@ fun InventoryAdjustmentScreen(
                     scope = scope,
                     userName = userName,
                     branchName = branchName,
-                    isClockedIn = true, // Simplified as this screen often requires clock-in
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = onLogout
                 )
             }

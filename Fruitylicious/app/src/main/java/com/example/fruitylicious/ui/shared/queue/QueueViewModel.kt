@@ -10,6 +10,7 @@ import com.example.fruitylicious.data.local.dao.TransactionItemAddonDao
 import com.example.fruitylicious.data.local.dao.TransactionItemDao
 import com.example.fruitylicious.data.local.db.PosDatabase
 import com.example.fruitylicious.data.local.entity.AuditLogEntity
+import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,6 +18,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
@@ -48,6 +50,7 @@ data class QueueUiState(
     val orders: List<QueueOrderRow> = emptyList(),
     val selectedStatus: String = "pending",
     val isLoading: Boolean = true,
+    val isClockedIn: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -60,6 +63,7 @@ class QueueViewModel @Inject constructor(
     private val transactionItemAddonDao: TransactionItemAddonDao,
     private val productDao: ProductDao,
     private val auditLogDao: AuditLogDao,
+    private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig
 ) : ViewModel() {
@@ -69,6 +73,7 @@ class QueueViewModel @Inject constructor(
 
     init {
         observeAll()
+        observeClockInStatus()
     }
 
     private fun observeAll() {
@@ -206,6 +211,21 @@ class QueueViewModel @Inject constructor(
                 error = null,
                 successMessage = null
             )
+        }
+    }
+
+    private fun observeClockInStatus() {
+        viewModelScope.launch {
+            if (sessionManager.isAdmin()) {
+                _uiState.update { it.copy(isClockedIn = true) }
+                return@launch
+            }
+
+            val userId = sessionManager.getUserId()
+            staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val hasActiveLog = logs.any { it.clockOut == null }
+                _uiState.update { it.copy(isClockedIn = hasActiveLog) }
+            }
         }
     }
 

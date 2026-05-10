@@ -82,6 +82,7 @@ fun SalesSummaryScreen(
                     scope = scope,
                     staffName = staffName,
                     branchName = uiState.branchName.ifBlank { "B${uiState.branchId}" },
+                    isClockedIn = uiState.isClockedIn,
                     onLogout = onLogout
                 )
             }

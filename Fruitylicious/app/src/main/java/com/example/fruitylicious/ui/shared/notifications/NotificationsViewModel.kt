@@ -10,6 +10,7 @@ import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.remote.dto.InventoryReportItemDto
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
@@ -48,6 +49,7 @@ data class NotificationsUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
+    val isClockedIn: Boolean = false,
     val localBranchId: Int = 0,
     val userBranchId: String = "",
     val isLoading: Boolean = false,
@@ -60,6 +62,7 @@ class NotificationsViewModel @Inject constructor(
     private val ingredientDao: IngredientDao,
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
+    private val staffLogRepository: StaffLogRepository,
     private val sessionManager: SessionManager,
     private val branchConfig: BranchConfig,
     private val networkMonitor: NetworkMonitor
@@ -86,6 +89,7 @@ class NotificationsViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
+        observeClockInStatus()
 
         // Reactive loading: only one central point for loading
         viewModelScope.launch {
@@ -232,6 +236,21 @@ class NotificationsViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
+            }
+        }
+    }
+
+    private fun observeClockInStatus() {
+        viewModelScope.launch {
+            if (sessionManager.isAdmin()) {
+                _uiState.update { it.copy(isClockedIn = true) }
+                return@launch
+            }
+
+            val userId = sessionManager.getUserId()
+            staffLogRepository.observeStaffLogsByUser(userId).collectLatest { logs ->
+                val hasActiveLog = logs.any { it.clockOut == null }
+                _uiState.update { it.copy(isClockedIn = hasActiveLog) }
             }
         }
     }

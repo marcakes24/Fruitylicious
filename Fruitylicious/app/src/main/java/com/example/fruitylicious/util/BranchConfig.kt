@@ -48,7 +48,14 @@ class BranchConfigManager @Inject constructor(
             "${config.apiBaseUrl}/"
         }
 
-        val updatedConfig = config.copy(apiBaseUrl = normalizedUrl)
+        // Ensure branchId and branchName remain unchangeable by using the current ones
+        val currentId = branchId
+        val currentName = branchName
+        val updatedConfig = config.copy(
+            branchId = currentId,
+            branchName = currentName,
+            apiBaseUrl = normalizedUrl
+        )
 
         preferences.edit()
             .putInt(KEY_BRANCH_ID, updatedConfig.branchId)
