@@ -67,7 +67,6 @@ data class InventoryMonitoringUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -99,7 +98,6 @@ class InventoryMonitoringViewModel @Inject constructor(
     val uiState: StateFlow<InventoryMonitoringUiState> = _uiState.asStateFlow()
 
     private var branches: List<BranchEntity> = emptyList()
-    private var lockoutJob: Job? = null
     private var loadJob: Job? = null
     private val refreshTrigger = MutableStateFlow(0)
 
@@ -107,7 +105,26 @@ class InventoryMonitoringViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
-        loadRows()
+
+        // Reactive loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    delay(300) // Debounce branch selection
+                    loadRows()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                    loadJob?.cancel()
+                }
+            }
+        }
     }
 
     private fun observeLocalData() {
@@ -125,14 +142,13 @@ class InventoryMonitoringViewModel @Inject constructor(
                 }
                 .collectLatest { rows ->
                     _uiState.update { state ->
-                        // Show local data if:
-                        // 1. Local branch selected
-                        // 2. Offline
-                        // 3. Error fallback
-                        if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null) {
+                        // Avoid showing local data as a "flickering" placeholder if we are currently loading remote data
+                        val isActivelyLoadingRemote = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
+
+                        if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.rows.isEmpty() && !isActivelyLoadingRemote)) {
                             state.copy(
                                 rows = rows,
-                                isLoading = false
+                                isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false
                             )
                         } else {
                             state
@@ -187,7 +203,7 @@ class InventoryMonitoringViewModel @Inject constructor(
         }.sortedBy { it.ingredientName.lowercase() }
     }
 
-    fun selectBranch(branchId: Int?) {
+    fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
         val finalBranchId = if (state.isAdmin && state.isOnline) {
             branchId
@@ -201,13 +217,12 @@ class InventoryMonitoringViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
-                error = null,
-                rows = emptyList()
+                error = null
+                // Removed: rows = emptyList() to prevent flickering
             )
         }
 
         refreshTrigger.value += 1
-        loadRows()
     }
 
     private fun loadRows() {
@@ -318,12 +333,9 @@ class InventoryMonitoringViewModel @Inject constructor(
             onFailure = { error ->
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        error = error.message ?: "Failed to load remote inventory.",
-                        isRemoteAccessLocked = true
+                        isLoading = false
                     )
                 }
-                startLockoutTimer()
                 refreshTrigger.value += 1
             }
         )
@@ -380,20 +392,15 @@ class InventoryMonitoringViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     rows = aggregated,
-                    isLoading = false,
-                    error = firstError,
-                    isRemoteAccessLocked = firstError != null
+                    isLoading = false
                 )
             }
         } else {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
-                    error = firstError ?: "Failed to load remote inventory.",
-                    isRemoteAccessLocked = true
+                    isLoading = false
                 )
             }
-            startLockoutTimer()
             refreshTrigger.value += 1
         }
     }
@@ -416,14 +423,6 @@ class InventoryMonitoringViewModel @Inject constructor(
                 image = null
             )
         }.sortedBy { it.ingredientName.lowercase() }
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            delay(5 * 60 * 1000L)
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
-        }
     }
 
     private fun ensureLocalBranchExists(branchList: List<BranchEntity>): List<BranchEntity> {

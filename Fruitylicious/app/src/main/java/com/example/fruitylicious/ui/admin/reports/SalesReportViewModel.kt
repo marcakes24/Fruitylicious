@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -41,6 +44,7 @@ data class SalesSeries(
 data class SalesReportUiState(
     val period: String = "daily",
     val selectedDate: Long = System.currentTimeMillis(),
+    val selectedBranchId: Int? = null,
     val rangeText: String = "",
     val totalSales: Double = 0.0,
     val previousSales: Double = 0.0,
@@ -73,6 +77,7 @@ class SalesReportViewModel @Inject constructor(
 
     private var reportJob: Job? = null
     private var chartJob: Job? = null
+    private val refreshTrigger = MutableStateFlow(0)
 
     private val PAGE_SIZE = 50
 
@@ -83,40 +88,46 @@ class SalesReportViewModel @Inject constructor(
         val status: String
     )
 
-    fun setPeriod(
-        period: String,
-        branchId: Int?
-    ) {
+    init {
+        // Reactive loading: watch all parameters that affect the report
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                _uiState.map { it.period }.distinctUntilChanged(),
+                _uiState.map { it.selectedDate }.distinctUntilChanged(),
+                networkMonitor.observeNetworkStatus().distinctUntilChanged(),
+                refreshTrigger
+            ) { branchId, period, date, online, _ ->
+                // Collect parameters into a single trigger
+                // We return a dummy value to trigger collectLatest
+                true
+            }.collectLatest { 
+                loadReportInternal()
+            }
+        }
+    }
+
+    fun onBranchSelected(branchId: Int?) {
+        if (_uiState.value.selectedBranchId == branchId) return
+        _uiState.update { it.copy(selectedBranchId = branchId) }
+    }
+
+    fun setPeriod(period: String) {
         _uiState.update {
             it.copy(
                 period = period,
                 selectedDate = System.currentTimeMillis()
             )
         }
-
-        loadReport(
-            branchId = branchId,
-            period = period
-        )
     }
 
-    fun setSelectedDate(
-        date: Long,
-        branchId: Int?
-    ) {
+    fun setSelectedDate(date: Long) {
         _uiState.update {
             it.copy(selectedDate = date)
         }
-
-        loadReport(
-            branchId = branchId
-        )
     }
 
-    fun navigatePeriod(
-        delta: Int,
-        branchId: Int?
-    ) {
+    fun navigatePeriod(delta: Int) {
         val current = Calendar.getInstance().apply {
             timeInMillis = _uiState.value.selectedDate
         }
@@ -127,14 +138,14 @@ class SalesReportViewModel @Inject constructor(
             "monthly" -> current.add(Calendar.MONTH, delta)
         }
 
-        setSelectedDate(current.timeInMillis, branchId)
+        setSelectedDate(current.timeInMillis)
     }
 
-    fun refresh(branchId: Int?) {
-        loadReport(branchId)
+    fun refresh() {
+        refreshTrigger.value += 1
     }
 
-    fun loadMoreItems(branchId: Int?) {
+    fun loadMoreItems() {
         val state = _uiState.value
         if (state.isLoadingMore || !state.hasMore) return
 
@@ -144,6 +155,7 @@ class SalesReportViewModel @Inject constructor(
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
             val localBranchId = sessionManager.getBranchId()
+            val branchId = state.selectedBranchId
             val range = getRange(state.period, state.selectedDate)
             val nextPage = state.currentPage + 1
 
@@ -181,8 +193,7 @@ class SalesReportViewModel @Inject constructor(
                     onFailure = { error ->
                         _uiState.update {
                             it.copy(
-                                isLoadingMore = false,
-                                error = error.message
+                                isLoadingMore = false
                             )
                         }
                     }
@@ -194,10 +205,11 @@ class SalesReportViewModel @Inject constructor(
         }
     }
 
-    fun loadReport(
-        branchId: Int?,
-        period: String = _uiState.value.period
-    ) {
+    private fun loadReportInternal() {
+        val state = _uiState.value
+        val branchId = state.selectedBranchId
+        val period = state.period
+        
         reportJob?.cancel()
         chartJob?.cancel()
 
@@ -209,15 +221,14 @@ class SalesReportViewModel @Inject constructor(
                     isLoading = true,
                     error = null,
                     currentPage = 0,
-                    hasMore = false,
-                    salesBreakdown = emptyList()
+                    hasMore = false
                 )
             }
 
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
-            val range = getRange(period, _uiState.value.selectedDate)
+            val range = getRange(period, state.selectedDate)
 
             _uiState.update {
                 it.copy(rangeText = formatRangeText(period, range))
@@ -226,15 +237,19 @@ class SalesReportViewModel @Inject constructor(
             // Always observe/load chart data (has internal local fallback)
             observeChartData(branchId, period, range)
 
-            // 1. Load Local first as placeholder
-            loadLocalReport(
-                branchId = branchId ?: if (isAdmin) null else localBranchId,
-                period = period,
-                range = range
-            )
+            val isRemoteNeeded = isOnline && isAdmin && (branchId == null || branchId != localBranchId)
+
+            // 1. Load Local only if remote is NOT needed
+            if (!isRemoteNeeded) {
+                loadLocalReport(
+                    branchId = branchId ?: if (isAdmin) null else localBranchId,
+                    period = period,
+                    range = range
+                )
+            }
 
             // 2. Then if remote is needed and possible, load remote
-            if (isOnline && isAdmin && (branchId == null || branchId != localBranchId)) {
+            if (isRemoteNeeded) {
                 _uiState.update { it.copy(isLoading = true) }
                 loadRemoteReport(
                     branchId = branchId,
@@ -588,7 +603,7 @@ class SalesReportViewModel @Inject constructor(
                 }
             },
             onFailure = { error ->
-                _uiState.update { it.copy(error = error.message) }
+                _uiState.update { it.copy(isLoading = false) }
             }
         )
 
@@ -649,8 +664,7 @@ class SalesReportViewModel @Inject constructor(
             onFailure = { error ->
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        error = it.error ?: error.message
+                        isLoading = false
                     )
                 }
             }

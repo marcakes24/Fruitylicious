@@ -113,9 +113,8 @@ fun NotificationsScreen(
                     branches = uiState.branches,
                     isAdmin = uiState.isAdmin,
                     isOnline = uiState.isOnline,
-                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
                     localBranchId = uiState.localBranchId,
-                    onBranchSelected = { viewModel.selectBranch(it) },
+                    onBranchSelected = { viewModel.onBranchSelected(it) },
                     onMenuClick = {
                         scope.launch {
                             drawerState.open()
@@ -189,7 +188,6 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
-    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelected: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -225,7 +223,6 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
-                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelected,
                     activeColor = NotifGreen,
                     containerColor = Color(0xFFF5F5F5),

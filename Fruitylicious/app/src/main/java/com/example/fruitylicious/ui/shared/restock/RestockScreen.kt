@@ -174,10 +174,9 @@ fun RestockScreen(
                     branches = uiState.branches,
                     isAdmin = uiState.isAdmin,
                     isOnline = uiState.isOnline,
-                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
                     localBranchId = uiState.localBranchId,
                     onBranchSelect = { branchId ->
-                        viewModel.selectBranch(branchId)
+                        viewModel.onBranchSelected(branchId)
                     },
                     onMenuClick = {
                         scope.launch {
@@ -368,7 +367,10 @@ fun RestockScreen(
                             }
                         }
                     } else {
-                        itemsIndexed(filteredHistory) { index, entry ->
+                        itemsIndexed(
+                            items = filteredHistory,
+                            key = { _, entry -> entry.restockId }
+                        ) { index, entry ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Color.White,
@@ -439,7 +441,6 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
-    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -475,7 +476,6 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
-                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = RsGreen,
                     containerColor = Color(0xFFF5F5F5),

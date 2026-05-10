@@ -48,7 +48,6 @@ data class NotificationsUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 0,
     val userBranchId: String = "",
     val isLoading: Boolean = false,
@@ -81,14 +80,32 @@ class NotificationsViewModel @Inject constructor(
 
     private var branches: List<BranchEntity> = emptyList()
     private val refreshTrigger = MutableStateFlow(0)
-    private var lockoutJob: kotlinx.coroutines.Job? = null
     private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
         observeBranches()
         observeNetwork()
         observeLocalData()
-        loadNotifications()
+
+        // Reactive loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    delay(300) // Debounce branch selection
+                    loadNotifications()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                    loadJob?.cancel()
+                }
+            }
+        }
     }
 
     private fun observeLocalData() {
@@ -100,19 +117,17 @@ class NotificationsViewModel @Inject constructor(
             ) { inventory, ingredients, _ ->
                 buildNotificationRows(inventory, ingredients)
             }.collect { rows ->
-                val state = _uiState.value
-                
-                // Show local data if:
-                // 1. Local branch selected
-                // 2. Offline
-                // 3. Error fallback
-                // 4. Loading remote data (placeholder)
-                if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.notifications.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
+                _uiState.update { state ->
+                    // Avoid showing local data as a "flickering" placeholder if we are currently loading remote data
+                    val isActivelyLoadingRemote = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
+
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.notifications.isEmpty() && !isActivelyLoadingRemote)) {
+                        state.copy(
                             notifications = rows,
                             isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false
                         )
+                    } else {
+                        state
                     }
                 }
             }
@@ -149,7 +164,7 @@ class NotificationsViewModel @Inject constructor(
         }.sortedWith(notificationSorter())
     }
 
-    fun selectBranch(branchId: Int?) {
+    fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
 
         val finalBranchId = if (state.isAdmin && state.isOnline) {
@@ -164,13 +179,12 @@ class NotificationsViewModel @Inject constructor(
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
-                error = null,
-                notifications = emptyList()
+                error = null
+                // Removed: notifications = emptyList() to prevent flickering
             )
         }
 
         refreshTrigger.value += 1
-        loadNotifications()
     }
 
     private fun loadNotifications() {
@@ -218,7 +232,6 @@ class NotificationsViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
-                loadNotifications()
             }
         }
     }
@@ -272,12 +285,9 @@ class NotificationsViewModel @Inject constructor(
             onFailure = { exception ->
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Failed to load remote notifications.",
-                        isRemoteAccessLocked = true
+                        isLoading = false
                     )
                 }
-                startLockoutTimer()
                 refreshTrigger.value += 1
             }
         )
@@ -324,20 +334,15 @@ class NotificationsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     notifications = allRows.sortedWith(notificationSorter()),
-                    isLoading = false,
-                    error = firstError,
-                    isRemoteAccessLocked = firstError != null
+                    isLoading = false
                 )
             }
         } else {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
-                    error = firstError ?: "Failed to load remote notifications.",
-                    isRemoteAccessLocked = true
+                    isLoading = false
                 )
             }
-            startLockoutTimer()
             refreshTrigger.value += 1
         }
     }
@@ -403,14 +408,6 @@ class NotificationsViewModel @Inject constructor(
                 else -> 2
             }
         }.thenBy { it.branchId }.thenBy { it.name.lowercase() }
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            delay(5 * 60 * 1000L)
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
-        }
     }
 
     private fun isAdminUser(): Boolean {

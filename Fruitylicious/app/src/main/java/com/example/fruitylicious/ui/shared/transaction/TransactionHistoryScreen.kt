@@ -203,7 +203,6 @@ fun TransactionHistoryScreen(
                     selectedBranchId = uiState.selectedBranchId,
                     canAccessCrossBranch = uiState.canAccessCrossBranch,
                     isOnline = uiState.isOnline,
-                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
                     branches = uiState.branches,
                     localBranchId = uiState.localBranchId,
                     onBranchSelect = {
@@ -414,7 +413,6 @@ private fun Header(
     selectedBranchId: Int?,
     canAccessCrossBranch: Boolean,
     isOnline: Boolean,
-    isRemoteAccessLocked: Boolean,
     branches: List<BranchEntity>,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
@@ -447,7 +445,6 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
-                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = ThGreen,
                     containerColor = Color(0xFFF5F5F5),

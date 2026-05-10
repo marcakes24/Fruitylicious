@@ -131,16 +131,20 @@ class WasteReportViewModel @Inject constructor(
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
+            val isRemoteNeeded = isAdmin && isOnline && (branchId == null || branchId != localBranchId)
 
-            // 1. Load Local first as placeholder
-            loadLocalReport(
-                branchId = branchId ?: localBranchId,
-                from = range.first,
-                to = range.second
-            )
+            // 1. Load Local only if remote is NOT needed
+            if (!isRemoteNeeded) {
+                loadLocalReport(
+                    branchId = branchId ?: localBranchId,
+                    from = range.first,
+                    to = range.second,
+                    shouldSetLoading = true
+                )
+            }
 
             // 2. Then Load Remote/Combined if needed
-            if (isAdmin && isOnline && (branchId == null || branchId != localBranchId)) {
+            if (isRemoteNeeded) {
                 _uiState.update { it.copy(isLoading = true) }
                 if (branchId == null) {
                     loadCombinedReport(range.first, range.second)
@@ -203,8 +207,7 @@ class WasteReportViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            isLoadingMore = false,
-                            error = error.message
+                            isLoadingMore = false
                         )
                     }
                 }
@@ -329,16 +332,14 @@ class WasteReportViewModel @Inject constructor(
                     mostWastedQty = topItem?.totalQuantity ?: 0.0,
                     mostWastedUnit = topItem?.unitType ?: "",
                     availableUnits = finalItems.map { it.unitType }.distinct().sorted(),
-                    isLoading = false,
-                    error = null
+                    isLoading = false
                 )
             }
 
         } catch (e: Exception) {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to load combined waste report."
+                    isLoading = false
                 )
             }
         }
@@ -347,7 +348,8 @@ class WasteReportViewModel @Inject constructor(
     private suspend fun loadLocalReport(
         branchId: Int?,
         from: Long,
-        to: Long
+        to: Long,
+        shouldSetLoading: Boolean = true
     ) {
         try {
             val totalWaste = wasteLogDao.getTotalWasteQuantity(
@@ -393,7 +395,7 @@ class WasteReportViewModel @Inject constructor(
                     wasteByItem = wasteByItem,
                     staffActivity = staffActivity,
                     availableUnits = wasteByItem.map { row -> row.unitType }.distinct().sorted(),
-                    isLoading = false,
+                    isLoading = if (shouldSetLoading) false else it.isLoading,
                     hasMore = false,
                     error = null
                 )
@@ -401,7 +403,7 @@ class WasteReportViewModel @Inject constructor(
         } catch (exception: Exception) {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
+                    isLoading = if (shouldSetLoading) false else it.isLoading,
                     error = exception.message ?: "Failed to load local waste report."
                 )
             }
@@ -512,8 +514,7 @@ class WasteReportViewModel @Inject constructor(
             onFailure = { error ->
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        error = it.error ?: error.message
+                        isLoading = false
                     )
                 }
             }

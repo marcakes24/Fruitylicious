@@ -75,12 +75,15 @@ class InventoryReportViewModel @Inject constructor(
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
+            val isRemoteNeeded = isAdmin && isOnline && (branchId == null || branchId != localBranchId)
 
-            // 1. Load Local first as placeholder
-            loadLocalReport(localBranchId)
+            // 1. Load Local first as placeholder ONLY if remote is NOT needed
+            if (!isRemoteNeeded) {
+                loadLocalReport(localBranchId)
+            }
 
             // 2. Then Load Remote if needed and possible
-            if (isAdmin && isOnline && (branchId == null || branchId != localBranchId)) {
+            if (isRemoteNeeded) {
                 _uiState.update { it.copy(isLoading = true) }
                 if (branchId == null) {
                     loadRemoteAllBranchesReport()
@@ -197,8 +200,7 @@ class InventoryReportViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         rows = emptyList(),
-                        isLoading = false,
-                        error = exception.message ?: "Failed to load remote inventory report."
+                        isLoading = false
                     )
                 }
             }
@@ -251,16 +253,14 @@ class InventoryReportViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     rows = aggregatedRows,
-                    isLoading = false,
-                    error = firstError
+                    isLoading = false
                 )
             }
         } catch (exception: Exception) {
             _uiState.update {
                 it.copy(
                     rows = emptyList(),
-                    isLoading = false,
-                    error = exception.message ?: "Failed to load combined inventory report."
+                    isLoading = false
                 )
             }
         }

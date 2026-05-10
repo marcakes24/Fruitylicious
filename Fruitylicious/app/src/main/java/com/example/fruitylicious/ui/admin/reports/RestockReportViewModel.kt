@@ -123,7 +123,6 @@ class RestockReportViewModel @Inject constructor(
                     error = null,
                     currentPage = 0,
                     hasMore = false,
-                    frequencyItems = emptyList(),
                     rangeText = formatRangeText(state.period, range)
                 )
             }
@@ -131,16 +130,21 @@ class RestockReportViewModel @Inject constructor(
             val localBranchId = sessionManager.getBranchId()
             val isOnline = networkMonitor.isOnline()
             val isAdmin = isAdminUser()
+            val isRemoteNeeded = isAdmin && isOnline && (branchId == null || branchId != localBranchId)
 
-            // 1. Load Local first as placeholder
-            loadLocalReport(
-                branchId = branchId ?: localBranchId,
-                from = range.first,
-                to = range.second
-            )
+            // 1. Load Local only if remote is NOT needed (offline or local branch)
+            // This prevents flickering/jumping between local-only and combined data.
+            if (!isRemoteNeeded) {
+                loadLocalReport(
+                    branchId = branchId ?: localBranchId,
+                    from = range.first,
+                    to = range.second,
+                    shouldSetLoading = true
+                )
+            }
 
-            // 2. Then Load Remote/Combined if needed
-            if (isAdmin && isOnline && (branchId == null || branchId != localBranchId)) {
+            // 2. Then Load Remote/Combined if needed. Combined loader handles local data internally.
+            if (isRemoteNeeded) {
                 _uiState.update { it.copy(isLoading = true) }
                 if (branchId == null) {
                     loadCombinedReport(range.first, range.second)
@@ -200,8 +204,7 @@ class RestockReportViewModel @Inject constructor(
                 onFailure = { error ->
                     _uiState.update {
                         it.copy(
-                            isLoadingMore = false,
-                            error = error.message
+                            isLoadingMore = false
                         )
                     }
                 }
@@ -304,14 +307,15 @@ class RestockReportViewModel @Inject constructor(
                 )
             }
         } catch (e: Exception) {
-            _uiState.update { it.copy(isLoading = false, error = e.message) }
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
     private suspend fun loadLocalReport(
         branchId: Int,
         from: Long,
-        to: Long
+        to: Long,
+        shouldSetLoading: Boolean = true
     ) {
         try {
             val totalToday = restockLogDao.getTotalRestockedUnits(
@@ -350,7 +354,7 @@ class RestockReportViewModel @Inject constructor(
                     topIngredients = topIngredients,
                     frequencyItems = frequencyItems,
                     availableUnits = topIngredients.map { it.unitType }.distinct().sorted(),
-                    isLoading = false,
+                    isLoading = if (shouldSetLoading) false else it.isLoading,
                     hasMore = false,
                     error = null
                 )
@@ -358,7 +362,7 @@ class RestockReportViewModel @Inject constructor(
         } catch (exception: Exception) {
             _uiState.update {
                 it.copy(
-                    isLoading = false,
+                    isLoading = if (shouldSetLoading) false else it.isLoading,
                     error = exception.message ?: "Failed to load local restock report."
                 )
             }
@@ -459,8 +463,7 @@ class RestockReportViewModel @Inject constructor(
             onFailure = { error ->
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
-                        error = it.error ?: error.message
+                        isLoading = false
                     )
                 }
             }

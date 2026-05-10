@@ -23,6 +23,7 @@ class AutoSyncManager @Inject constructor(
     @ApplicationScope private val applicationScope: CoroutineScope
 ) {
     private var syncJob: Job? = null
+    private var periodicSyncJob: Job? = null
     private val mutex = Mutex()
     private var isSyncing = false
 
@@ -84,5 +85,23 @@ class AutoSyncManager @Inject constructor(
                 }
             }
         }
+    }
+
+    fun startPeriodicSync() {
+        periodicSyncJob?.cancel()
+        periodicSyncJob = applicationScope.launch {
+            while (true) {
+                delay(5 * 60 * 1000) // 5 minutes
+                if (networkMonitor.isOnline()) {
+                    Log.d("AutoSyncManager", "Periodic sync triggered (5m interval)")
+                    performSync()
+                }
+            }
+        }
+    }
+
+    fun stopPeriodicSync() {
+        periodicSyncJob?.cancel()
+        periodicSyncJob = null
     }
 }

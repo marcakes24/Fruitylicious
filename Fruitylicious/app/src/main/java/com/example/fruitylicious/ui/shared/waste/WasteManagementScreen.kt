@@ -150,7 +150,7 @@ fun WasteManagementScreen(
         }
     }
 
-    val onBranchSelect = remember(viewModel) { { id: Int? -> viewModel.selectBranch(id) } }
+    val onBranchSelect = remember(viewModel) { { id: Int? -> viewModel.onBranchSelected(id) } }
     val onMenuClick = remember(scope, drawerState) { { scope.launch { drawerState.open() }; Unit } }
     val onEntryClick = {
         if (uiState.isClockedIn) {
@@ -203,7 +203,6 @@ fun WasteManagementScreen(
                     branches = uiState.branches,
                     isAdmin = uiState.isAdmin,
                     isOnline = uiState.isOnline,
-                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
                     localBranchId = uiState.localBranchId,
                     onBranchSelect = onBranchSelect,
                     onMenuClick = onMenuClick
@@ -364,7 +363,10 @@ fun WasteManagementScreen(
                             }
                         }
                     } else {
-                        itemsIndexed(filteredHistory) { index, entry ->
+                        itemsIndexed(
+                            items = filteredHistory,
+                            key = { _, entry -> entry.wasteId }
+                        ) { index, entry ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Color.White,
@@ -376,12 +378,10 @@ fun WasteManagementScreen(
                                 }
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                    key(entry.wasteId) {
-                                        WasteRecordRow(
-                                            entry = entry,
-                                            onImageClick = { file -> expandedImageFile = file }
-                                        )
-                                    }
+                                    WasteRecordRow(
+                                        entry = entry,
+                                        onImageClick = { file -> expandedImageFile = file }
+                                    )
                                     if (index < filteredHistory.size - 1 || uiState.hasMore) {
                                         HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
                                     }
@@ -479,7 +479,6 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
-    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -515,7 +514,6 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
-                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = WsGreen,
                     containerColor = Color(0xFFF5F5F5),

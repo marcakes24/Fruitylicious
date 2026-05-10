@@ -25,9 +25,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 
 data class WasteIngredientRow(
@@ -57,7 +60,6 @@ data class WasteManagementUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -98,7 +100,6 @@ class WasteManagementViewModel @Inject constructor(
     val uiState: StateFlow<WasteManagementUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-    private var lockoutJob: kotlinx.coroutines.Job? = null
     private val refreshTrigger = MutableStateFlow(0)
     private var branches: List<BranchEntity> = emptyList()
 
@@ -107,7 +108,25 @@ class WasteManagementViewModel @Inject constructor(
         observeNetwork()
         observeLocalData()
         observeClockInStatus()
-        loadHistory()
+
+        // Reactive history loading: only one central point for loading
+        viewModelScope.launch {
+            combine(
+                _uiState.map { it.isOnline }.distinctUntilChanged(),
+                _uiState.map { it.selectedBranchId }.distinctUntilChanged(),
+                refreshTrigger
+            ) { online, branchId, trigger ->
+                Triple(online, branchId, trigger)
+            }.collectLatest { (online, branchId, _) ->
+                // ONLY load if online AND selected branch is NOT the local branch
+                if (online && branchId != localBranchId) {
+                    delay(300) // Debounce branch selection
+                    loadHistory()
+                } else {
+                    // For local branch, observeLocalData handles everything
+                }
+            }
+        }
     }
 
     private fun observeLocalData() {
@@ -135,7 +154,10 @@ class WasteManagementViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .collect { (ingredientRows, historyRows, _) ->
                 _uiState.update { state ->
-                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
+                    // Avoid flickering: don't show local data as placeholder if remote fetch is in progress for non-local branch
+                    val isRemoteFetchInProgress = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
+
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.history.isEmpty() && !isRemoteFetchInProgress)) {
                         state.copy(
                             ingredients = ingredientRows,
                             history = historyRows,
@@ -179,7 +201,7 @@ class WasteManagementViewModel @Inject constructor(
             }
     }
 
-    fun selectBranch(branchId: Int?) {
+    fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
 
         val finalBranchId = if (state.isAdmin && state.isOnline) {
@@ -188,19 +210,20 @@ class WasteManagementViewModel @Inject constructor(
             localBranchId
         }
 
+        if (state.selectedBranchId == finalBranchId) return
+
         _uiState.update {
             it.copy(
                 selectedBranchId = finalBranchId,
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null,
-                history = emptyList()
+                error = null
+                // Removed: history = emptyList() to prevent flickering
             )
         }
 
         refreshTrigger.value += 1
-        loadHistory()
     }
 
     fun refresh() {
@@ -208,13 +231,12 @@ class WasteManagementViewModel @Inject constructor(
             it.copy(
                 isLoading = true,
                 error = null,
-                currentPage = 0,
-                history = emptyList()
+                currentPage = 0
+                // Removed: history = emptyList() to prevent flickering
             )
         }
 
         refreshTrigger.value += 1
-        loadHistory()
     }
 
     private fun observeBranches() {
@@ -223,7 +245,6 @@ class WasteManagementViewModel @Inject constructor(
                 branches = branchList
                 _uiState.update { it.copy(branches = branchList) }
                 refreshTrigger.value += 1
-                loadHistory()
             }
         }
     }
@@ -243,8 +264,6 @@ class WasteManagementViewModel @Inject constructor(
                         selectedBranchId = forcedBranchId
                     )
                 }
-
-                loadHistory()
             }
         }
     }
@@ -295,7 +314,7 @@ class WasteManagementViewModel @Inject constructor(
         val state = _uiState.value
         viewModelScope.launch {
             if (page == 0) {
-                _uiState.update { it.copy(isLoading = true, error = null, history = emptyList()) }
+                _uiState.update { it.copy(isLoading = true, error = null) }
             } else {
                 _uiState.update { it.copy(isLoadingMore = true) }
             }
@@ -343,23 +362,12 @@ class WasteManagementViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            isLoadingMore = false,
-                            error = error.message ?: "Failed to load remote waste history.",
-                            isRemoteAccessLocked = true
+                            isLoadingMore = false
                         )
                     }
-                    startLockoutTimer()
                     refreshTrigger.value += 1
                 }
             )
-        }
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }
 

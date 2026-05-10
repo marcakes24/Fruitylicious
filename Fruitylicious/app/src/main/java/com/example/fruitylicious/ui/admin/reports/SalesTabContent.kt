@@ -389,7 +389,7 @@ fun SalesTabContent(
     var selectedSeriesIndex by remember(uiState.timeSeriesData) { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(branchId) {
-        viewModel.loadReport(branchId)
+        viewModel.onBranchSelected(branchId)
     }
 
     val pctChange = if (uiState.previousSales > 0.0) {
@@ -410,7 +410,7 @@ fun SalesTabContent(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        viewModel.setSelectedDate(it, branchId)
+                        viewModel.setSelectedDate(it)
                     }
                     showDatePicker = false
                 }) {
@@ -458,7 +458,7 @@ fun SalesTabContent(
                             .clip(RoundedCornerShape(8.dp))
                             .background(if (isSelected) Color.White else Color.Transparent)
                             .clickable {
-                                viewModel.setPeriod(period, branchId)
+                                viewModel.setPeriod(period)
                             }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -478,7 +478,7 @@ fun SalesTabContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = { viewModel.navigatePeriod(-1, branchId) }) {
+                IconButton(onClick = { viewModel.navigatePeriod(-1) }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Previous",
@@ -508,7 +508,7 @@ fun SalesTabContent(
                     )
                 }
 
-                IconButton(onClick = { viewModel.navigatePeriod(1, branchId) }) {
+                IconButton(onClick = { viewModel.navigatePeriod(1) }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "Next",
@@ -765,7 +765,7 @@ fun SalesTabContent(
                         if (uiState.isLoadingMore) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = RptGreen)
                         } else {
-                            TextButton(onClick = { viewModel.loadMoreItems(branchId) }) {
+                            TextButton(onClick = { viewModel.loadMoreItems() }) {
                                 Text("Load More", color = RptGreen, fontWeight = FontWeight.Bold)
                             }
                         }

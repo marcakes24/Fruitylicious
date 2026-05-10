@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
         syncManager.start(applicationContext)
         syncManager.syncNow(applicationContext)
         autoSyncManager.startNetworkObserver()
+        autoSyncManager.startPeriodicSync()
 
         setContent {
             MaterialTheme {

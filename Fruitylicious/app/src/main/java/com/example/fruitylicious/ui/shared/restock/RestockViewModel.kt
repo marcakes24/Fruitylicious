@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 data class RestockIngredientRow(
     val ingredientId: Int,
@@ -56,7 +57,6 @@ data class RestockUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
@@ -97,7 +97,6 @@ class RestockViewModel @Inject constructor(
     val uiState: StateFlow<RestockUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 20
-    private var lockoutJob: kotlinx.coroutines.Job? = null
     private val refreshTrigger = MutableStateFlow(0)
     private var branches: List<BranchEntity> = emptyList()
 
@@ -118,7 +117,7 @@ class RestockViewModel @Inject constructor(
             }.collectLatest { (online, branchId, _) ->
                 // ONLY load if online AND selected branch is NOT the local branch
                 if (online && branchId != localBranchId) {
-                    kotlinx.coroutines.delay(300) // Debounce branch selection and status changes
+                    delay(300) // Debounce branch selection and status changes
                     loadHistory()
                 } else {
                     // For local branch, observeLocalData handles everything
@@ -151,14 +150,13 @@ class RestockViewModel @Inject constructor(
                 Triple(ingredientRows, historyRows, logs.size)
             }
             .flowOn(kotlinx.coroutines.Dispatchers.Default)
+            .flowOn(kotlinx.coroutines.Dispatchers.Default)
             .collect { (ingredientRows, historyRows, _) ->
                 _uiState.update { state ->
-                    // Show local data if:
-                    // 1. Local branch selected
-                    // 2. Offline
-                    // 3. Error fallback
-                    // 4. Loading remote data (placeholder)
-                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.history.isEmpty()) {
+                    // Avoid flickering: don't show local data as placeholder if remote fetch is in progress for non-local branch
+                    val isRemoteFetchInProgress = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
+
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.history.isEmpty() && !isRemoteFetchInProgress)) {
                         state.copy(
                             ingredients = ingredientRows,
                             history = historyRows,
@@ -201,7 +199,7 @@ class RestockViewModel @Inject constructor(
             }
     }
 
-    fun selectBranch(branchId: Int?) {
+    fun onBranchSelected(branchId: Int?) {
         val state = _uiState.value
 
         val finalBranchId = if (state.isAdmin && state.isOnline) {
@@ -218,8 +216,8 @@ class RestockViewModel @Inject constructor(
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null,
-                history = emptyList()
+                error = null
+                // Removed: history = emptyList() to prevent flickering
             )
         }
 
@@ -231,8 +229,8 @@ class RestockViewModel @Inject constructor(
             it.copy(
                 isLoading = true,
                 error = null,
-                currentPage = 0,
-                history = emptyList()
+                currentPage = 0
+                // Removed: history = emptyList() to prevent flickering
             )
         }
 
@@ -313,7 +311,7 @@ class RestockViewModel @Inject constructor(
         val state = _uiState.value
         viewModelScope.launch {
             if (page == 0) {
-                _uiState.update { it.copy(isLoading = true, error = null, history = emptyList()) }
+                _uiState.update { it.copy(isLoading = true, error = null) }
             } else {
                 _uiState.update { it.copy(isLoadingMore = true) }
             }
@@ -357,23 +355,12 @@ class RestockViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            isLoadingMore = false,
-                            error = error.message ?: "Failed to load remote restock history.",
-                            isRemoteAccessLocked = true
+                            isLoadingMore = false
                         )
                     }
-                    startLockoutTimer()
                     refreshTrigger.value += 1
                 }
             )
-        }
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
         }
     }
 

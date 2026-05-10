@@ -70,7 +70,6 @@ data class TransactionHistoryUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
     val currentPage: Int = 0,
-    val isRemoteAccessLocked: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
 )
@@ -103,7 +102,6 @@ class TransactionHistoryViewModel @Inject constructor(
 
     private val PAGE_SIZE = 50
     private val refreshTrigger = MutableStateFlow(0)
-    private var lockoutJob: kotlinx.coroutines.Job? = null
     private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
@@ -146,12 +144,10 @@ class TransactionHistoryViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .collect { rows ->
                 _uiState.update { state ->
-                    // Show local data if:
-                    // 1. Local branch selected
-                    // 2. Offline
-                    // 3. Error fallback
-                    // 4. Loading remote data (placeholder)
-                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || state.transactions.isEmpty()) {
+                    // Avoid showing local data as a "flickering" placeholder if we are currently loading remote data
+                    val isActivelyLoadingRemote = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
+                    
+                    if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.transactions.isEmpty() && !isActivelyLoadingRemote)) {
                         state.copy(
                             transactions = rows,
                             isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
@@ -265,8 +261,7 @@ class TransactionHistoryViewModel @Inject constructor(
                 isLoading = true,
                 currentPage = 0,
                 hasMore = true,
-                error = null,
-                transactions = emptyList()
+                error = null
             )
         }
 
@@ -319,7 +314,7 @@ class TransactionHistoryViewModel @Inject constructor(
 
     private suspend fun loadRemoteTransactionsPage(page: Int) {
         if (page == 0) {
-            _uiState.update { it.copy(isLoading = true, error = null, transactions = emptyList()) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
         } else {
             _uiState.update { it.copy(isLoadingMore = true) }
         }
@@ -353,23 +348,12 @@ class TransactionHistoryViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        isLoadingMore = false,
-                        error = error.message ?: "Failed to load transactions.",
-                        isRemoteAccessLocked = true
+                        isLoadingMore = false
                     )
                 }
-                startLockoutTimer()
                 refreshTrigger.value += 1
             }
         )
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L) // 5 minutes
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
-        }
     }
 
     fun voidTransaction(transactionId: String) {

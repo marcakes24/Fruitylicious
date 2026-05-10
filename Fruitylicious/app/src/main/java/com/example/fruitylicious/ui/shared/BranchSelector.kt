@@ -31,8 +31,7 @@ fun BranchSelector(
     activeColor: Color = Color(0xFF2E7D32), // Default Fruitylicious Green
     containerColor: Color = Color(0xFFF5F5F5),
     contentColor: Color = Color(0xFF666E7A),
-    localBranchId: Int? = null,
-    isRemoteAccessLocked: Boolean = false
+    localBranchId: Int? = null
 ) {
     // Ensure displayBranches contains at least the local branch if provided
     val displayBranches = remember(branches, localBranchId) {
@@ -55,14 +54,14 @@ fun BranchSelector(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isOnline && !isRemoteAccessLocked) containerColor else containerColor.copy(alpha = 0.5f))
+            .background(if (isOnline) containerColor else containerColor.copy(alpha = 0.5f))
             .padding(3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         BranchSelectorTab(
             label = "All",
             isSelected = selectedBranchId == null,
-            enabled = isOnline && !isRemoteAccessLocked,
+            enabled = isOnline,
             activeColor = activeColor,
             contentColor = contentColor,
             onClick = { onBranchSelected(null) }
@@ -73,7 +72,7 @@ fun BranchSelector(
             BranchSelectorTab(
                 label = "B${branch.branchId}",
                 isSelected = selectedBranchId == branch.branchId,
-                enabled = isLocal || (isOnline && !isRemoteAccessLocked),
+                enabled = isLocal || isOnline,
                 activeColor = activeColor,
                 contentColor = contentColor,
                 onClick = { onBranchSelected(branch.branchId) }

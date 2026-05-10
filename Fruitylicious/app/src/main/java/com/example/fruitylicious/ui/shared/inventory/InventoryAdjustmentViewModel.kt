@@ -69,7 +69,6 @@ data class InventoryAdjustmentUiState(
     val hasMore: Boolean = false,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val isRemoteAccessLocked: Boolean = false,
     val localBranchId: Int = 1,
     val error: String? = null,
     val successMessage: String? = null
@@ -113,7 +112,6 @@ class InventoryAdjustmentViewModel @Inject constructor(
     val uiState: StateFlow<InventoryAdjustmentUiState> = _uiState.asStateFlow()
 
     private val PAGE_SIZE = 50
-    private var lockoutJob: kotlinx.coroutines.Job? = null
     private var loadJob: kotlinx.coroutines.Job? = null
 
     private var inventoryItems: List<InventoryEntity> = emptyList()
@@ -416,19 +414,10 @@ class InventoryAdjustmentViewModel @Inject constructor(
                 }
             },
             onFailure = { error ->
-                _uiState.update { it.copy(error = it.error ?: error.message, isRemoteAccessLocked = true) }
-                startLockoutTimer()
+                _uiState.update { it.copy(isLoading = false) }
                 loadLocalHistory()
             }
         )
-    }
-
-    private fun startLockoutTimer() {
-        lockoutJob?.cancel()
-        lockoutJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5 * 60 * 1000L)
-            _uiState.update { it.copy(isRemoteAccessLocked = false) }
-        }
     }
 
     private fun rebuildIngredients() {

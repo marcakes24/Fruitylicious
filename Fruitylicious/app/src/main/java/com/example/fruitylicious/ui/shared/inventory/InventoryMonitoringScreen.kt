@@ -120,10 +120,9 @@ fun InventoryMonitoringScreen(
                     branches = uiState.branches,
                     isAdmin = uiState.isAdmin,
                     isOnline = uiState.isOnline,
-                    isRemoteAccessLocked = uiState.isRemoteAccessLocked,
                     localBranchId = uiState.localBranchId,
                     onBranchSelect = { branchId ->
-                        viewModel.selectBranch(branchId)
+                        viewModel.onBranchSelected(branchId)
                     },
                     onMenuClick = {
                         scope.launch {
@@ -226,7 +225,6 @@ private fun Header(
     branches: List<BranchEntity>,
     isAdmin: Boolean,
     isOnline: Boolean,
-    isRemoteAccessLocked: Boolean,
     localBranchId: Int,
     onBranchSelect: (Int?) -> Unit,
     onMenuClick: () -> Unit
@@ -262,7 +260,6 @@ private fun Header(
                     selectedBranchId = selectedBranchId,
                     branches = branches,
                     isOnline = isOnline,
-                    isRemoteAccessLocked = isRemoteAccessLocked,
                     onBranchSelected = onBranchSelect,
                     activeColor = ImGreen,
                     containerColor = Color(0xFFF5F5F5),
