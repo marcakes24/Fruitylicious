@@ -207,17 +207,11 @@ fun StaffLogScreen(
                     }
 
                     when {
-                        uiState.isLoading && filteredLogs.isEmpty() -> {
-                            item {
-                                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
-                                    androidx.compose.material3.CircularProgressIndicator(color = SlGreen)
-                                }
-                            }
-                        }
-
                         filteredLogs.isEmpty() -> {
-                            item {
-                                EmptyStaffLogText("No staff logs found")
+                            if (!uiState.isLoading) {
+                                item {
+                                    EmptyStaffLogText("No staff logs found")
+                                }
                             }
                         }
 

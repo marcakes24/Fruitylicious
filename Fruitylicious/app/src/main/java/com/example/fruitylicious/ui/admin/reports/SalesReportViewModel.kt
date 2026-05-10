@@ -203,7 +203,7 @@ class SalesReportViewModel @Inject constructor(
 
         reportJob = viewModelScope.launch {
             delay(300) // Debounce rapid toggling
-            
+
             _uiState.update {
                 it.copy(
                     isLoading = true,

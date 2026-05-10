@@ -217,9 +217,9 @@ class InventoryAdjustmentViewModel @Inject constructor(
     fun selectBranch(branchId: Int?) {
         val state = _uiState.value
         val finalBranchId = if (state.isAdmin && state.isOnline) branchId else localBranchId
-        
+
         if (state.selectedBranchId == finalBranchId) return
-        
+
         _uiState.update { it.copy(selectedBranchId = finalBranchId, isLoading = true) }
         refreshTrigger.value += 1
     }

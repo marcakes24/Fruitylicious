@@ -113,7 +113,7 @@ class WasteReportViewModel @Inject constructor(
         reportJob?.cancel()
         reportJob = viewModelScope.launch {
             delay(300) // Debounce branch selection
-            
+
             val state = _uiState.value
             val range = getRange(state.period, state.selectedDate)
 

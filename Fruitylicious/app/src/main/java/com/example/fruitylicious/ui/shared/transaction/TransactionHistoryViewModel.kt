@@ -110,7 +110,7 @@ class TransactionHistoryViewModel @Inject constructor(
         observeBranches()
         observeNetworkStatus()
         observeLocalData()
-        
+
         // Reactive loading: only one central point for loading
         viewModelScope.launch {
             combine(

@@ -91,7 +91,7 @@ class AuditLogViewModel @Inject constructor(
         observeBranches()
         observeNetwork()
         observeLocalData()
-        
+
         // Reactive history loading: only one central point for loading
         viewModelScope.launch {
             combine(

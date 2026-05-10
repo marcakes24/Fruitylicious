@@ -216,15 +216,11 @@ fun AuditLogScreen(
                         }
 
                         when {
-                            uiState.isLoading && filteredLogs.isEmpty() -> {
-                                item {
-                                    EmptyAuditText("Loading audit logs...")
-                                }
-                            }
-
                             filteredLogs.isEmpty() -> {
-                                item {
-                                    EmptyAuditText("No audit logs found")
+                                if (!uiState.isLoading) {
+                                    item {
+                                        EmptyAuditText("No audit logs found")
+                                    }
                                 }
                             }
 

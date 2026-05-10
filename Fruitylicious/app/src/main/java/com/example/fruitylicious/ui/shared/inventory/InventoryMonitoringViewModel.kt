@@ -275,7 +275,7 @@ class InventoryMonitoringViewModel @Inject constructor(
                 if (t is kotlinx.coroutines.CancellationException) {
                     return@launch
                 }
-                
+
                 _uiState.update { 
                     it.copy(
                         isLoading = false, 
