@@ -290,7 +290,8 @@ fun PosScreen(
                             drawerState.open()
                         }
                     },
-                    onBack = onBack
+                    onBack = onBack,
+                    isLoading = uiState.isLoading
                 )
 
                 Column(
@@ -388,7 +389,8 @@ fun PosScreen(
                     },
                     onItemClick = { item ->
                         editingCartItem = item
-                    }
+                    },
+                    isLoading = uiState.isLoading
                 )
             }
         }
@@ -398,7 +400,8 @@ fun PosScreen(
 @Composable
 private fun PosHeader(
     onMenuClick: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isLoading: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -410,11 +413,14 @@ private fun PosHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onMenuClick) {
+            IconButton(
+                onClick = onMenuClick,
+                enabled = !isLoading
+            ) {
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menu",
-                    tint = Color.White
+                    tint = if (isLoading) Color.White.copy(alpha = 0.5f) else Color.White
                 )
             }
 
@@ -428,11 +434,14 @@ private fun PosHeader(
                 modifier = Modifier.weight(1f)
             )
 
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = onBack,
+                enabled = !isLoading
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.White
+                    tint = if (isLoading) Color.White.copy(alpha = 0.5f) else Color.White
                 )
             }
         }
@@ -1227,7 +1236,8 @@ private fun CartBottomSection(
     onRemove: (CartItem) -> Unit,
     onClear: () -> Unit,
     onCheckout: () -> Unit,
-    onItemClick: (CartItem) -> Unit
+    onItemClick: (CartItem) -> Unit,
+    isLoading: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         AnimatedVisibility(visible = addedToCartMsg) {
@@ -1327,7 +1337,8 @@ private fun CartBottomSection(
                 onRemove = onRemove,
                 onClear = onClear,
                 onCheckout = onCheckout,
-                onItemClick = onItemClick
+                onItemClick = onItemClick,
+                isLoading = isLoading
             )
         }
     }
@@ -1450,7 +1461,8 @@ private fun CartPanel(
     onRemove: (CartItem) -> Unit,
     onClear: () -> Unit,
     onCheckout: () -> Unit,
-    onItemClick: (CartItem) -> Unit
+    onItemClick: (CartItem) -> Unit,
+    isLoading: Boolean = false
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1612,7 +1624,7 @@ private fun CartPanel(
                         modifier = Modifier
                             .weight(1f)
                             .height(46.dp),
-                        enabled = cartItems.isNotEmpty(),
+                        enabled = cartItems.isNotEmpty() && !isLoading,
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                     ) {

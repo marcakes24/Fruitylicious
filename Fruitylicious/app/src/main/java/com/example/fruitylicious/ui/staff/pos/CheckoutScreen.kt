@@ -74,6 +74,7 @@ import com.example.fruitylicious.R
 import com.example.fruitylicious.STAFF_POS
 import com.example.fruitylicious.STAFF_QUEUE
 import com.example.fruitylicious.data.repository.CartItem
+import com.example.fruitylicious.util.navigateSafe
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -132,7 +133,8 @@ fun CheckoutScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             CheckoutHeader(
-                onBack = onBack
+                onBack = onBack,
+                isLoading = uiState.isLoading
             )
 
             AnimatedContent(
@@ -231,7 +233,8 @@ fun CheckoutScreen(
 
 @Composable
 private fun CheckoutHeader(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isLoading: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -241,12 +244,13 @@ private fun CheckoutHeader(
     ) {
         IconButton(
             onClick = onBack,
+            enabled = !isLoading,
             modifier = Modifier.align(Alignment.CenterStart)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = Color.White
+                tint = if (isLoading) Color.White.copy(alpha = 0.5f) else Color.White
             )
         }
 

@@ -11,12 +11,14 @@ import com.example.fruitylicious.data.repository.IngredientRepository
 import com.example.fruitylicious.data.repository.ProductRepository
 import com.example.fruitylicious.data.repository.ProductVariantRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.absoluteValue
 
@@ -24,6 +26,11 @@ data class RecipeLineUi(
     val ingredientId: Int = 0,
     val quantity: String = "",
     val unit: String = ""
+)
+
+data class RecipeLineDraft(
+    val packagingLines: List<RecipeLineUi>,
+    val recipeLines: List<RecipeLineUi>
 )
 
 data class RecipeManagementUiState(
@@ -36,6 +43,7 @@ data class RecipeManagementUiState(
     val selectedVariant: ProductVariantEntity? = null,
     val packagingLines: List<RecipeLineUi> = emptyList(),
     val recipeLines: List<RecipeLineUi> = emptyList(),
+    val variantDrafts: Map<Int?, RecipeLineDraft> = emptyMap(),
     val isLoading: Boolean = true,
     val isRecipesLoaded: Boolean = false,
     val error: String? = null,
@@ -52,6 +60,8 @@ class RecipeManagementViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(RecipeManagementUiState())
     val uiState: StateFlow<RecipeManagementUiState> = _uiState.asStateFlow()
+
+    private var loadRecipeJob: Job? = null
 
     init {
         observeProducts()
@@ -120,6 +130,7 @@ class RecipeManagementViewModel @Inject constructor(
                 selectedVariant = firstVariant,
                 recipeLines = emptyList(),
                 packagingLines = emptyList(),
+                variantDrafts = emptyMap(),
                 error = null,
                 successMessage = null
             )
@@ -133,28 +144,55 @@ class RecipeManagementViewModel @Inject constructor(
     }
 
     fun selectVariant(variant: ProductVariantEntity) {
-        _uiState.update {
-            it.copy(
-                selectedVariant = variant,
-                recipeLines = emptyList(),
-                packagingLines = emptyList(),
-                error = null,
-                successMessage = null
-            )
-        }
+        val currentState = _uiState.value
+        val oldVariantId = currentState.selectedVariant?.variantId
 
-        loadRecipe(variant.variantId)
+        // Checkpoint: save current work into drafts
+        val updatedDrafts = currentState.variantDrafts.toMutableMap()
+        updatedDrafts[oldVariantId] = RecipeLineDraft(
+            packagingLines = currentState.packagingLines,
+            recipeLines = currentState.recipeLines
+        )
+
+        val existingDraft = updatedDrafts[variant.variantId]
+
+        if (existingDraft != null) {
+            _uiState.update {
+                it.copy(
+                    selectedVariant = variant,
+                    packagingLines = existingDraft.packagingLines,
+                    recipeLines = existingDraft.recipeLines,
+                    variantDrafts = updatedDrafts,
+                    error = null,
+                    successMessage = null
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedVariant = variant,
+                    recipeLines = emptyList(),
+                    packagingLines = emptyList(),
+                    variantDrafts = updatedDrafts,
+                    error = null,
+                    successMessage = null
+                )
+            }
+            loadRecipe(variant.variantId)
+        }
     }
 
     private fun loadRecipe(variantId: Int) {
-        viewModelScope.launch {
+        loadRecipeJob?.cancel()
+        loadRecipeJob = viewModelScope.launch {
             val recipes = productRecipeDao.getRecipesForVariant(variantId)
             mapRecipesToUi(recipes)
         }
     }
 
     private fun loadProductRecipe(productId: Int) {
-        viewModelScope.launch {
+        loadRecipeJob?.cancel()
+        loadRecipeJob = viewModelScope.launch {
             val recipes = productRecipeDao.getRecipesForProduct(productId)
                 .filter { it.variantId == null }
             mapRecipesToUi(recipes)
@@ -162,7 +200,8 @@ class RecipeManagementViewModel @Inject constructor(
     }
 
     private fun mapRecipesToUi(recipes: List<ProductRecipeEntity>) {
-        val ingredientsMap = _uiState.value.ingredients.associateBy { it.ingredientId }
+        val currentState = _uiState.value
+        val ingredientsMap = currentState.ingredients.associateBy { it.ingredientId }
 
         val packagingEntities = recipes.filter { 
             ingredientsMap[it.ingredientId]?.isPackaging == true 
@@ -171,36 +210,52 @@ class RecipeManagementViewModel @Inject constructor(
             ingredientsMap[it.ingredientId]?.isPackaging != true 
         }
 
-        _uiState.update {
-            it.copy(
-                packagingLines = if (packagingEntities.isEmpty()) {
-                    if (it.selectedProduct?.isAddon == true) emptyList() else listOf(RecipeLineUi())
-                } else {
-                    packagingEntities.map { recipe ->
-                        val ingredient = ingredientsMap[recipe.ingredientId]
-                        RecipeLineUi(
-                            ingredientId = recipe.ingredientId,
-                            quantity = recipe.quantityRequired.toString(),
-                            unit = ingredient?.let { item -> recipeInputUnitFor(item) } ?: ""
-                        )
-                    }
-                },
-                recipeLines = if (ingredientEntities.isEmpty()) {
-                    listOf(RecipeLineUi())
-                } else {
-                    ingredientEntities.map { recipe ->
-                        val ingredient = ingredientsMap[recipe.ingredientId]
+        val pLines = if (packagingEntities.isEmpty()) {
+            if (currentState.selectedProduct?.isAddon == true) emptyList() else listOf(RecipeLineUi())
+        } else {
+            packagingEntities.map { recipe ->
+                val ingredient = ingredientsMap[recipe.ingredientId]
+                RecipeLineUi(
+                    ingredientId = recipe.ingredientId,
+                    quantity = formatQuantity(recipe.quantityRequired),
+                    unit = ingredient?.let { item -> recipeInputUnitFor(item) } ?: ""
+                )
+            }
+        }
 
-                        RecipeLineUi(
-                            ingredientId = recipe.ingredientId,
-                            quantity = recipe.quantityRequired.toString(),
-                            unit = ingredient?.let { item ->
-                                recipeInputUnitFor(item)
-                            } ?: ""
-                        )
-                    }
-                }
+        val rLines = if (ingredientEntities.isEmpty()) {
+            listOf(RecipeLineUi())
+        } else {
+            ingredientEntities.map { recipe ->
+                val ingredient = ingredientsMap[recipe.ingredientId]
+
+                RecipeLineUi(
+                    ingredientId = recipe.ingredientId,
+                    quantity = formatQuantity(recipe.quantityRequired),
+                    unit = ingredient?.let { item ->
+                        recipeInputUnitFor(item)
+                    } ?: ""
+                )
+            }
+        }
+
+        _uiState.update { state ->
+            val updatedDrafts = state.variantDrafts.toMutableMap()
+            updatedDrafts[state.selectedVariant?.variantId] = RecipeLineDraft(pLines, rLines)
+            
+            state.copy(
+                packagingLines = pLines,
+                recipeLines = rLines,
+                variantDrafts = updatedDrafts
             )
+        }
+    }
+
+    private fun formatQuantity(value: Double): String {
+        return if (value % 1.0 == 0.0) {
+            value.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", value)
         }
     }
 
@@ -234,15 +289,19 @@ class RecipeManagementViewModel @Inject constructor(
         }
     }
 
-    fun updateLineIngredient(index: Int, ingredient: IngredientEntity) {
+    fun updateLineIngredient(index: Int, ingredient: IngredientEntity?) {
         _uiState.update { state ->
             state.copy(
                 recipeLines = state.recipeLines.mapIndexed { i, line ->
                     if (i == index) {
-                        line.copy(
-                            ingredientId = ingredient.ingredientId,
-                            unit = recipeInputUnitFor(ingredient)
-                        )
+                        if (ingredient == null) {
+                            line.copy(ingredientId = 0, unit = "")
+                        } else {
+                            line.copy(
+                                ingredientId = ingredient.ingredientId,
+                                unit = recipeInputUnitFor(ingredient)
+                            )
+                        }
                     } else {
                         line
                     }
@@ -251,15 +310,19 @@ class RecipeManagementViewModel @Inject constructor(
         }
     }
 
-    fun updatePackagingIngredient(index: Int, ingredient: IngredientEntity) {
+    fun updatePackagingIngredient(index: Int, ingredient: IngredientEntity?) {
         _uiState.update { state ->
             state.copy(
                 packagingLines = state.packagingLines.mapIndexed { i, line ->
                     if (i == index) {
-                        line.copy(
-                            ingredientId = ingredient.ingredientId,
-                            unit = recipeInputUnitFor(ingredient)
-                        )
+                        if (ingredient == null) {
+                            line.copy(ingredientId = 0, unit = "")
+                        } else {
+                            line.copy(
+                                ingredientId = ingredient.ingredientId,
+                                unit = recipeInputUnitFor(ingredient)
+                            )
+                        }
                     } else {
                         line
                     }
@@ -377,6 +440,7 @@ class RecipeManagementViewModel @Inject constructor(
                 selectedVariant = null,
                 recipeLines = emptyList(),
                 packagingLines = emptyList(),
+                variantDrafts = emptyMap(),
                 error = null,
                 successMessage = null
             )

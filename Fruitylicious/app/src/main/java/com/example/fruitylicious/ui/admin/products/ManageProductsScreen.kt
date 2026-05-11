@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
@@ -68,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -444,7 +446,8 @@ private fun SearchBar(
 private fun DialogTextField(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String
+    placeholder: String,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
 ) {
     BasicTextField(
         value = value,
@@ -455,6 +458,7 @@ private fun DialogTextField(
             .clip(RoundedCornerShape(8.dp))
             .background(DialogBgGray)
             .padding(horizontal = 16.dp, vertical = 14.dp),
+        keyboardOptions = keyboardOptions,
         decorationBox = { inner ->
             if (value.isEmpty()) {
                 Text(
@@ -513,11 +517,21 @@ private fun ProductEditDialog(
         }
 
         FieldBlock("Medium Price") {
-            DialogTextField(mediumPrice, { mediumPrice = it }, "0.00")
+            DialogTextField(
+                value = mediumPrice,
+                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) mediumPrice = it },
+                placeholder = "0.00",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
         }
 
         FieldBlock("Large Price") {
-            DialogTextField(largePrice, { largePrice = it }, "0.00")
+            DialogTextField(
+                value = largePrice,
+                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) largePrice = it },
+                placeholder = "0.00",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -562,7 +576,12 @@ private fun AddonEditDialog(
         }
 
         FieldBlock("Price") {
-            DialogTextField(price, { price = it }, "0.00")
+            DialogTextField(
+                value = price,
+                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) price = it },
+                placeholder = "0.00",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))

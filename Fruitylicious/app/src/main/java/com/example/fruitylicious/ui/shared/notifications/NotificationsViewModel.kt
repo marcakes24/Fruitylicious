@@ -1,5 +1,6 @@
 package com.example.fruitylicious.ui.shared.notifications
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.BranchDao
@@ -12,10 +13,13 @@ import com.example.fruitylicious.data.remote.dto.InventoryReportItemDto
 import com.example.fruitylicious.data.repository.ReportRepository
 import com.example.fruitylicious.data.repository.StaffLogRepository
 import com.example.fruitylicious.util.BranchConfig
+import com.example.fruitylicious.util.ImageStorage
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -29,6 +33,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class NotificationRow(
     val ingredientId: Int,
@@ -58,6 +63,7 @@ data class NotificationsUiState(
 
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val inventoryDao: InventoryDao,
     private val ingredientDao: IngredientDao,
     private val branchDao: BranchDao,
@@ -286,11 +292,13 @@ class NotificationsViewModel @Inject constructor(
 
         result.fold(
             onSuccess = { report ->
-                val rows = report.items.mapNotNull { item ->
-                    item.toNotificationRow(
-                        branchId = report.branchId ?: branchId,
-                        branchName = report.branchName ?: "Branch $branchId"
-                    )
+                val rows = withContext(Dispatchers.IO) {
+                    report.items.mapNotNull { item ->
+                        item.toNotificationRow(
+                            branchId = report.branchId ?: branchId,
+                            branchName = report.branchName ?: "Branch $branchId"
+                        )
+                    }
                 }.sortedWith(notificationSorter())
 
                 _uiState.update {
@@ -330,12 +338,15 @@ class NotificationsViewModel @Inject constructor(
                 results.forEach { (branch, result) ->
                     result.fold(
                         onSuccess = { report ->
-                            allRows.addAll(report.items.mapNotNull { item ->
-                                item.toNotificationRow(
-                                    branchId = branch.branchId,
-                                    branchName = branch.branchName
-                                )
-                            })
+                            val rows = withContext(Dispatchers.IO) {
+                                report.items.mapNotNull { item ->
+                                    item.toNotificationRow(
+                                        branchId = branch.branchId,
+                                        branchName = branch.branchName
+                                    )
+                                }
+                            }
+                            allRows.addAll(rows)
                         },
                         onFailure = { exception ->
                             if (firstError == null) firstError = exception.message
@@ -370,15 +381,26 @@ class NotificationsViewModel @Inject constructor(
         branchId: Int,
         branchName: String
     ): NotificationRow? {
-        // We use local images if available
-        val localImage = null // Could lookup from localIngredients if needed, but not critical for remote view
-        
+        val localIngredient = ingredientDao.getIngredientByIdSync(ingredientId)
+        val localImagePath = localIngredient?.image
+        val hasLocalImage = localImagePath != null && ImageStorage.getImageFile(context, localImagePath).exists()
+
+        val finalImagePath = if (hasLocalImage) {
+            localImagePath
+        } else {
+            ImageStorage.saveBase64Image(
+                context = context,
+                base64Value = image,
+                folder = "ingredients"
+            )
+        }
+
         return buildNotificationRow(
             ingredientId = ingredientId,
             branchId = branchId,
             branchName = branchName,
             name = ingredientName,
-            imageUrl = localImage,
+            imageUrl = finalImagePath,
             currentStock = currentStock,
             unitType = unitType,
             lowStockThreshold = lowStockThreshold

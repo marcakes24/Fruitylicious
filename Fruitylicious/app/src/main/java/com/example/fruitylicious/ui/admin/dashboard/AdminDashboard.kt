@@ -64,6 +64,7 @@ import com.example.fruitylicious.ADMIN_WASTE_HISTORY
 import com.example.fruitylicious.STAFF_POS
 import com.example.fruitylicious.data.local.entity.BranchEntity
 import com.example.fruitylicious.ui.shared.OwnerSideBarContent
+import com.example.fruitylicious.util.navigateSafe
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.ceil
@@ -131,7 +132,7 @@ fun AdminDashboardScreen(
                     DashboardHeader(
                         hasNotifications = uiState.hasNotifications,
                         onNotificationsClick = {
-                            navController.navigate(ADMIN_NOTIFICATIONS)
+                            navController.navigateSafe(ADMIN_NOTIFICATIONS)
                         },
                         onMenuClick = {
                             scope.launch {
@@ -160,14 +161,14 @@ fun AdminDashboardScreen(
                         dateText = uiState.dateText,
                         isOnline = uiState.isOnline,
                         onStartPos = {
-                            navController.navigate(STAFF_POS)
+                            navController.navigateSafe(STAFF_POS)
                         }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     QuickActionsSection(
-                        onNavigate = { route -> navController.navigate(route) }
+                        onNavigate = { route -> navController.navigateSafe(route) }
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -178,7 +179,7 @@ fun AdminDashboardScreen(
                         transactionCount = uiState.dailyTransactionCount,
                         selectedHour = uiState.selectedHourlySales,
                         onHourClick = viewModel::onHourSelected,
-                        onViewReport = { navController.navigate(ADMIN_REPORTS_DASHBOARD) }
+                        onViewReport = { navController.navigateSafe(ADMIN_REPORTS_DASHBOARD) }
                     )
 
                     val error = uiState.error

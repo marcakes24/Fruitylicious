@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -319,11 +321,11 @@ private fun RecipeDetailDialog(
     onVariantSelected: (ProductVariantEntity) -> Unit,
     onAddLine: () -> Unit,
     onRemoveLine: (Int) -> Unit,
-    onIngredientSelected: (Int, IngredientEntity) -> Unit,
+    onIngredientSelected: (Int, IngredientEntity?) -> Unit,
     onQuantityChanged: (Int, String) -> Unit,
     onAddPackagingLine: () -> Unit,
     onRemovePackagingLine: (Int) -> Unit,
-    onPackagingSelected: (Int, IngredientEntity) -> Unit,
+    onPackagingSelected: (Int, IngredientEntity?) -> Unit,
     onPackagingQuantityChanged: (Int, String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
@@ -595,11 +597,11 @@ private fun RecipeIngredientRow(
     line: RecipeLineUi,
     ingredients: List<IngredientEntity>,
     onRemove: (() -> Unit)?,
-    onIngredientSelected: (IngredientEntity) -> Unit,
+    onIngredientSelected: (IngredientEntity?) -> Unit,
     onQuantityChanged: (String) -> Unit
 ) {
     var ingredientExpanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember(line.ingredientId) { mutableStateOf("") }
 
     val selectedIngredient = ingredients.firstOrNull {
         it.ingredientId == line.ingredientId
@@ -625,6 +627,9 @@ private fun RecipeIngredientRow(
                 value = searchQuery.ifEmpty { selectedIngredient?.ingredientName ?: "" },
                 onValueChange = {
                     searchQuery = it
+                    if (it.isEmpty()) {
+                        onIngredientSelected(null)
+                    }
                 },
                 options = filteredIngredients,
                 onOptionClick = {
@@ -647,7 +652,7 @@ private fun RecipeIngredientRow(
 
             OutlinedTextField(
                 value = line.quantity,
-                onValueChange = onQuantityChanged,
+                onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) onQuantityChanged(it) },
                 modifier = Modifier
                     .width(64.dp)
                     .height(48.dp),
@@ -657,6 +662,7 @@ private fun RecipeIngredientRow(
                     fontSize = 13.sp,
                     color = RmTextMain
                 ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RmGreen,
                     unfocusedBorderColor = Color(0xFFE0E0E0),

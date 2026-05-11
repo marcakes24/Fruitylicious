@@ -63,6 +63,7 @@ import com.example.fruitylicious.STAFF_RESTOCK_HISTORY
 import com.example.fruitylicious.STAFF_SALES_SUMMARY
 import com.example.fruitylicious.STAFF_TRANSACTION_HISTORY
 import com.example.fruitylicious.STAFF_WASTE_HISTORY
+import com.example.fruitylicious.util.navigateSafe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -389,7 +390,7 @@ private fun StaffSidebarLogout(
                         drawerState.close()
                     }
 
-                    navController.navigate(LOGIN) {
+                    navController.navigateSafe(LOGIN) {
                         popUpTo(0) {
                             inclusive = true
                         }
@@ -446,7 +447,7 @@ private fun staffNavigateTo(
 
     val isLandingPage = route == STAFF_LOG || route == STAFF_DASHBOARD
 
-    navController.navigate(route) {
+    navController.navigateSafe(route) {
         popUpTo(STAFF_LOG) {
             saveState = true
         }

@@ -73,6 +73,7 @@ import com.example.fruitylicious.LOGIN
 import com.example.fruitylicious.R
 import com.example.fruitylicious.STAFF_POS
 import com.example.fruitylicious.TRANSACTION_HISTORY
+import com.example.fruitylicious.util.navigateSafe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -425,7 +426,7 @@ private fun OwnerSidebarLogout(
                     drawerState.close()
                 }
 
-                navController.navigate(LOGIN) {
+                navController.navigateSafe(LOGIN) {
                     popUpTo(0) {
                         inclusive = true
                     }
@@ -468,7 +469,7 @@ private fun ownerNavigateTo(
 
     val isDashboard = route == ADMIN_DASHBOARD
 
-    navController.navigate(route) {
+    navController.navigateSafe(route) {
         popUpTo(ADMIN_DASHBOARD) {
             saveState = true
         }

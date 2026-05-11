@@ -17,6 +17,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.fruitylicious.ui.auth.LoginScreen
 import com.example.fruitylicious.util.SessionManager
+import com.example.fruitylicious.util.navigateSafe
+import com.example.fruitylicious.util.popBackStackSafe
 import kotlinx.coroutines.delay
 
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
@@ -100,7 +102,7 @@ fun FruityliciousNavGraph(
             delay(60000) // Check every minute
             if (sessionManager.isLoggedIn() && sessionManager.isSessionExpired()) {
                 sessionManager.clearSession()
-                navController.navigate(LOGIN) {
+                navController.navigateSafe(LOGIN) {
                     popUpTo(0)
                 }
             }
@@ -108,10 +110,10 @@ fun FruityliciousNavGraph(
     }
 
     fun safeBack(fallbackRoute: String) {
-        val popped = navController.popBackStack()
+        val popped = navController.popBackStackSafe()
 
-        if (!popped) {
-            navController.navigate(fallbackRoute) {
+        if (!popped && navController.currentBackStackEntry?.lifecycle?.currentState == androidx.lifecycle.Lifecycle.State.RESUMED) {
+            navController.navigateSafe(fallbackRoute) {
                 launchSingleTop = true
             }
         }
@@ -152,7 +154,7 @@ fun FruityliciousNavGraph(
                         STAFF_LOG
                     }
 
-                    navController.navigate(destination) {
+                    navController.navigateSafe(destination) {
                         popUpTo(LOGIN) {
                             inclusive = true
                         }
@@ -160,7 +162,7 @@ fun FruityliciousNavGraph(
                     }
                 },
                 onGuestClick = {
-                    navController.navigate(GUEST_SCREEN)
+                    navController.navigateSafe(GUEST_SCREEN)
                 }
             )
         }
@@ -184,10 +186,10 @@ fun FruityliciousNavGraph(
                 branchName = if (sessionManager.isAdmin()) "All" else "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 },
                 onNavigate = { route ->
-                    navController.navigate(route) {
+                    navController.navigateSafe(route) {
                         launchSingleTop = true
                     }
                 },
@@ -211,7 +213,7 @@ fun FruityliciousNavGraph(
                         route
                     }
 
-                    navController.navigate(destination) {
+                    navController.navigateSafe(destination) {
                         val popToRoute = if (sessionManager.isAdmin()) ADMIN_DASHBOARD else STAFF_LOG
                         popUpTo(popToRoute) {
                             inclusive = false
@@ -231,7 +233,7 @@ fun FruityliciousNavGraph(
                 userName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) {
+                    navController.navigateSafe(LOGIN) {
                         popUpTo(0)
                     }
                 }
@@ -246,7 +248,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -259,7 +261,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -272,7 +274,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -285,7 +287,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -296,7 +298,7 @@ fun FruityliciousNavGraph(
                 staffName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -309,7 +311,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -322,7 +324,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -335,7 +337,7 @@ fun FruityliciousNavGraph(
                 branchName = "Branch ${sessionManager.getBranchId()}",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -352,7 +354,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -363,7 +365,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -374,7 +376,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -387,7 +389,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -400,7 +402,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -413,7 +415,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -426,7 +428,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -437,7 +439,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -448,7 +450,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -458,7 +460,7 @@ fun FruityliciousNavGraph(
                 navController = navController,
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -469,7 +471,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -482,7 +484,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -495,7 +497,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -506,7 +508,7 @@ fun FruityliciousNavGraph(
                 adminName = sessionManager.getUserName(),
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }
@@ -519,7 +521,7 @@ fun FruityliciousNavGraph(
                 branchName = "All",
                 onLogout = {
                     sessionManager.clearSession()
-                    navController.navigate(LOGIN) { popUpTo(0) }
+                    navController.navigateSafe(LOGIN) { popUpTo(0) }
                 }
             )
         }

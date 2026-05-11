@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -54,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -157,150 +159,151 @@ fun InventoryAdjustmentScreen(
                     )
                 }
 
-                // Fixed Controls area
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
-                    Button(
-                        onClick = { showEntryDialog = true; viewModel.clearMessages() },
-                        modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = IaGreen)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("New Adjustment", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    item {
+                        Column {
+                            Button(
+                                onClick = { showEntryDialog = true; viewModel.clearMessages() },
+                                modifier = Modifier.fillMaxWidth().height(56.dp).shadow(2.dp, RoundedCornerShape(12.dp)),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = IaGreen)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("New Adjustment", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            FilterCard(
+                                searchQuery = uiState.searchQuery,
+                                onSearchChange = { viewModel.setSearchQuery(it) },
+                                selectedDateText = selectedDateText,
+                                onDateClick = { showDatePicker = true },
+                                onDateClear = { viewModel.setDateRange(null, null) }
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    if (!uiState.successMessage.isNullOrBlank()) {
+                        item { 
+                            Text(
+                                text = uiState.successMessage!!, 
+                                color = IaGreen, 
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) 
+                        }
+                    }
 
-                    FilterCard(
-                        searchQuery = uiState.searchQuery,
-                        onSearchChange = { viewModel.setSearchQuery(it) },
-                        selectedDateText = selectedDateText,
-                        onDateClick = { showDatePicker = true },
-                        onDateClear = { viewModel.setDateRange(null, null) }
-                    )
-                }
+                    if (uiState.isLoading) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(Modifier.fillMaxWidth().padding(48.dp), Alignment.Center) {
+                                    androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
+                                }
+                            }
+                        }
+                    } else if (uiState.history.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                                    Text("No records found", color = Color.Gray)
+                                }
+                            }
+                        }
+                    } else {
+                        // --- History Card Header ---
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Adjustment History",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = IaTextMain
+                                        )
 
-                Box(modifier = Modifier.weight(1f)) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        if (!uiState.successMessage.isNullOrBlank()) {
-                            item { 
-                                Text(
-                                    text = uiState.successMessage!!, 
-                                    color = IaGreen, 
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                ) 
+                                        Surface(
+                                            color = Color(0xFFFFB300),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "${uiState.history.size} entries",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                                }
                             }
                         }
 
-                        if (uiState.isLoading) {
-                            item {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(24.dp),
-                                    color = Color.White,
-                                    shadowElevation = 2.dp
-                                ) {
-                                    Box(Modifier.fillMaxWidth().padding(48.dp), Alignment.Center) {
-                                        androidx.compose.material3.CircularProgressIndicator(color = IaGreen)
-                                    }
+                        itemsIndexed(uiState.history) { index, item ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color.White,
+                                shadowElevation = 2.dp,
+                                shape = if (index == uiState.history.lastIndex && !uiState.hasMore) {
+                                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                } else {
+                                    RoundedCornerShape(0.dp)
                                 }
-                            }
-                        } else if (uiState.history.isEmpty()) {
-                            item {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(24.dp),
-                                    color = Color.White,
-                                    shadowElevation = 2.dp
-                                ) {
-                                    Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
-                                        Text("No records found", color = Color.Gray)
-                                    }
-                                }
-                            }
-                        } else {
-                            // --- History Card Header ---
-                            item {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                                    color = Color.White,
-                                    shadowElevation = 2.dp
-                                ) {
-                                    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "Adjustment History",
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = IaTextMain
-                                            )
-
-                                            Surface(
-                                                color = Color(0xFFFFB300),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${uiState.history.size} entries",
-                                                    color = Color.White,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(12.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    AdjustmentRow(item)
+                                    if (index < uiState.history.size - 1 || uiState.hasMore) {
                                         HorizontalDivider(color = Color(0xFFF1F5F9))
                                     }
                                 }
                             }
-
-                            itemsIndexed(uiState.history) { index, item ->
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = Color.White,
-                                    shadowElevation = 2.dp,
-                                    shape = if (index == uiState.history.lastIndex && !uiState.hasMore) {
-                                        RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
-                                    } else {
-                                        RoundedCornerShape(0.dp)
-                                    }
-                                ) {
-                                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                        AdjustmentRow(item)
-                                        if (index < uiState.history.size - 1 || uiState.hasMore) {
-                                            HorizontalDivider(color = Color(0xFFF1F5F9))
-                                        }
-                                    }
-                                }
-                            }
                         }
+                    }
 
-                        if (uiState.hasMore) {
-                            item {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
-                                    color = Color.White,
-                                    shadowElevation = 2.dp
-                                ) {
-                                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                        if (uiState.isLoadingMore) {
-                                            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
-                                        } else {
-                                            TextButton(onClick = { viewModel.loadMoreHistory() }) {
-                                                Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
-                                            }
+                    if (uiState.hasMore) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                                color = Color.White,
+                                shadowElevation = 2.dp
+                            ) {
+                                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    if (uiState.isLoadingMore) {
+                                        androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp), color = IaGreen)
+                                    } else {
+                                        TextButton(onClick = { viewModel.loadMoreHistory() }) {
+                                            Text("Load More", color = IaGreen, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -478,6 +481,7 @@ fun AdjustmentEntryDialog(
                         value = quantity, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) quantity = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Enter quantity", color = Color.LightGray) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color(0xFFE2E8F0),
