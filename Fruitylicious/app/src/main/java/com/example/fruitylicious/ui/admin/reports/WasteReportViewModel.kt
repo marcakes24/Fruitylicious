@@ -9,6 +9,7 @@ import com.example.fruitylicious.data.local.dao.WasteReasonRow
 import com.example.fruitylicious.data.local.dao.StaffWasteRow
 import com.example.fruitylicious.data.local.dao.WasteUnitTotal
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,13 +53,14 @@ class WasteReportViewModel @Inject constructor(
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val networkMonitor: NetworkMonitor,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val branchConfigManager: BranchConfigManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WasteReportUiState())
     val uiState: StateFlow<WasteReportUiState> = _uiState.asStateFlow()
 
-    private val localBranchId = sessionManager.getBranchId()
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
     private val PAGE_SIZE = 50
     private var reportJob: kotlinx.coroutines.Job? = null
 

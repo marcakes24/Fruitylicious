@@ -71,7 +71,7 @@ data class InventoryAdjustmentUiState(
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
     val isClockedIn: Boolean = false,
-    val localBranchId: Int = 1,
+    val localBranchId: Int = 0,
     val error: String? = null,
     val successMessage: String? = null
 )

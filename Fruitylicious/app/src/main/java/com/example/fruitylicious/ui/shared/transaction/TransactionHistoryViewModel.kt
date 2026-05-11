@@ -62,8 +62,8 @@ data class TransactionHistoryRow(
 data class TransactionHistoryUiState(
     val transactions: List<TransactionHistoryRow> = emptyList(),
     val isAdmin: Boolean = false,
-    val localBranchId: Int = 1,
-    val selectedBranchId: Int? = 1,
+    val localBranchId: Int = 0,
+    val selectedBranchId: Int? = null,
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
     val isClockedIn: Boolean = false,

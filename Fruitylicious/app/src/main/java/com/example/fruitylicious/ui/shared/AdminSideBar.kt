@@ -467,13 +467,11 @@ private fun ownerNavigateTo(
 
     if (route == currentRoute) return
 
-    val isDashboard = route == ADMIN_DASHBOARD
-
     navController.navigateSafe(route) {
         popUpTo(ADMIN_DASHBOARD) {
             saveState = true
         }
         launchSingleTop = true
-        restoreState = !isDashboard
+        restoreState = false
     }
 }

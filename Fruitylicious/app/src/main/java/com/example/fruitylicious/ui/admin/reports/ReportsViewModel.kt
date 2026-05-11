@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fruitylicious.data.local.dao.BranchDao
 import com.example.fruitylicious.data.local.entity.BranchEntity
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,8 +19,8 @@ import kotlinx.coroutines.launch
 data class ReportsUiState(
     val adminName: String = "",
     val isAdmin: Boolean = false,
-    val localBranchId: Int = 1,
-    val selectedBranchId: Int? = 1,
+    val localBranchId: Int = 0,
+    val selectedBranchId: Int? = null,
     val branches: List<BranchEntity> = emptyList(),
     val isOnline: Boolean = false,
     val canAccessCrossBranch: Boolean = false,
@@ -30,10 +31,11 @@ data class ReportsUiState(
 class ReportsViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val branchDao: BranchDao,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val branchConfigManager: BranchConfigManager
 ) : ViewModel() {
 
-    private val localBranchId = sessionManager.getBranchId()
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
 
     private val _uiState = MutableStateFlow(
         ReportsUiState(

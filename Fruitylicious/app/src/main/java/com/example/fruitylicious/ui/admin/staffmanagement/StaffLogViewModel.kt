@@ -50,7 +50,7 @@ data class StaffLogUiState(
     val selectedBranchId: Int? = null,
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
-    val localBranchId: Int = 1,
+    val localBranchId: Int = 0,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,

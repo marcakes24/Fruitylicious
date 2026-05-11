@@ -69,7 +69,7 @@ data class InventoryMonitoringUiState(
     val isAdmin: Boolean = false,
     val isOnline: Boolean = false,
     val isClockedIn: Boolean = false,
-    val localBranchId: Int = 1,
+    val localBranchId: Int = 0,
     val userBranchId: String = "B1",
     val isLoading: Boolean = true,
     val error: String? = null

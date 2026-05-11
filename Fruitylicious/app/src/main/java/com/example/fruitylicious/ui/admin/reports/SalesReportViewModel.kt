@@ -9,6 +9,7 @@ import com.example.fruitylicious.data.local.dao.TopComboRow
 import com.example.fruitylicious.data.local.dao.TopSellingItemRow
 import com.example.fruitylicious.data.local.dao.TransactionDao
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -69,10 +70,17 @@ class SalesReportViewModel @Inject constructor(
     private val transactionDao: TransactionDao,
     private val reportRepository: ReportRepository,
     private val networkMonitor: NetworkMonitor,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val branchConfigManager: BranchConfigManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SalesReportUiState())
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
+
+    private val _uiState = MutableStateFlow(
+        SalesReportUiState(
+            selectedBranchId = localBranchId
+        )
+    )
     val uiState: StateFlow<SalesReportUiState> = _uiState.asStateFlow()
 
     private var reportJob: Job? = null

@@ -9,6 +9,7 @@ import com.example.fruitylicious.data.local.entity.IngredientEntity
 import com.example.fruitylicious.data.local.entity.InventoryEntity
 import com.example.fruitylicious.data.remote.dto.InventoryReportItemDto
 import com.example.fruitylicious.data.repository.ReportRepository
+import com.example.fruitylicious.util.BranchConfigManager
 import com.example.fruitylicious.util.NetworkMonitor
 import com.example.fruitylicious.util.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,7 +45,8 @@ class InventoryReportViewModel @Inject constructor(
     private val branchDao: BranchDao,
     private val reportRepository: ReportRepository,
     private val networkMonitor: NetworkMonitor,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val branchConfigManager: BranchConfigManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InventoryReportUiState())
@@ -52,7 +54,8 @@ class InventoryReportViewModel @Inject constructor(
 
     private var localInventoryItems: List<InventoryEntity> = emptyList()
     private var localIngredients: List<IngredientEntity> = emptyList()
-    private var selectedBranchId: Int? = sessionManager.getBranchId()
+    private val localBranchId = sessionManager.getBranchId().takeIf { it > 0 } ?: branchConfigManager.branchId
+    private var selectedBranchId: Int? = localBranchId
     private var reportJob: kotlinx.coroutines.Job? = null
 
     init {
