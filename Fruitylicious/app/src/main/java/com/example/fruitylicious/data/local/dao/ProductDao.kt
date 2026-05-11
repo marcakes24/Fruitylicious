@@ -26,6 +26,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE productId = :productId AND isDeleted = 0 LIMIT 1")
     suspend fun getProductById(productId: Int): ProductEntity?
 
+    @Query("SELECT * FROM products WHERE productId = :productId AND isDeleted = 0 LIMIT 1")
+    fun getProductByIdSync(productId: Int): ProductEntity?
+
     @Query("SELECT * FROM products WHERE productName LIKE '%' || :query || '%' AND isDeleted = 0 ORDER BY productName ASC")
     fun searchProducts(query: String): Flow<List<ProductEntity>>
 

@@ -277,12 +277,22 @@ class SyncRepository @Inject constructor(
                 userDao.upsertUsers(body.users.map { it.copy(isSynced = true, syncedAt = pulledAt) })
 
                 productDao.upsertProducts(body.products.map { product ->
-                    val localPath = ImageStorage.saveBase64Image(context, product.image, "products")
+                    val localProduct = productDao.getProductByIdSync(product.productId)
+                    val localPath = if (ImageStorage.isBase64Image(product.image)) {
+                        ImageStorage.saveBase64Image(context, product.image, "products")
+                    } else if (localProduct?.image != null && ImageStorage.getImageFile(context, localProduct.image).exists()) {
+                        localProduct.image
+                    } else null
                     product.copy(image = localPath ?: product.image, isSynced = true, syncedAt = pulledAt)
                 })
 
                 ingredientDao.upsertIngredients(body.ingredients.map { ingredient ->
-                    val localPath = ImageStorage.saveBase64Image(context, ingredient.image, "ingredients")
+                    val localIngredient = ingredientDao.getIngredientByIdSync(ingredient.ingredientId)
+                    val localPath = if (ImageStorage.isBase64Image(ingredient.image)) {
+                        ImageStorage.saveBase64Image(context, ingredient.image, "ingredients")
+                    } else if (localIngredient?.image != null && ImageStorage.getImageFile(context, localIngredient.image).exists()) {
+                        localIngredient.image
+                    } else null
                     ingredient.copy(image = localPath ?: ingredient.image, isSynced = true, syncedAt = pulledAt)
                 })
 
@@ -298,12 +308,22 @@ class SyncRepository @Inject constructor(
                 body.inventoryAdjustments.forEach { inventoryAdjustmentDao.upsertAdjustment(it.copy(isSynced = true, syncedAt = pulledAt)) }
 
                 wasteLogDao.upsertWasteLogs(body.wasteLogs.map { wasteLog ->
-                    val localPath = ImageStorage.saveBase64Image(context, wasteLog.image, "waste")
+                    val localLog = wasteLogDao.getWasteLogByIdSync(wasteLog.wasteId)
+                    val localPath = if (ImageStorage.isBase64Image(wasteLog.image)) {
+                        ImageStorage.saveBase64Image(context, wasteLog.image, "waste")
+                    } else if (localLog?.image != null && ImageStorage.getImageFile(context, localLog.image).exists()) {
+                        localLog.image
+                    } else null
                     wasteLog.copy(image = localPath ?: wasteLog.image, isSynced = true, syncedAt = pulledAt)
                 })
 
                 staffLogDao.upsertStaffLogs(body.staffLogs.map { staffLog ->
-                    val localPath = ImageStorage.saveBase64Image(context, staffLog.image, "staff_logs")
+                    val localLog = staffLogDao.getStaffLogByIdSync(staffLog.logId)
+                    val localPath = if (ImageStorage.isBase64Image(staffLog.image)) {
+                        ImageStorage.saveBase64Image(context, staffLog.image, "staff_logs")
+                    } else if (localLog?.image != null && ImageStorage.getImageFile(context, localLog.image).exists()) {
+                        localLog.image
+                    } else null
                     staffLog.copy(image = localPath ?: staffLog.image, isSynced = true, syncedAt = pulledAt)
                 })
 

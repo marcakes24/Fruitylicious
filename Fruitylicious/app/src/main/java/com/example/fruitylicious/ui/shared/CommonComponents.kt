@@ -581,7 +581,9 @@ fun <T> FruitySearchableDropdown(
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = Color(0xFFCBD5E1),
-                    focusedBorderColor = Color(0xFF2E7D32)
+                    focusedBorderColor = Color(0xFF2E7D32),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
                 ),
                 singleLine = true
             )

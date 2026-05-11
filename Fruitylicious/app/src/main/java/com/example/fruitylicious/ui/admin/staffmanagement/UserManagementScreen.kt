@@ -525,6 +525,10 @@ private fun UserDialog(
                                 dialogError = "Password is required."
                                 return@Button
                             }
+                            if (password.isNotEmpty() && password.length < 8) {
+                                dialogError = "Password must be at least 8 characters."
+                                return@Button
+                            }
                             if (password != confirmPassword) {
                                 dialogError = "Passwords do not match."
                                 return@Button

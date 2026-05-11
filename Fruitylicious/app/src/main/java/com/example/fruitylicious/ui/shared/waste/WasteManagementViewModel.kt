@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class WasteIngredientRow(
     val ingredientId: Int,
@@ -154,7 +155,7 @@ class WasteManagementViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .collect { (ingredientRows, historyRows, _) ->
                 _uiState.update { state ->
-                    // Avoid flickering: don't show local data as placeholder if remote fetch is in progress for non-local branch
+                    // Always allow local data as a base, especially for synced images
                     val isRemoteFetchInProgress = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
 
                     if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.history.isEmpty() && !isRemoteFetchInProgress)) {
@@ -162,7 +163,7 @@ class WasteManagementViewModel @Inject constructor(
                             ingredients = ingredientRows,
                             history = historyRows,
                             isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
-                            hasMore = historyRows.size >= (state.currentPage + 1) * PAGE_SIZE,
+                            hasMore = if (state.selectedBranchId == localBranchId) historyRows.size >= (state.currentPage + 1) * PAGE_SIZE else state.hasMore,
                             error = state.error
                         )
                     } else {
@@ -329,22 +330,38 @@ class WasteManagementViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { pageResponse ->
-                    val newRows = pageResponse.items.map { item ->
-                         WasteHistoryRow(
-                            wasteId = item.wasteId,
-                            ingredientName = item.ingredientName,
-                            quantity = item.quantity,
-                            unitType = item.unitType,
-                            reason = item.reason,
-                            branchId = item.branchId ?: state.selectedBranchId ?: 0,
-                            branchName = branches.firstOrNull { it.branchId == item.branchId }?.branchName ?: "Remote Branch",
-                            dateTime = item.dateTime,
-                            imagePath = ImageStorage.saveBase64Image(
-                                context = context,
-                                base64Value = item.image,
-                                folder = "waste"
+                    val newRows = withContext(Dispatchers.IO) {
+                        // Fetch local logs for this branch to merge existing images
+                        val localLogs = wasteLogDao.getWasteLogsByBranch(state.selectedBranchId ?: 0)
+                        val localImageMap = localLogs.associate { it.wasteId to it.image }
+
+                        pageResponse.items.map { item ->
+                            val localImagePath = localImageMap[item.wasteId]
+                            val hasLocalImage = localImagePath != null && ImageStorage.getImageFile(context, localImagePath).exists()
+
+                            // Only save if we don't already have it locally
+                            val finalImagePath = if (hasLocalImage) {
+                                localImagePath
+                            } else {
+                                ImageStorage.saveBase64Image(
+                                    context = context,
+                                    base64Value = item.image,
+                                    folder = "waste"
+                                )
+                            }
+
+                            WasteHistoryRow(
+                                wasteId = item.wasteId,
+                                ingredientName = item.ingredientName,
+                                quantity = item.quantity,
+                                unitType = item.unitType,
+                                reason = item.reason,
+                                branchId = item.branchId ?: state.selectedBranchId ?: 0,
+                                branchName = branches.firstOrNull { it.branchId == item.branchId }?.branchName ?: "Remote Branch",
+                                dateTime = item.dateTime,
+                                imagePath = finalImagePath
                             )
-                        )
+                        }
                     }
 
                     _uiState.update {

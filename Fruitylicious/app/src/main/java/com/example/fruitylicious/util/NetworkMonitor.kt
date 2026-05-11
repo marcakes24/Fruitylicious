@@ -26,7 +26,10 @@ class NetworkMonitor @Inject constructor(
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                trySend(true)
+                val capabilities = connectivityManager.getNetworkCapabilities(network)
+                if (capabilities != null) {
+                    trySend(hasInternetCapability(capabilities))
+                }
             }
 
             override fun onLost(network: Network) {
@@ -60,9 +63,6 @@ class NetworkMonitor @Inject constructor(
 
     private fun hasInternetCapability(capabilities: NetworkCapabilities): Boolean {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
-                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

@@ -22,6 +22,9 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId AND isDeleted = 0")
     suspend fun getIngredientById(ingredientId: Int): IngredientEntity?
 
+    @Query("SELECT * FROM ingredients WHERE ingredientId = :ingredientId AND isDeleted = 0")
+    fun getIngredientByIdSync(ingredientId: Int): IngredientEntity?
+
     @Query("""
         SELECT * FROM ingredients
         WHERE ingredientName = :ingredientName

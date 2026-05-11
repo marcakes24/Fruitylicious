@@ -43,6 +43,12 @@ interface StaffLogDao {
     @Query("SELECT * FROM staff_logs WHERE isSynced = 0")
     suspend fun getUnsyncedStaffLogs(): List<StaffLogEntity>
 
+    @Query("SELECT * FROM staff_logs WHERE logId = :logId")
+    suspend fun getStaffLogById(logId: String): StaffLogEntity?
+
+    @Query("SELECT * FROM staff_logs WHERE logId = :logId")
+    fun getStaffLogByIdSync(logId: String): StaffLogEntity?
+
     @Upsert
     suspend fun upsertStaffLog(staffLog: StaffLogEntity)
 

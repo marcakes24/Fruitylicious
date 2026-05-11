@@ -66,6 +66,10 @@ class UserRepository @Inject constructor(
             return Result.failure(IllegalArgumentException("Password is required."))
         }
 
+        if (!passwordHasher.isHashed(password) && password.length < 8) {
+            return Result.failure(IllegalArgumentException("Password must be at least 8 characters."))
+        }
+
         val existingUser = userDao.getUserByUsername(cleanUsername)
 
         if (existingUser != null && existingUser.userId != userId) {

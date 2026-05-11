@@ -444,7 +444,7 @@ private fun staffNavigateTo(
 
     if (route == currentRoute) return
 
-    val isLandingPage = route == STAFF_LOG
+    val isLandingPage = route == STAFF_LOG || route == STAFF_DASHBOARD
 
     navController.navigate(route) {
         popUpTo(STAFF_LOG) {

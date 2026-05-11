@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.fruitylicious.data.local.entity.IngredientEntity
@@ -330,13 +331,16 @@ private fun RecipeDetailDialog(
     val packagingIngredients = ingredients.filter { it.isPackaging }
     val regularIngredients = ingredients.filter { !it.isPackaging }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = Color.White,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .fillMaxWidth(0.95f)
+                .padding(vertical = 16.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -518,7 +522,7 @@ private fun RecipeHeaderRow() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -526,21 +530,22 @@ private fun RecipeHeaderRow() {
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = RmTextSub,
-            modifier = Modifier.weight(1.8f)
+            modifier = Modifier.weight(1f).padding(start = 12.dp)
         )
         Text(
             text = "Qty",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = RmTextSub,
-            modifier = Modifier.width(75.dp)
+            modifier = Modifier.width(64.dp).padding(start = 12.dp)
         )
         Text(
             text = "Unit",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = RmTextSub,
-            modifier = Modifier.width(45.dp)
+            modifier = Modifier.width(40.dp),
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.size(28.dp)) // Offset for delete button
     }
@@ -614,7 +619,7 @@ private fun RecipeIngredientRow(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             FruitySearchableDropdown(
                 value = searchQuery.ifEmpty { selectedIngredient?.ingredientName ?: "" },
@@ -627,12 +632,16 @@ private fun RecipeIngredientRow(
                     searchQuery = it.ingredientName
                     ingredientExpanded = false
                 },
-                modifier = Modifier.weight(1.8f),
+                modifier = Modifier.weight(1f),
                 expanded = ingredientExpanded,
                 onExpandedChange = { ingredientExpanded = it },
                 placeholder = "Select",
                 itemContent = { ingredient ->
-                    Text(ingredient.ingredientName, fontSize = 13.sp)
+                    Text(
+                        text = ingredient.ingredientName,
+                        fontSize = 13.sp,
+                        color = RmTextMain
+                    )
                 }
             )
 
@@ -640,14 +649,19 @@ private fun RecipeIngredientRow(
                 value = line.quantity,
                 onValueChange = onQuantityChanged,
                 modifier = Modifier
-                    .width(75.dp)
+                    .width(64.dp)
                     .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
-                textStyle = TextStyle(fontSize = 13.sp),
+                textStyle = TextStyle(
+                    fontSize = 13.sp,
+                    color = RmTextMain
+                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RmGreen,
-                    unfocusedBorderColor = Color(0xFFE0E0E0)
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedTextColor = RmTextMain,
+                    unfocusedTextColor = RmTextMain
                 )
             )
 
@@ -655,7 +669,7 @@ private fun RecipeIngredientRow(
                 text = line.unit.ifBlank { "-" },
                 fontSize = 11.sp,
                 color = RmTextSub,
-                modifier = Modifier.width(45.dp),
+                modifier = Modifier.width(40.dp),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

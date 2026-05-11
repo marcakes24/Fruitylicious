@@ -26,6 +26,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import com.example.fruitylicious.util.BranchConfigManager
 import javax.inject.Singleton
 
 @Module
@@ -35,7 +36,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePosDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        branchConfigManager: BranchConfigManager
     ): PosDatabase {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -88,13 +90,16 @@ object DatabaseModule {
                     // We can't use userDao directly here easily without circular dependency if not careful,
                     // but we can execute raw SQL for initial seed.
                     val now = System.currentTimeMillis()
+                    val branchId = branchConfigManager.branchId
+                    val adminUsername = "admin$branchId"
+                    val adminPassword = if (adminUsername.length < 8) "${adminUsername}12345678".substring(0, 8) else adminUsername
                     db.execSQL(
                         "INSERT OR IGNORE INTO users (userId, name, role, username, password, lastModified, isSynced, isDeleted) " +
-                                "VALUES (1, 'Default Admin', 'admin', '1', '1', $now, 0, 0)"
+                                "VALUES (1, 'Default Admin', 'admin', '$adminUsername', '$adminPassword', $now, 0, 0)"
                     )
                     db.execSQL(
                         "INSERT OR IGNORE INTO users (userId, name, role, username, password, lastModified, isSynced, isDeleted) " +
-                                "VALUES (2, 'Default Staff', 'staff', 'staff', 'staff', $now, 0, 0)"
+                                "VALUES (2, 'Default Staff', 'staff', 'staff', 'staff1234', $now, 0, 0)"
                     )
                 }
             })

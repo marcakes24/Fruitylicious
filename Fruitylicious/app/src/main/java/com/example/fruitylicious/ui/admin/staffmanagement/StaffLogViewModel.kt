@@ -129,14 +129,15 @@ class StaffLogViewModel @Inject constructor(
                 }
                 .collectLatest { rows ->
                     _uiState.update { state ->
-                        // Avoid flickering: don't show local data as placeholder if remote fetch is in progress for non-local branch
+                        // Always allow local data to be the baseline
+                        // This ensures synced images for other branches are visible if remote fetch hasn't finished
                         val isRemoteFetchInProgress = state.isOnline && state.selectedBranchId != localBranchId && state.isLoading
 
                         if (state.selectedBranchId == localBranchId || !state.isOnline || state.error != null || (state.logs.isEmpty() && !isRemoteFetchInProgress)) {
                             state.copy(
                                 logs = rows,
-                                isLoading = false,
-                                hasMore = rows.size >= (state.currentPage + 1) * PAGE_SIZE
+                                isLoading = if (state.selectedBranchId != localBranchId && state.isOnline && state.error == null) state.isLoading else false,
+                                hasMore = if (state.selectedBranchId == localBranchId) rows.size >= (state.currentPage + 1) * PAGE_SIZE else state.hasMore
                             )
                         } else {
                             state
@@ -291,7 +292,25 @@ class StaffLogViewModel @Inject constructor(
             result.fold(
                 onSuccess = { pageResponse ->
                     val newRows = withContext(Dispatchers.IO) {
+                        // Fetch local logs for this branch to merge existing images
+                        val localLogs = staffLogDao.getStaffLogsByBranch(state.selectedBranchId ?: 0)
+                        val localImageMap = localLogs.associate { it.logId to it.image }
+
                         pageResponse.items.map { log ->
+                            val localImagePath = localImageMap[log.logId]
+                            val hasLocalImage = localImagePath != null && ImageStorage.getImageFile(context, localImagePath).exists()
+
+                            // Only save if we don't already have it locally
+                            val finalImagePath = if (hasLocalImage) {
+                                localImagePath
+                            } else {
+                                ImageStorage.saveBase64Image(
+                                    context = context,
+                                    base64Value = log.image,
+                                    folder = "staff_logs"
+                                )
+                            }
+
                             StaffLogRow(
                                 logId = log.logId,
                                 userId = log.userId,
@@ -301,11 +320,7 @@ class StaffLogViewModel @Inject constructor(
                                 branchName = log.branchName ?: branches.firstOrNull { it.branchId == log.branchId }?.branchName ?: "Remote Branch",
                                 clockIn = log.clockIn,
                                 clockOut = log.clockOut,
-                                imagePath = ImageStorage.saveBase64Image(
-                                    context = context,
-                                    base64Value = log.image,
-                                    folder = "staff_logs"
-                                )
+                                imagePath = finalImagePath
                             )
                         }
                     }
