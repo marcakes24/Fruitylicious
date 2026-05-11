@@ -88,6 +88,7 @@ fun RestockScreen(
     mode: SharedScreenMode = SharedScreenMode.OWNER,
     userName: String = "User",
     branchName: String = "",
+    initialIngredientName: String? = null,
     onLogout: () -> Unit = {},
     viewModel: RestockViewModel = hiltViewModel()
 ) {
@@ -102,6 +103,14 @@ fun RestockScreen(
     var selectedDateMillis by remember { mutableLongStateOf(0L) }
 
     val datePickerState = rememberDatePickerState()
+
+    // Handle initial ingredient name from notification
+    androidx.compose.runtime.LaunchedEffect(initialIngredientName, uiState.isClockedIn) {
+        if (!initialIngredientName.isNullOrBlank() && uiState.isClockedIn) {
+            viewModel.clearMessages()
+            showRestockEntry = true
+        }
+    }
 
     val selectedDateText = remember(selectedDateMillis) {
         if (selectedDateMillis == 0L) {
@@ -422,6 +431,7 @@ fun RestockScreen(
     if (showRestockEntry) {
         RestockEntryDialog(
             ingredients = uiState.ingredients,
+            initialIngredientName = initialIngredientName,
             onDismiss = {
                 showRestockEntry = false
             },
@@ -581,14 +591,50 @@ private fun RestockRecordRow(entry: RestockHistoryRow) {
 @Composable
 private fun RestockEntryDialog(
     ingredients: List<RestockIngredientRow>,
+    initialIngredientName: String? = null,
     onDismiss: () -> Unit,
     onSubmit: (RestockIngredientRow, String, String) -> Unit
 ) {
-    var selectedIngredient by remember { mutableStateOf<RestockIngredientRow?>(null) }
+    // Trim initial name for better matching
+    val targetName = remember(initialIngredientName) { 
+        initialIngredientName?.trim() 
+    }
+
+    var selectedIngredient by remember(ingredients, targetName) {
+        mutableStateOf(
+            if (targetName != null) {
+                ingredients.find { it.ingredientName.trim().equals(targetName, ignoreCase = true) }
+            } else {
+                null
+            }
+        )
+    }
+    
     var quantity by remember { mutableStateOf("") }
     var supplier by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
-    var ingredientSearchQuery by remember { mutableStateOf("") }
+    
+    var ingredientSearchQuery by remember {
+        mutableStateOf(selectedIngredient?.ingredientName ?: "")
+    }
+
+    // Sync search query if selectedIngredient changes (e.g. from ingredients list loading)
+    androidx.compose.runtime.LaunchedEffect(selectedIngredient) {
+        if (selectedIngredient != null && ingredientSearchQuery.isEmpty()) {
+            ingredientSearchQuery = selectedIngredient?.ingredientName ?: ""
+        }
+    }
+
+    // Still keep the update effect in case ingredients change and we find a match late
+    androidx.compose.runtime.LaunchedEffect(ingredients, targetName) {
+        if (selectedIngredient == null && targetName != null && ingredients.isNotEmpty()) {
+            val found = ingredients.find { it.ingredientName.trim().equals(targetName, ignoreCase = true) }
+            if (found != null) {
+                selectedIngredient = found
+                ingredientSearchQuery = found.ingredientName
+            }
+        }
+    }
 
     val filteredIngredients = remember(ingredients, ingredientSearchQuery) {
         if (ingredientSearchQuery.isEmpty()) {

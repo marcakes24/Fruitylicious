@@ -53,6 +53,7 @@ class InventoryReportViewModel @Inject constructor(
     private var localInventoryItems: List<InventoryEntity> = emptyList()
     private var localIngredients: List<IngredientEntity> = emptyList()
     private var selectedBranchId: Int? = sessionManager.getBranchId()
+    private var reportJob: kotlinx.coroutines.Job? = null
 
     init {
         observeInventory()
@@ -63,8 +64,8 @@ class InventoryReportViewModel @Inject constructor(
         branchId: Int?
     ) {
         selectedBranchId = branchId
-
-        viewModelScope.launch {
+        reportJob?.cancel()
+        reportJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -98,31 +99,29 @@ class InventoryReportViewModel @Inject constructor(
         viewModelScope.launch {
             inventoryDao.observeAllInventory().collectLatest { items ->
                 localInventoryItems = items
-
-                val localBranchId = sessionManager.getBranchId()
-                val isOnline = networkMonitor.isOnline()
-                val isAdmin = isAdminUser()
-
-                if (!isAdmin || !isOnline) {
-                    loadLocalReport(localBranchId)
-                }
+                tryRefreshingLocalReport()
             }
         }
     }
 
     private fun observeIngredients() {
         viewModelScope.launch {
-            ingredientDao.observeIngredients().collectLatest { items ->
-                localIngredients = items
-
-                val localBranchId = sessionManager.getBranchId()
-                val isOnline = networkMonitor.isOnline()
-                val isAdmin = isAdminUser()
-
-                if (!isAdmin || !isOnline) {
-                    loadLocalReport(localBranchId)
-                }
+            ingredientDao.observeAllIngredients().collectLatest { ingredients ->
+                localIngredients = ingredients
+                tryRefreshingLocalReport()
             }
+        }
+    }
+
+    private fun tryRefreshingLocalReport() {
+        val localBranchId = sessionManager.getBranchId()
+        val isOnline = networkMonitor.isOnline()
+        val isAdmin = isAdminUser()
+
+        // Automatically refresh local report if we are offline, or a staff,
+        // or an admin viewing their own local branch.
+        if (!isAdmin || !isOnline || selectedBranchId == localBranchId) {
+            loadLocalReport(localBranchId)
         }
     }
 

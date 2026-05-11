@@ -863,8 +863,14 @@ private fun DeleteConfirmationDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = DialogBtnDelete),
                         shape = RoundedCornerShape(10.dp)
                     ) {
+                        val buttonText = when {
+                            isAddon -> "Delete Add on"
+                            isFullProduct -> "Delete Product"
+                            else -> "Delete Size"
+                        }
+
                         Text(
-                            text = if (isAddon) "Delete Add on" else "Delete Size",
+                            text = buttonText,
                             color = MpTextMain,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp

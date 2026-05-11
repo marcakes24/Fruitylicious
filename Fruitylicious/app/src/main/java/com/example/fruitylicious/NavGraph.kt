@@ -12,13 +12,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.fruitylicious.ui.auth.LoginScreen
 import com.example.fruitylicious.util.SessionManager
 import com.example.fruitylicious.util.navigateSafe
 import com.example.fruitylicious.util.popBackStackSafe
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.delay
 
 import com.example.fruitylicious.ui.admin.dashboard.AdminDashboardScreen
@@ -266,12 +270,25 @@ fun FruityliciousNavGraph(
             )
         }
 
-        composable(STAFF_RESTOCK_HISTORY) {
+        composable(
+            route = "$STAFF_RESTOCK_HISTORY?ingredientName={ingredientName}",
+            arguments = listOf(
+                navArgument("ingredientName") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val ingredientName = backStackEntry.arguments?.getString("ingredientName")?.let {
+                try { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
+            }
             RestockScreen(
                 navController = navController,
                 mode = SharedScreenMode.STAFF,
                 userName = sessionManager.getUserName(),
                 branchName = "Branch ${sessionManager.getBranchId()}",
+                initialIngredientName = ingredientName,
                 onLogout = {
                     sessionManager.clearSession()
                     navController.navigateSafe(LOGIN) { popUpTo(0) }
@@ -420,12 +437,25 @@ fun FruityliciousNavGraph(
             )
         }
 
-        composable(ADMIN_RESTOCK_HISTORY) {
+        composable(
+            route = "$ADMIN_RESTOCK_HISTORY?ingredientName={ingredientName}",
+            arguments = listOf(
+                navArgument("ingredientName") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val ingredientName = backStackEntry.arguments?.getString("ingredientName")?.let {
+                try { URLDecoder.decode(it, StandardCharsets.UTF_8.toString()) } catch (_: Exception) { it }
+            }
             RestockScreen(
                 navController = navController,
                 mode = SharedScreenMode.OWNER,
                 userName = sessionManager.getUserName(),
                 branchName = "All",
+                initialIngredientName = ingredientName,
                 onLogout = {
                     sessionManager.clearSession()
                     navController.navigateSafe(LOGIN) { popUpTo(0) }

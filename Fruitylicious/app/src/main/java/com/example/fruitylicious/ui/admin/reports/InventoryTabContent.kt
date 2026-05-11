@@ -131,6 +131,21 @@ fun InventoryTabContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = RptGreen,
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
+
                 filteredRows.isEmpty() -> {
                     Text(
                         text = "No inventory data.",

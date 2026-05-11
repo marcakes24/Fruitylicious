@@ -427,6 +427,17 @@ fun SalesTabContent(
         }
     }
 
+    val activeSeriesIndex = when (branchId) {
+        1 -> 0
+        2 -> 1
+        else -> 2
+    }
+    val activeColor = when (branchId) {
+        1 -> RptRed
+        2 -> RptBlue
+        else -> RptGreen
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -637,23 +648,12 @@ fun SalesTabContent(
             SalesTimeSeriesChart(
                 seriesList = uiState.timeSeriesData,
                 selectedPointIndex = selectedPointIndex,
-                selectedSeriesIndex = selectedSeriesIndex,
+                selectedSeriesIndex = selectedSeriesIndex ?: if (branchId == null) activeSeriesIndex else 0,
                 onSelectionChanged = { pIdx, sIdx ->
                     selectedPointIndex = pIdx
                     selectedSeriesIndex = sIdx
                 }
             )
-        }
-
-        val activeSeriesIndex = when (branchId) {
-            1 -> 0
-            2 -> 1
-            else -> 2
-        }
-        val activeColor = when (branchId) {
-            1 -> RptRed
-            2 -> RptBlue
-            else -> RptGreen
         }
 
         SalesRptCard {
@@ -684,19 +684,27 @@ fun SalesTabContent(
                 Text("No sales found", color = RptTextSub, fontSize = 13.sp)
             } else {
                 uiState.salesBreakdown.forEach { row ->
-                    val displayQty = when (activeSeriesIndex) {
-                        0 -> row.b1Qty
-                        1 -> row.b2Qty
-                        else -> row.qty
+                    val displayQty = if (branchId == null) {
+                        when (activeSeriesIndex) {
+                            0 -> row.b1Qty
+                            1 -> row.b2Qty
+                            else -> row.qty
+                        }
+                    } else {
+                        row.qty
                     }
                     
-                    val displayAmount = when (activeSeriesIndex) {
-                        0 -> row.b1Amount
-                        1 -> row.b2Amount
-                        else -> row.totalAmount
+                    val displayAmount = if (branchId == null) {
+                        when (activeSeriesIndex) {
+                            0 -> row.b1Amount
+                            1 -> row.b2Amount
+                            else -> row.totalAmount
+                        }
+                    } else {
+                        row.totalAmount
                     }
                     
-                    if (displayQty > 0 || activeSeriesIndex == 2) {
+                    if (displayQty > 0 || branchId == null) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

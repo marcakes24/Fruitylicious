@@ -58,6 +58,8 @@ import com.example.fruitylicious.ui.shared.ErrorWarning
 import com.example.fruitylicious.ui.shared.SharedDrawerContent
 import com.example.fruitylicious.ui.shared.SharedScreenMode
 import com.example.fruitylicious.util.ImageStorage
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -164,11 +166,14 @@ fun NotificationsScreen(
                                 NotificationItem(
                                     notification = notification,
                                     onRestock = {
-                                        val route = if (mode == SharedScreenMode.OWNER) {
+                                        val routeBase = if (mode == SharedScreenMode.OWNER) {
                                             ADMIN_RESTOCK_HISTORY
                                         } else {
                                             STAFF_RESTOCK_HISTORY
                                         }
+
+                                        val encodedName = URLEncoder.encode(notification.name, StandardCharsets.UTF_8.toString())
+                                        val route = "$routeBase?ingredientName=$encodedName"
 
                                         navController.navigate(route)
                                     }
